@@ -1,0 +1,19 @@
+V1.2:
+    - Optimize Average calculation. Calculate avg upon adding new value and keep it in object property
+    - Buzzer Alarm timing update that match with older version
+    - Implemented Battery health service that check battery voltage and trigger alarm in case if value below certain threshold(3.2V)
+    - Blue LED to show device initialization
+    - Once device ready after initialization, Activate buzzer for few millisec and activate chase LED
+    - Status Service that drives Status led based on health and motion Status
+    - Refactored Movement service and added redundant pressure checking that increase the reliabilty of movement detection
+
+Releasing V1.1
+    - Updated the velocity threshold calculation code
+    - changed the velocity threshold adj value
+    - platformio.ini file changes. Now upload will use the default avrdude installed with platformio
+    
+initial version V1.0
+    - movement service implmented
+    - status led blink implemented
+    - alert service implemented
+    - implemented code to capture necessary data for debugging/analyzing using uart
