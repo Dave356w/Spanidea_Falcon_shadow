@@ -12,9 +12,12 @@ MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, flo
     vel_ms_ref = vel_ms;
     pressure_avg_ref = pres_avg;
     variance_pres = 0.0;
+    reset_counter = 100;
+    zero_calib_value = 0.0;
 
-    state = MotionStates::ERROR_RESET;
-    last_state = MotionStates::ERROR_RESET;
+    state = MotionStates::STATE_ERROR_RESET;
+    last_state = MotionStates::STATE_ERROR_RESET;
+
     monitor_state = MonitorStates::MONITORING;
 }
 
@@ -37,145 +40,132 @@ void MovementService::reset_counters(void)
  *
  *
  */
-void MovementService::run(void)
+
+void MovementService::fsm_run()
 {
+    float    present_accel = 0.0, delta_accel = 0.0;
 
-    /*
-     * Perform the following check regardless of whether monitoring mode 
-     * is enabled or not
-     */
-
-    if (fabs((*vel_ms_ref)) > VEL_MAX_LIMIT) {
-        /*
-         * Crossed the limit, let move it to reset state
-         */
-
-        acceleration_avg_ref->fill(0.0);
-        setErrorResetState();
-    }
 
     switch (state) {
 
-    case MotionStates::NOT_MOVING:
-        if (last_state != MotionStates::NOT_MOVING) {
-            Serial.print("Run-State: NOT_MOVING \r\n");
-            last_state = MotionStates::NOT_MOVING;
-        }
-
-        if (isStartedMoving() == true) {
-            reset_counters();
-            vel_threshold = 0;
-            state = MotionStates::MOVEMENT_DETECTED;
-            MovementService::startMonitoring();
-            enable_alarm();
+    case MotionStates::STATE_NOT_MOVING:
+        if (last_state != MotionStates::STATE_NOT_MOVING) {
+            Serial.print("Transitioned to STATE_NOT_MOVING \r\n");
+            last_state = MotionStates::STATE_NOT_MOVING;
         }
         break;
 
-    case MotionStates::MOVEMENT_DETECTED:
-        if (last_state != MotionStates::MOVEMENT_DETECTED) {
-            Serial.print("Run-State: MOVEMENT_DETECTED \r\n");
-            last_state = MotionStates::MOVEMENT_DETECTED;
+    case MotionStates::STATE_CALIBERATION:
+        if (last_state != MotionStates::STATE_CALIBERATION) {
+            Serial.print("Performing Self Calibration \r\n");
+            last_state = MotionStates::STATE_CALIBERATION;
         }
 
-        /* 
-         * Lets wait for few ms for device to accelerate little bit 
-         * and calculate/decide the velocity threshold
+        if ((millis() - start_timer) > CALIB_TIMEOUT_MS) {
+            zero_calib_value = acceleration_avg_ref->avg();
+            set_state(STATE_MONITORING);
+            Serial.print("Calib-Value : ");
+            Serial.print(zero_calib_value, 6);
+            Serial.print("\r\n");
+        }
+        break;
+
+    case MotionStates::STATE_MONITORING:
+        if (last_state != MotionStates::STATE_MONITORING) {
+            Serial.print("Transitioned to STATE_MONITORING \r\n");
+            last_state = MotionStates::STATE_MONITORING;
+        }
+
+        present_accel = acceleration_avg_ref->avg();
+        delta_accel = 0.0;
+
+        if (present_accel > zero_calib_value)
+            delta_accel = present_accel - zero_calib_value;
+        else if (present_accel < zero_calib_value)
+            delta_accel = zero_calib_value - present_accel;
+
+        if (delta_accel > 0.01) {
+            start_timer = millis();
+            set_state(STATE_MOVEMENT_DETECTED);
+        }
+        break;
+
+    case MotionStates::STATE_MOVEMENT_DETECTED:
+        if (last_state != MotionStates::STATE_MOVEMENT_DETECTED) {
+            Serial.print("Transitioned to STATE_MOVEMENT_DETECTED \r\n");
+            last_state = MotionStates::STATE_MOVEMENT_DETECTED;
+        }
+
+        if ((millis() - start_timer) > MOVEMENT_DETECTION_TIMEOUT_MS) {
+            enable_alarm();
+            set_state(STATE_MOVING);
+        }
+        break;
+
+    case MotionStates::STATE_MOVING:
+        if (last_state != MotionStates::STATE_MOVING) {
+            Serial.print("Transitioned to STATE_MOVING \r\n");
+            last_state = MotionStates::STATE_MOVING;
+        }
+
+        /*
+         * In this state, if the movement stops, then we start
+         * a timer, which will decide when to stop.
          */
+        present_accel = acceleration_avg_ref->avg();
+        delta_accel = 0.0;
 
-        if (vel_threshold == 0 && (millis() - timer_ms) > (VEL_THRESHOLD_SET_TIMEOUT)) {
-            vel_threshold = (*vel_ms_ref);
+        if (present_accel > zero_calib_value)
+            delta_accel = present_accel - zero_calib_value;
+        else if (present_accel < zero_calib_value)
+            delta_accel = zero_calib_value - present_accel;
 
-            /*
-             * Velocity is too low, must be noise. Should reset to prev state
-             */
-            if (fabs(vel_threshold) < 0.01) {
-                setErrorResetState();
-            }
-
-            if (vel_threshold > 0) {
-                vel_threshold *= VEL_THRESHOLD_ADJ;
-            }
-
-            MovementService::stopMonitoring();
-        }
-
-        if (isMovingConfirmed() == true) {
-            reset_counters();
-            state = MotionStates::MOVING;
-            MovementService::startMonitoring();
-            enable_alarm();
+        if (delta_accel < 0.01) {
+            start_timer = millis();
+            set_state(STATE_DECELERATING);
         }
         break;
 
-    case MotionStates::MOVING:
-        if (last_state != MotionStates::MOVING) {
-            Serial.print("Run-State: MOVING \r\n");
-            last_state = MotionStates::MOVING;
+    case MotionStates::STATE_DECELERATING:
+        if (last_state != MotionStates::STATE_DECELERATING) {
+            Serial.print("Transitioned to STATE_DECELERATING \r\n");
+            last_state = MotionStates::STATE_DECELERATING;
         }
 
-        if (isAtRestOrStable() == true) {
-            (*adj_acc_ref) = (*acc_mss_ref) * -1;
-        }
-
-        if (isDecelerating() == true) {
-            reset_counters();
-            (*vel_ms_ref) = 0.0;
-            vel_threshold = 0;
-            state = MotionStates::DECELERATING;
-            enable_alarm();
-        }
-        break;
-
-    case MotionStates::DECELERATING:
-        if (last_state != MotionStates::DECELERATING) {
-            Serial.print("Run-State: DECELERATING \r\n");
-            last_state = MotionStates::DECELERATING;
-        }
-
-        if (isAtRestOrStable() == true) {
-            *adj_acc_ref = (*acc_mss_ref) * -1;
-            acceleration_avg_ref->fill(0.0);
-            reset_counters();
-            state = MotionStates::STOPPED;
+        if ((millis() - start_timer) > STOP_TIMEOUT_MS) {
             disable_alarm();
+            set_state(STATE_STOPPED);
         }
         break;
 
-    case MotionStates::STOPPED:
-        if (last_state != MotionStates::STOPPED) {
-            Serial.print("Run-State: STOPPED \r\n");
-            last_state = MotionStates::STOPPED;
+    case MotionStates::STATE_STOPPED:
+        if (last_state != MotionStates::STATE_STOPPED) {
+            Serial.print("Transitioned to STATE_STOPPED \r\n");
+            last_state = MotionStates::STATE_STOPPED;
         }
-
-        stopMonitoring();
-        reset_counters();
-        state = MotionStates::NOT_MOVING;
-        disable_alarm();
+        set_state(STATE_MONITORING);
         break;
 
-    case MotionStates::ERROR_RESET:
-        if (last_state != MotionStates::ERROR_RESET) {
-            Serial.print("Run-State: ERROR_RESET \r\n");
-            last_state = MotionStates::ERROR_RESET;
+    case MotionStates::STATE_ERROR_RESET:
+        if (last_state != MotionStates::STATE_ERROR_RESET) {
+            Serial.print("Transitioned to STATE_ERROR_RESET \r\n");
+            last_state = MotionStates::STATE_ERROR_RESET;
         }
 
-        if (isAtRestOrStable() == true) {
-            stopMonitoring();
-        }
-
-        /* 
-         * Check monitoring is done and acceleration below expected
-         */
-        if (isMonitoring() == false && fabs(acceleration_avg_ref->avg()) < 0.02) {
-            state = MotionStates::NOT_MOVING;
-            disable_alarm();
+        if (reset_counter == 0) {
+            set_state(STATE_CALIBERATION);
+            start_timer = millis();
+        } else {
+            reset_counter--;
         }
         break;
 
     default:
         break;
+
     }
 
+    return;
 }
 
 /**
@@ -202,7 +192,7 @@ bool MovementService::isAtRestOrStable()
             }
         }
 
-        if (state >= MotionStates::DECELERATING) {
+        if (state >= MotionStates::STATE_DECELERATING) {
             float pres_avg = pressure_avg_ref->avg();
             variance_pres = 0.0;
             for (int i =0; i < pressure_avg_ref->size(); i++) {
@@ -288,10 +278,15 @@ inline bool MovementService::isMonitoring()
 
 void MovementService::setErrorResetState()
 {
-    state = MotionStates::ERROR_RESET;
+    state = MotionStates::STATE_ERROR_RESET;
     (*vel_ms_ref) = 0;
     vel_threshold = 0;
     timer_ms = millis();
     disable_alarm();
     startMonitoring();
+}
+
+void MovementService::set_state(int arg_state)
+{
+    state = arg_state;
 }
