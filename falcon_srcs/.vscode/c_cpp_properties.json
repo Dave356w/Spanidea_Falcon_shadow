@@ -10,10 +10,6 @@
             "includePath": [
                 "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/include",
                 "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/src",
-                "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328P/Grove - Step Counter_BMA456_",
-                "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328P/Adafruit DPS310",
-                "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328P/Adafruit Unified Sensor",
-                "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328P/Adafruit BusIO",
                 "/home/biju/.platformio/packages/framework-arduino-avr-minicore/libraries/Wire/src",
                 "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328P/Mcp320x/src",
                 "/home/biju/.platformio/packages/framework-arduino-avr-minicore/libraries/SPI/src",
@@ -32,10 +28,6 @@
                 "path": [
                     "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/include",
                     "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/src",
-                    "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328P/Grove - Step Counter_BMA456_",
-                    "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328P/Adafruit DPS310",
-                    "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328P/Adafruit Unified Sensor",
-                    "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328P/Adafruit BusIO",
                     "/home/biju/.platformio/packages/framework-arduino-avr-minicore/libraries/Wire/src",
                     "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328P/Mcp320x/src",
                     "/home/biju/.platformio/packages/framework-arduino-avr-minicore/libraries/SPI/src",

@@ -2,7 +2,7 @@
 #include <RollingAvg.h>
 #include <Mcp320x.h>
 #include <SPI.h>
-#include <Adafruit_DPS310.h>
+//#include <Adafruit_DPS310.h>
 #include "movement_service.h"
 #include "alarm.h"
 
@@ -19,26 +19,26 @@
 #define NS_ACC_Y                            MCP3208::Channel::SINGLE_6
 #define NS_ACC_X                            MCP3208::Channel::SINGLE_7
 
-#define Z1                            MCP3208::Channel::SINGLE_5
-#define Z2                            MCP3208::Channel::SINGLE_2
+#define Z1                                  MCP3208::Channel::SINGLE_5
+#define Z2                                  MCP3208::Channel::SINGLE_2
 
 
-#define ADC_VREF    3300     // 3.3V Vref
-#define ADC_CLK     1000000  // SPI clock 1MHz
+#define ADC_VREF                            3300     // 3.3V Vref
+#define ADC_CLK                             1000000  // SPI clock 1MHz
 
-#define INIT_TIMER_MS 20
-#define INIT_TIME_MS 8000
-#define BATTERY_BLINK_PERIOD_MS           1000  // time the RGB LED waits to blink to indicate the battery state
-#define BATTERY_BLINK_DURATION_MS         25    // time the RGB LED blinks on to indicate battery state
+#define INIT_TIMER_MS                       20
+#define INIT_TIME_MS                        8000
+#define BATTERY_BLINK_PERIOD_MS             1000  // time the RGB LED waits to blink to indicate the battery state
+#define BATTERY_BLINK_DURATION_MS           25    // time the RGB LED blinks on to indicate battery state
 
-#define HEALTH_CHECK_INTERVAL_MS  100
+#define HEALTH_CHECK_INTERVAL_MS            100
 
-#define BATT_R1                           5100.0
-#define BATT_R2                           1500.0
-#define VBATT_CONST  ((BATT_R1 + BATT_R2)/BATT_R2)
-#define VBATT_DIODE_DROP                  0
-#define VOLTAGE_THRESHOLD                 3700
-#define VOLTAGE_LOW                       3400
+#define BATT_R1                             5100.0
+#define BATT_R2                             1500.0
+#define VBATT_CONST                         ((BATT_R1 + BATT_R2)/BATT_R2)
+#define VBATT_DIODE_DROP                    0
+#define VOLTAGE_THRESHOLD                   3700
+#define VOLTAGE_LOW                         3400
 
 
 void enable_timer1();

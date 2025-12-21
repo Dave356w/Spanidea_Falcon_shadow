@@ -4,7 +4,7 @@
  * Copyright Spanidea 2024-25
  ************************************************************
  */
-
+#include <avr/sleep.h>
 #include "main.h"
 #include "arduino_bma456.h"
 
@@ -16,35 +16,64 @@ uint32_t init_time_g = 0;
 float acc_mss_g = 0.0, vel_ms_g = 0.0, adj_acc_g = 0.0;
 SystemStates state = SystemStates::SYSTEM_STATE_INITIALIZING;
 static boolean in_isr = false;
-RollingAvg<float> pressure_avg_g(2);
-RollingAvg<float> acceleration_avg_g(8);
-//RollingAvg<float> adj_acc_avg_g(16);
+RollingAvg<float> pressure_avg_g(1);
+RollingAvg<float> acceleration_avg_g(1);
 RollingAvg<uint16_t> battery_avg(8);
 float x = 0, y = 0, z = 0;
 float g_value, accel_value;
-RollingAvg<float> bosch_acceleration_avg_g(4);
+RollingAvg<float> bosch_acceleration_avg_g(1);
 float self_calib_acceleration = 0.0;
 MCP3208 adc(ADC_VREF, PIN_ADC_CS);
 MovementService ms(&acceleration_avg_g, &acc_mss_g, &adj_acc_g, &vel_ms_g, &pressure_avg_g);
 
-Adafruit_DPS310 dps;
+//Adafruit_DPS310 dps;
 
 #define EN_3_AXIS_SENS 1
+typedef void (*FUNC_PTR)(char *p);
 
 uint16_t read_battery_voltage();
+void bosch_interrupt();
+extern void bma_dbg_init(FUNC_PTR p);
+
+void debug_log(char *p_log)
+{
+#ifdef SERIAL_EN
+    Serial.print(p_log);
+#endif
+}
+
+void falcon_configure_sleep() 
+{
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+}
+
+void falcon_sleep_test() 
+{
+  sleep_enable();
+  sleep_cpu();
+}
 
 void setup() {
 
     /*
      * Configure the debug serial port here
     */
+#ifdef SERIAL_EN
     Serial.begin(115200);
+#endif
 
+//    bma_dbg_init(debug_log);
     /*
      * Configure the ADC chip-select line here
     */
     pinMode(PIN_ADC_CS, OUTPUT);
     digitalWrite(PIN_ADC_CS, HIGH);
+
+    /*
+     * Configure interrupt pin for Sensor
+    */
+//    pinMode(BMS456_INTERRUPT, INPUT_PULLUP);
+//    attachInterrupt(digitalPinToInterrupt(BMS456_INTERRUPT), bosch_interrupt, RISING);
 
     /*
      * Configure the ADC chip here for SPI protocol.
@@ -53,7 +82,9 @@ void setup() {
     SPI.begin();
     SPI.beginTransaction(settings);
 
+#ifdef SERIAL_EN
     Serial.print("Configured SPI interface \r\n");
+#endif
 
     /*
      * Configure all Alarm Ports here
@@ -61,15 +92,20 @@ void setup() {
     setup_alarm();
     disable_alarm();
 
+#ifdef SERIAL_EN
     Serial.print("Configured Alarms \r\n");
+#endif
 
     init_pressure_sensor();
 
     digitalWrite(PIN_GREEN_LED, HIGH);
     init_time_g = millis();
+#ifdef SERIAL_EN
     Serial.print("Device Booted \r\n");
-
+#endif
     bma456.initialize(RANGE_2G, ODR_100_HZ, NORMAL_AVG4, CONTINUOUS);
+
+    falcon_configure_sleep();
 }
 
 void initialization()
@@ -102,7 +138,9 @@ void initialization()
             delay(100);   
         }
 
+#ifdef SERIAL_EN
         Serial.print("Transitioning to Normal Operation \r\n");
+#endif
         digitalWrite(PIN_PIEZO, LOW);
         digitalWrite(PIN_GREEN_LED, LOW);
         digitalWrite(PIN_CHASE_LED, HIGH);
@@ -115,7 +153,10 @@ void initialization()
 void loop() 
 {
     static int  bma_read_counter = 0;
+    uint16_t int_status = 0;
 
+    falcon_sleep_test();
+    
     switch (state) {
 
     case SystemStates::SYSTEM_STATE_INITIALIZING:
@@ -123,6 +164,17 @@ void loop()
         break;
 
     case SystemStates::SYSTEM_STATE_NOMINAL:
+#if 0
+        int_status = bma456.readInterruptStatus();
+        if (int_status & 0x20) {
+#ifdef SERIAL_EN
+            Serial.print("Any Motion Interrupt happened :0x");
+            Serial.println(int_status, HEX);
+#endif
+        }
+#endif
+        
+#if 1
         ms.fsm_run();
 
         if (bma_read_counter++ > 1000 ) {
@@ -131,6 +183,7 @@ void loop()
         }
 
         check_for_battery_voltage();
+#endif
         alarm_service();
         break;
 
@@ -210,6 +263,18 @@ ISR(TIMER1_COMPA_vect)
     return;
 }
 
+void bosch_interrupt() {
+{
+    static int ctr = 0;
+#ifdef SERIAL_EN
+    Serial.print("\r\n BSH: ISR - ");
+    Serial.print(ctr);
+#endif
+    ctr++;
+}
+
+}
+
 void log_data()
 {
     static int loop_cnt = 0;
@@ -217,6 +282,7 @@ void log_data()
 
     if (loop_cnt++ > 100) {
 #if 0
+#ifdef SERIAL_EN
         Serial.print("\r\n Index: ");
         Serial.print(index);
         Serial.print(" X: ");
@@ -227,7 +293,7 @@ void log_data()
         Serial.print(z);
         Serial.print("\r\n Accl: ");
         Serial.print(acceleration_avg_g.avg());
-
+#endif
 #endif
         loop_cnt = 0; 
         index++;
@@ -235,33 +301,35 @@ void log_data()
 
 }
 
-void debug_log(char *p_log)
-{
-    Serial.print(p_log);
-
-}
 
 /*
  * Initialize the pressure sensor here
 */
 void init_pressure_sensor()
 {
+#if 0
     if (! dps.begin_I2C()) {             // Can pass in I2C address here
+#ifdef SERIAL_EN
         Serial.println("Failed to find DPS");
+#endif
 //        while (1) yield();
     }
 
+#ifdef SERIAL_EN
     Serial.println("DPS Pressure Sensor OK!");
+#endif
+
 #if 0
     dps.configurePressure(DPS310_32HZ, DPS310_32SAMPLES);
     dps.configureTemperature(DPS310_32HZ, DPS310_32SAMPLES);
+#endif
 #endif
 }
 
 uint8_t read_pressure()
 {
-    static sensors_event_t pressure_event;
 #if 0
+    static sensors_event_t pressure_event;
     if (dps.pressureAvailable()) {
         dps.getEvents(NULL, &pressure_event);
         // pressure_g = pressure_event.pressure * 100.0;

@@ -50,29 +50,45 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_NOT_MOVING:
         if (last_state != MotionStates::STATE_NOT_MOVING) {
+
+#ifdef SERIAL_EN
             Serial.print("Transitioned to STATE_NOT_MOVING \r\n");
+#endif
             last_state = MotionStates::STATE_NOT_MOVING;
         }
         break;
 
     case MotionStates::STATE_CALIBERATION:
         if (last_state != MotionStates::STATE_CALIBERATION) {
+
+#ifdef SERIAL_EN
             Serial.print("Performing Self Calibration \r\n");
+#endif
+
             last_state = MotionStates::STATE_CALIBERATION;
         }
 
         if ((millis() - start_timer) > CALIB_TIMEOUT_MS) {
             zero_calib_value = acceleration_avg_ref->avg();
             set_state(STATE_MONITORING);
+
+#ifdef SERIAL_EN
             Serial.print("Calib-Value : ");
             Serial.print(zero_calib_value, 6);
             Serial.print("\r\n");
+#endif
+
+            digitalWrite(PIN_GREEN_LED, LOW);
         }
         break;
 
     case MotionStates::STATE_MONITORING:
         if (last_state != MotionStates::STATE_MONITORING) {
+
+#ifdef SERIAL_EN
             Serial.print("Transitioned to STATE_MONITORING \r\n");
+#endif
+
             last_state = MotionStates::STATE_MONITORING;
         }
 
@@ -92,7 +108,11 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_MOVEMENT_DETECTED:
         if (last_state != MotionStates::STATE_MOVEMENT_DETECTED) {
+
+#ifdef SERIAL_EN
             Serial.print("Transitioned to STATE_MOVEMENT_DETECTED \r\n");
+#endif
+
             last_state = MotionStates::STATE_MOVEMENT_DETECTED;
         }
 
@@ -104,7 +124,10 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_MOVING:
         if (last_state != MotionStates::STATE_MOVING) {
+
+#ifdef SERIAL_EN
             Serial.print("Transitioned to STATE_MOVING \r\n");
+#endif
             last_state = MotionStates::STATE_MOVING;
         }
 
@@ -128,7 +151,9 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_DECELERATING:
         if (last_state != MotionStates::STATE_DECELERATING) {
+#ifdef SERIAL_EN
             Serial.print("Transitioned to STATE_DECELERATING \r\n");
+#endif
             last_state = MotionStates::STATE_DECELERATING;
         }
 
@@ -140,7 +165,9 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_STOPPED:
         if (last_state != MotionStates::STATE_STOPPED) {
+#ifdef SERIAL_EN
             Serial.print("Transitioned to STATE_STOPPED \r\n");
+#endif
             last_state = MotionStates::STATE_STOPPED;
         }
         set_state(STATE_MONITORING);
@@ -148,12 +175,15 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_ERROR_RESET:
         if (last_state != MotionStates::STATE_ERROR_RESET) {
+#ifdef SERIAL_EN
             Serial.print("Transitioned to STATE_ERROR_RESET \r\n");
+#endif
             last_state = MotionStates::STATE_ERROR_RESET;
         }
 
         if (reset_counter == 0) {
             set_state(STATE_CALIBERATION);
+            digitalWrite(PIN_GREEN_LED, HIGH);
             start_timer = millis();
         } else {
             reset_counter--;
@@ -174,6 +204,7 @@ void MovementService::fsm_run()
  */
 bool MovementService::isAtRestOrStable()
 {
+#if 0
     float acc_avg = acceleration_avg_ref->avg();
 
     if ((millis() - timer_ms) > (TEMP_WAIT)) {
@@ -215,7 +246,7 @@ bool MovementService::isAtRestOrStable()
 
         timer_ms = millis();
     }
-
+#endif
     return false;
 }
 

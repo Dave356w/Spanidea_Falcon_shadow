@@ -11,3 +11,6 @@
 
 #define PIN_PIEZO                           PIN_PB0 //PB0-8
 #define PIN_RED_LED                         PIN_PB1 //PB1-9
+
+#define BMS456_INTERRUPT                    PIN_PD2
+//#define BMS456_INTERRUPT                    PIN_PD3
