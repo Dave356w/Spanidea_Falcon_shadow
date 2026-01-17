@@ -6,6 +6,9 @@
  */
 
 #include "main.h"
+#include <avr/sleep.h>
+#include <avr/interrupt.h>
+#include <avr/wdt.h>
 #include "arduino_bma456.h"
 
 uint16_t x_axis_1, x_axis_2, y_axis_1, y_axis_2, z_axis_1, z_axis_2;
@@ -72,6 +75,21 @@ void setup() {
     bma456.initialize(RANGE_2G, ODR_100_HZ, NORMAL_AVG4, CONTINUOUS);
 }
 
+void setup_wdt(void)
+{
+    MCUSR = 0;
+    WDTCSR = (1 << WDCE) | (1 << WDE);
+    WDTCSR = (1 << WDIE) | (1 << WDP3) | (1 << WDP0);  // ~4s
+}
+
+void configure_sleep_mode()
+{
+    setup_wdt();
+    set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+    sleep_enable();
+    sleep_cpu();
+}
+
 void initialization()
 {
 
@@ -96,7 +114,7 @@ void initialization()
         enable_timer1();
 
         digitalWrite(PIN_PIEZO, HIGH);  
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 4; i++) {
             digitalWrite(PIN_CHASE_CLK, HIGH);
             digitalWrite(PIN_CHASE_CLK, LOW);
             delay(100);   
@@ -111,7 +129,33 @@ void initialization()
     return;
 }
 
+void toggle_green_led()
+{
+    static unsigned char green_toggle = 0;
 
+    if (green_toggle == 0) {
+        green_toggle = 1;
+        digitalWrite(PIN_GREEN_LED, LOW);
+    } else {
+        green_toggle = 0;
+        digitalWrite(PIN_GREEN_LED, HIGH);
+    }
+}
+
+void toggle_red_led()
+{
+    static unsigned char red_toggle = 0;
+
+    if (red_toggle == 0) {
+        red_toggle = 1;
+        digitalWrite(PIN_RED_LED, LOW);
+    } else {
+        red_toggle = 0;
+        digitalWrite(PIN_RED_LED, HIGH);
+    }
+}
+
+int wdt_inited = 0;
 void loop() 
 {
     static int  bma_read_counter = 0;
@@ -123,8 +167,28 @@ void loop()
         break;
 
     case SystemStates::SYSTEM_STATE_NOMINAL:
+        toggle_green_led();
         ms.fsm_run();
+#if 0
+        if (wdt_inited == 0) {
+            configure_sleep_mode();
+            wdt_inited = 1;
+        }
+#endif
+        bma_read_counter++;
 
+        if (bma_read_counter > 10 ) {
+            configure_sleep_mode();
+//            digitalWrite(PIN_RED_LED, HIGH);
+            toggle_red_led();
+        }
+#if 0
+        if (bma_read_counter == 20 ) {
+            bma_read_counter = 0;
+            digitalWrite(PIN_RED_LED, LOW);
+            sleep_cpu();
+        }
+#endif
         if (bma_read_counter++ > 1000 ) {
             log_data();
             bma_read_counter = 0;
@@ -177,6 +241,9 @@ void disable_timer1()
     TCCR1B = 0;
 }
 
+ISR(WDT_vect) 
+{
+}
 
 ISR(TIMER1_COMPA_vect) 
 {
