@@ -24,8 +24,8 @@ void setup_alarm()
     pinMode(PIN_PIEZO, OUTPUT);
     digitalWrite(PIN_PIEZO, LOW);
 
-    pinMode(PIN_RED_LED, OUTPUT);
-    digitalWrite(PIN_RED_LED, LOW);
+//    pinMode(PIN_RED_LED, OUTPUT);
+//    digitalWrite(PIN_RED_LED, LOW);
 
     pinMode(PIN_CHASE_LED, OUTPUT);
     digitalWrite(PIN_CHASE_LED, HIGH);
@@ -34,7 +34,7 @@ void setup_alarm()
     pinMode(PIN_CHASE_CLK, OUTPUT);
 }
 
-void alarm_service()
+void check_for_active_alarm()
 {
     /*
      * Check if the alarm flag is enabled. If not, then bail out
@@ -65,12 +65,12 @@ void alarm_service()
     if (beep)
     {
         digitalWrite(PIN_PIEZO, HIGH);
-        digitalWrite(PIN_RED_LED, HIGH);
+//        digitalWrite(PIN_RED_LED, HIGH);
     }
     else
     {
         digitalWrite(PIN_PIEZO, LOW);
-        digitalWrite(PIN_RED_LED, LOW);
+//        digitalWrite(PIN_RED_LED, LOW);
     }
 
     return; 
@@ -78,6 +78,11 @@ void alarm_service()
 
 void enable_alarm()
 {
+    /*
+     * Check if alarm-flag is already enabled. If so, it means
+     * that the alarm is already active.
+     */
+
     if (alarm_status_g == 1) {
         return ;
     }
@@ -90,13 +95,18 @@ void enable_alarm()
 
 void disable_alarm()
 {
+    /*
+     * Check if alarm-flag is already disabled. If so, it means
+     * that the alarm is already disabled.
+     */
     if (alarm_status_g == 0) {
       return ;
     }
-    // no beep plz
+    /*
+     * Turn OFF the alarm & RED LED
+     */
     digitalWrite(PIN_PIEZO, LOW);
-    // turn off the big red LED
-    digitalWrite(PIN_RED_LED, LOW);
+//    digitalWrite(PIN_RED_LED, LOW);
 
     digitalWrite(PIN_CHASE_LED, HIGH);
     digitalWrite(PIN_CHASE_LED, LOW);

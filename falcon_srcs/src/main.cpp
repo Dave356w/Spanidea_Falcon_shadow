@@ -27,8 +27,6 @@ float self_calib_acceleration = 0.0;
 MCP3208 adc(ADC_VREF, PIN_ADC_CS);
 MovementService ms(&acceleration_avg_g, &acc_mss_g, &adj_acc_g, &vel_ms_g, &pressure_avg_g);
 
-Adafruit_DPS310 dps;
-
 #define EN_3_AXIS_SENS 1
 
 uint16_t read_battery_voltage();
@@ -38,8 +36,9 @@ void setup() {
     /*
      * Configure the debug serial port here
     */
-    Serial.begin(115200);
+    Serial.begin(9600);
 
+    Serial.print("\r\n\nDevice Booted \r\n");
     /*
      * Configure the ADC chip-select line here
     */
@@ -63,13 +62,11 @@ void setup() {
 
     Serial.print("Configured Alarms \r\n");
 
-    init_pressure_sensor();
-
     digitalWrite(PIN_GREEN_LED, HIGH);
     init_time_g = millis();
-    Serial.print("Device Booted \r\n");
 
     bma456.initialize(RANGE_2G, ODR_100_HZ, NORMAL_AVG4, CONTINUOUS);
+    Serial.print("Configured BMA456 \r\n");
 }
 
 void initialization()
@@ -83,7 +80,6 @@ void initialization()
     if (millis() - temp_timer > INIT_TIMER_MS) {
 
         temp_timer = millis();
-        read_pressure();
         battery_avg.add(read_battery_voltage());
     }
 
@@ -98,11 +94,12 @@ void initialization()
         digitalWrite(PIN_PIEZO, HIGH);  
         for (int i = 0; i < 8; i++) {
             digitalWrite(PIN_CHASE_CLK, HIGH);
+            delay(10);   
             digitalWrite(PIN_CHASE_CLK, LOW);
             delay(100);   
         }
 
-        Serial.print("Transitioning to Normal Operation \r\n");
+        Serial.print("Device initialized completely \r\n");
         digitalWrite(PIN_PIEZO, LOW);
         digitalWrite(PIN_GREEN_LED, LOW);
         digitalWrite(PIN_CHASE_LED, HIGH);
@@ -131,7 +128,7 @@ void loop()
         }
 
         check_for_battery_voltage();
-        alarm_service();
+        check_for_active_alarm();
         break;
 
     default:
@@ -147,8 +144,13 @@ void loop()
 
 float read_acceleration_mss()
 {
-
+    x = y = x = 0;
     bma456.getAcceleration(&x, &y, &z);
+#if 0
+    Serial.print("Z axis : ");
+    Serial.print(z, 6);
+    Serial.print("\r\n");
+#endif
     g_value = z / 16384.0;
     accel_value = g_value * 9.81;
     acceleration_avg_g.add(accel_value);
@@ -197,8 +199,6 @@ ISR(TIMER1_COMPA_vect)
 
     read_acceleration_mss();
 
-    read_pressure();
-
     /*
      * Turn off interrupts so we can't be interrupted while 
      * resetting our special variable
@@ -239,38 +239,6 @@ void debug_log(char *p_log)
 {
     Serial.print(p_log);
 
-}
-
-/*
- * Initialize the pressure sensor here
-*/
-void init_pressure_sensor()
-{
-    if (! dps.begin_I2C()) {             // Can pass in I2C address here
-        Serial.println("Failed to find DPS");
-//        while (1) yield();
-    }
-
-    Serial.println("DPS Pressure Sensor OK!");
-#if 0
-    dps.configurePressure(DPS310_32HZ, DPS310_32SAMPLES);
-    dps.configureTemperature(DPS310_32HZ, DPS310_32SAMPLES);
-#endif
-}
-
-uint8_t read_pressure()
-{
-    static sensors_event_t pressure_event;
-#if 0
-    if (dps.pressureAvailable()) {
-        dps.getEvents(NULL, &pressure_event);
-        // pressure_g = pressure_event.pressure * 100.0;
-        pressure_avg_g.add(pressure_event.pressure * 10.0);
-
-        return 0;
-    }
-#endif
-    return 1;
 }
 
 inline uint16_t read_battery_voltage() 
@@ -318,11 +286,11 @@ void check_for_battery_voltage()
          * If the Battery voltage is between 3.0V and 3.7V)
          */
 
-        digitalWrite(PIN_RED_LED, HIGH);
-        digitalWrite(PIN_PIEZO, HIGH);
+//        digitalWrite(PIN_RED_LED, HIGH);
+//        digitalWrite(PIN_PIEZO, HIGH);
         delay(BATTERY_BLINK_DURATION_MS);
-        digitalWrite(PIN_RED_LED, LOW);
-        digitalWrite(PIN_PIEZO, LOW);
+//        digitalWrite(PIN_RED_LED, LOW);
+//        digitalWrite(PIN_PIEZO, LOW);
 
     } else 
     {
@@ -330,7 +298,7 @@ void check_for_battery_voltage()
          * If the Battery voltage is < 3.0V
          */
 
-        digitalWrite(PIN_RED_LED, HIGH);
-        digitalWrite(PIN_PIEZO, HIGH);
+//        digitalWrite(PIN_RED_LED, HIGH);
+//        digitalWrite(PIN_PIEZO, HIGH);
     }
 }

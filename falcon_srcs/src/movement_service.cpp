@@ -15,6 +15,8 @@ MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, flo
     reset_counter = 100;
     zero_calib_value = 0.0;
 
+    Serial.print("Initialing FSM \r\n");
+
     state = MotionStates::STATE_ERROR_RESET;
     last_state = MotionStates::STATE_ERROR_RESET;
 
@@ -32,12 +34,25 @@ void MovementService::reset_counters(void)
 /*
  * State-Transition
  *
- * ERROR_RESET -> NOT_MOVING -> MOVEMENT_DETECTED -> MOVING -> DECELERATING
- *                    ^                                            |
- *                    |                                            v
- *                    +--------------<-------------------<----- STOPPED
- *
- *
+ *                       STATE_ERROR_RESET
+ *                              |
+ *                              V
+ *                      STATE_CALIBERATION
+ *                              |
+ *                              V
+ *                       STATE_MONITORING<------------+
+ *                              |                     |
+ *                              V                     |
+ *                    STATE_MOVEMENT_DETECTED         |
+ *                              |                     |
+ *                              V                     |
+ *                        STATE_MOVING                |
+ *                              |                     |
+ *                              V                     |
+ *                       STATE_DECELERATING           |
+ *                              |                     |
+ *                              V                     |
+ *                        STATE_STOPPED---------------+
  *
  */
 
@@ -50,14 +65,14 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_NOT_MOVING:
         if (last_state != MotionStates::STATE_NOT_MOVING) {
-            Serial.print("Transitioned to STATE_NOT_MOVING \r\n");
+            Serial.print("FSM: Transitioned to STATE_NOT_MOVING \r\n");
             last_state = MotionStates::STATE_NOT_MOVING;
         }
         break;
 
     case MotionStates::STATE_CALIBERATION:
         if (last_state != MotionStates::STATE_CALIBERATION) {
-            Serial.print("Performing Self Calibration \r\n");
+            Serial.print("FSM: Performing Self Calibration \r\n");
             last_state = MotionStates::STATE_CALIBERATION;
         }
 
@@ -72,7 +87,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_MONITORING:
         if (last_state != MotionStates::STATE_MONITORING) {
-            Serial.print("Transitioned to STATE_MONITORING \r\n");
+            Serial.print("FSM: Transitioned to STATE_MONITORING \r\n");
             last_state = MotionStates::STATE_MONITORING;
         }
 
@@ -92,7 +107,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_MOVEMENT_DETECTED:
         if (last_state != MotionStates::STATE_MOVEMENT_DETECTED) {
-            Serial.print("Transitioned to STATE_MOVEMENT_DETECTED \r\n");
+            Serial.print("FSM: Transitioned to STATE_MOVEMENT_DETECTED \r\n");
             last_state = MotionStates::STATE_MOVEMENT_DETECTED;
         }
 
@@ -104,7 +119,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_MOVING:
         if (last_state != MotionStates::STATE_MOVING) {
-            Serial.print("Transitioned to STATE_MOVING \r\n");
+            Serial.print("FSM: Transitioned to STATE_MOVING \r\n");
             last_state = MotionStates::STATE_MOVING;
         }
 
@@ -128,7 +143,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_DECELERATING:
         if (last_state != MotionStates::STATE_DECELERATING) {
-            Serial.print("Transitioned to STATE_DECELERATING \r\n");
+            Serial.print("FSM: Transitioned to STATE_DECELERATING \r\n");
             last_state = MotionStates::STATE_DECELERATING;
         }
 
@@ -140,7 +155,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_STOPPED:
         if (last_state != MotionStates::STATE_STOPPED) {
-            Serial.print("Transitioned to STATE_STOPPED \r\n");
+            Serial.print("FSM: Transitioned to STATE_STOPPED \r\n");
             last_state = MotionStates::STATE_STOPPED;
         }
         set_state(STATE_MONITORING);
@@ -148,10 +163,11 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_ERROR_RESET:
         if (last_state != MotionStates::STATE_ERROR_RESET) {
-            Serial.print("Transitioned to STATE_ERROR_RESET \r\n");
+            Serial.print("FSM: Transitioned to STATE_ERROR_RESET \r\n");
             last_state = MotionStates::STATE_ERROR_RESET;
         }
 
+        Serial.print("FSM: Device in ERROR_RESET state \r\n");
         if (reset_counter == 0) {
             set_state(STATE_CALIBERATION);
             start_timer = millis();
