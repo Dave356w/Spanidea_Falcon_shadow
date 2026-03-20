@@ -27,7 +27,7 @@
 #define ADC_CLK     1000000  // SPI clock 1MHz
 
 #define INIT_TIMER_MS 20
-#define INIT_TIME_MS 8000
+#define INIT_TIME_MS 80
 #define BATTERY_BLINK_PERIOD_MS           1000  // time the RGB LED waits to blink to indicate the battery state
 #define BATTERY_BLINK_DURATION_MS         25    // time the RGB LED blinks on to indicate battery state
 

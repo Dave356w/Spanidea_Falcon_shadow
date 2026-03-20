@@ -6,6 +6,6 @@
 extern uint8_t alarm_status_g;
 
 void setup_alarm();
-void alarm_service();
+void check_for_active_alarm();
 void enable_alarm();
 void disable_alarm();
