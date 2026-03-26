@@ -7,6 +7,7 @@
 
 #include "main.h"
 #include "arduino_bma456.h"
+//#include <Wire.h>
 
 uint16_t x_axis_1, x_axis_2, y_axis_1, y_axis_2, z_axis_1, z_axis_2;
 uint8_t sensor_value_updated = 0;
@@ -94,7 +95,7 @@ void initialization()
         digitalWrite(PIN_PIEZO, HIGH);  
         for (int i = 0; i < 8; i++) {
             digitalWrite(PIN_CHASE_CLK, HIGH);
-            delay(10);   
+            delay(100);   
             digitalWrite(PIN_CHASE_CLK, LOW);
             delay(100);   
         }
@@ -144,9 +145,9 @@ void loop()
 
 float read_acceleration_mss()
 {
-    x = y = x = 0;
+    x = y = z = 0;
     bma456.getAcceleration(&x, &y, &z);
-#if 0
+#if 1
     Serial.print("Z axis : ");
     Serial.print(z, 6);
     Serial.print("\r\n");

@@ -10,7 +10,7 @@
             "includePath": [
                 "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/include",
                 "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/src",
-                "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328PB/Grove - Step Counter_BMA456_",
+                "/home/biju/.platformio/packages/framework-arduino-avr-minicore/libraries/Wire1/src",
                 "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328PB/Adafruit DPS310",
                 "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328PB/Adafruit Unified Sensor",
                 "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328PB/Adafruit BusIO",
@@ -24,7 +24,6 @@
                 "/home/biju/.platformio/packages/framework-arduino-avr-minicore/libraries/Flash/src",
                 "/home/biju/.platformio/packages/framework-arduino-avr-minicore/libraries/SPI1/src",
                 "/home/biju/.platformio/packages/framework-arduino-avr-minicore/libraries/SoftwareSerial/src",
-                "/home/biju/.platformio/packages/framework-arduino-avr-minicore/libraries/Wire1/src",
                 ""
             ],
             "browse": {
@@ -32,7 +31,7 @@
                 "path": [
                     "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/include",
                     "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/src",
-                    "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328PB/Grove - Step Counter_BMA456_",
+                    "/home/biju/.platformio/packages/framework-arduino-avr-minicore/libraries/Wire1/src",
                     "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328PB/Adafruit DPS310",
                     "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328PB/Adafruit Unified Sensor",
                     "/home/biju/Github/Custom/Spanidea_Falcon/falcon_srcs/.pio/libdeps/ATmega328PB/Adafruit BusIO",
@@ -46,7 +45,6 @@
                     "/home/biju/.platformio/packages/framework-arduino-avr-minicore/libraries/Flash/src",
                     "/home/biju/.platformio/packages/framework-arduino-avr-minicore/libraries/SPI1/src",
                     "/home/biju/.platformio/packages/framework-arduino-avr-minicore/libraries/SoftwareSerial/src",
-                    "/home/biju/.platformio/packages/framework-arduino-avr-minicore/libraries/Wire1/src",
                     ""
                 ]
             },
