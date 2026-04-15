@@ -79,9 +79,11 @@ void MovementService::fsm_run()
         if ((millis() - start_timer) > CALIB_TIMEOUT_MS) {
             zero_calib_value = acceleration_avg_ref->avg();
             set_state(STATE_MONITORING);
-            Serial.print("Calib-Value : ");
+            Serial.print("-------------------------------------\r\n");
+            Serial.print("Zero-Calib-Value : ");
             Serial.print(zero_calib_value, 6);
             Serial.print("\r\n");
+            Serial.print("-------------------------------------\r\n");
         }
         break;
 
@@ -167,7 +169,7 @@ void MovementService::fsm_run()
             last_state = MotionStates::STATE_ERROR_RESET;
         }
 
-        Serial.print("FSM: Device in ERROR_RESET state \r\n");
+        //Serial.print("FSM: Device in ERROR_RESET state \r\n");
         if (reset_counter == 0) {
             set_state(STATE_CALIBERATION);
             start_timer = millis();

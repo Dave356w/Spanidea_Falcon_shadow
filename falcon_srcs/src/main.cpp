@@ -86,11 +86,11 @@ void initialization()
 
     if (millis() - init_time_g > INIT_TIME_MS) {
 
-        adj_acc_g = acceleration_avg_g.avg() * -1;
-        acceleration_avg_g.fill(read_acceleration_mss() + adj_acc_g);
+//        adj_acc_g = acceleration_avg_g.avg() * -1;
+//        acceleration_avg_g.fill(read_acceleration_mss() + adj_acc_g);
 
         state = SystemStates::SYSTEM_STATE_NOMINAL;
-        enable_timer1();
+        enable_timer();
 
         digitalWrite(PIN_PIEZO, HIGH);  
         for (int i = 0; i < 8; i++) {
@@ -147,19 +147,30 @@ float read_acceleration_mss()
 {
     x = y = z = 0;
     bma456.getAcceleration(&x, &y, &z);
-#if 1
-    Serial.print("Z axis : ");
-    Serial.print(z, 6);
-    Serial.print("\r\n");
-#endif
+
+
     g_value = z / 16384.0;
     accel_value = g_value * 9.81;
+
+    Serial.print(" Data : ");
+#if 0
+    Serial.print(x, 6);
+    Serial.print(" ");
+    Serial.print(y, 6);
+    Serial.print(" ");
+#endif
+    Serial.print(z, 6);
+
+    Serial.print("  G value : ");
+    Serial.print(accel_value, 6);
+    Serial.print("\r\n");
+
     acceleration_avg_g.add(accel_value);
 
     return (bosch_acceleration_avg_g.avg());
 }
-
-void enable_timer1()
+#if 0
+void enable_timer()
 {
     cli();
     TCCR1B = 0;
@@ -171,6 +182,30 @@ void enable_timer1()
     TIMSK1 |= (1 << OCIE1A);
     TCCR1B |= (1 << WGM13);
     OCR1A = 156;
+    sei();
+}
+#endif
+
+void enable_timer()
+{
+    cli();
+
+    // Reset control registers
+    TCCR1A = 0;
+    TCCR1B = 0;
+
+    // Set CTC mode (Mode 4)
+    TCCR1B |= (1 << WGM12);
+
+    // Set compare value (for ~10 ms interrupt)
+    OCR1A = 156;
+
+    // Enable Compare Match A interrupt
+    TIMSK1 |= (1 << OCIE1A);
+
+    // Start timer with prescaler = 1024
+    TCCR1B |= (1 << CS12) | (1 << CS10);
+
     sei();
 }
 
@@ -197,6 +232,14 @@ ISR(TIMER1_COMPA_vect)
      * be used inside this function
      */
     interrupts();
+#if 0
+    if (get_alarm_status()) {
+        Serial.print("Skipping Sensor Read \r\n");
+        acceleration_avg_g.fill(1);
+    } else {
+        read_acceleration_mss();
+    }
+#endif
 
     read_acceleration_mss();
 

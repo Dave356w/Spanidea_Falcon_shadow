@@ -73,8 +73,17 @@ void BMA456::initialize(MA456_RANGE range, MBA456_ODR odr, MA456_BW bw, MA456_PE
     Serial.print("\r\n");
 
     Wire1.begin();
+    TWSR1 = 0x00;   // prescaler = 1
+    TWBR1 = 0;
 
-    accel.dev_addr        = BMA4_I2C_ADDR_SECONDARY;
+//    Wire1.setClock(400000);
+
+//  For breakout board
+//   accel.dev_addr        = BMA4_I2C_ADDR_SECONDARY;
+
+//  For inbuilt sensor
+    accel.dev_addr        = BMA4_I2C_ADDR_PRIMARY;
+
     accel.interface       = BMA4_I2C_INTERFACE;
     accel.bus_read        = bma_i2c_read;
     accel.bus_write       = bma_i2c_write;
@@ -92,17 +101,20 @@ void BMA456::initialize(MA456_RANGE range, MBA456_ODR odr, MA456_BW bw, MA456_PE
         Serial.print("Chip-ID :");
         Serial.print(accel.chip_id);
         Serial.print("\r\n");
-
+        return;
     } else {
         Serial.print("BMA456-Init Suceeded \r\n");
     }
 
     bma4_set_command_register(0xB6, &accel); // reset device
 
+    Serial.print("BMA456: Waiting for POR \r\n");
     delay(500); // wait for POR finish
+    Serial.print("BMA456: Wait over POR over \r\n");
 
     bma456_write_config_file(&accel);
 
+    Serial.print("BMA456: Completed writing of config \r\n");
     accel_conf.odr = (uint8_t)odr;
     accel_conf.range = (uint8_t)range;
     accel_conf.bandwidth = (uint8_t)bw;
@@ -110,6 +122,7 @@ void BMA456::initialize(MA456_RANGE range, MBA456_ODR odr, MA456_BW bw, MA456_PE
 
     bma4_set_accel_config(&accel_conf, &accel);
 
+    Serial.print("BMA456: Completed setting of acceleration config \r\n");
     if (range == RANGE_2G) {
         devRange = 2000;
     } else if (range == RANGE_4G) {
@@ -121,6 +134,7 @@ void BMA456::initialize(MA456_RANGE range, MBA456_ODR odr, MA456_BW bw, MA456_PE
     }
 
     bma4_set_accel_enable(BMA4_ENABLE, &accel);
+    Serial.print("Completed BMA456 Configuration \r\n");
 }
 
 void BMA456::stepCounterEnable(MA456_PLATFORM_CONF conf, bool cmd) {

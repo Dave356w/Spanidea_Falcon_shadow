@@ -9,3 +9,5 @@ void setup_alarm();
 void check_for_active_alarm();
 void enable_alarm();
 void disable_alarm();
+uint8_t get_alarm_status();
+

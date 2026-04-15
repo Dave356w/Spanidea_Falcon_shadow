@@ -41,7 +41,7 @@
 #define VOLTAGE_LOW                       3400
 
 
-void enable_timer1();
+void enable_timer();
 void disable_timer1();
 float read_acceleration_mss();
 uint8_t read_pressure();

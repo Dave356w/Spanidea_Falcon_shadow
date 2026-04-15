@@ -93,6 +93,11 @@ void enable_alarm()
     alarm_status_g = 1;
 }
 
+uint8_t get_alarm_status()
+{
+    return (alarm_status_g);
+}
+
 void disable_alarm()
 {
     /*
