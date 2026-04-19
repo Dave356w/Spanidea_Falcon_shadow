@@ -50,6 +50,7 @@ class MovementService {
     MonitorStates monitor_state;
     uint32_t reset_counter;
     uint32_t start_timer;
+    uint32_t movement_start_timer;
 
     void reset_counters();
     void setErrorResetState();

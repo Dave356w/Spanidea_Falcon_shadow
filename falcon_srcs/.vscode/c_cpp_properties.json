@@ -51,6 +51,7 @@
             "defines": [
                 "PLATFORMIO=60119",
                 "ARDUINO_AVR_ATmega328PB",
+                "TWI_FREQ=100000L",
                 "F_CPU=1000000L",
                 "ARDUINO_ARCH_AVR",
                 "ARDUINO=10808",

@@ -232,16 +232,16 @@ ISR(TIMER1_COMPA_vect)
      * be used inside this function
      */
     interrupts();
-#if 0
+#if 1
     if (get_alarm_status()) {
         Serial.print("Skipping Sensor Read \r\n");
-        acceleration_avg_g.fill(1);
+//        acceleration_avg_g.fill(1);
     } else {
         read_acceleration_mss();
     }
 #endif
 
-    read_acceleration_mss();
+//    read_acceleration_mss();
 
     /*
      * Turn off interrupts so we can't be interrupted while 
