@@ -75,6 +75,9 @@ void MovementService::fsm_run()
             Serial.print("FSM: Performing Self Calibration \r\n");
             last_state = MotionStates::STATE_CALIBERATION;
         }
+        if ((millis() - start_timer) > (CALIB_TIMEOUT_MS - 1000)) {
+            enable_alarm();
+        }
 
         if ((millis() - start_timer) > CALIB_TIMEOUT_MS) {
             zero_calib_value = acceleration_avg_ref->avg();
@@ -84,6 +87,7 @@ void MovementService::fsm_run()
             Serial.print(zero_calib_value, 6);
             Serial.print("\r\n");
             Serial.print("-------------------------------------\r\n");
+            disable_alarm();
         }
         break;
 
@@ -101,6 +105,11 @@ void MovementService::fsm_run()
         else if (present_accel < zero_calib_value)
             delta_accel = zero_calib_value - present_accel;
 
+        /*
+         * If there is an acceleration in either direction, then transition to
+         * STATE_MOVEMENT_DETECTED state.
+         */
+
         if (delta_accel > 0.01) {
             start_timer = millis();
             set_state(STATE_MOVEMENT_DETECTED);
@@ -114,6 +123,7 @@ void MovementService::fsm_run()
         }
 
         if ((millis() - start_timer) > MOVEMENT_DETECTION_TIMEOUT_MS) {
+            movement_start_timer = millis();
             enable_alarm();
             set_state(STATE_MOVING);
         }
@@ -124,7 +134,7 @@ void MovementService::fsm_run()
             Serial.print("FSM: Transitioned to STATE_MOVING \r\n");
             last_state = MotionStates::STATE_MOVING;
         }
-
+#if 0
         /*
          * In this state, if the movement stops, then we start
          * a timer, which will decide when to stop.
@@ -141,6 +151,12 @@ void MovementService::fsm_run()
             start_timer = millis();
             set_state(STATE_DECELERATING);
         }
+#endif
+        if ((millis() - movement_start_timer) > STOP_TIMEOUT_MS) {
+            Serial.print("FSM: Alarm timeout happened \r\n");
+            set_state(STATE_DECELERATING);
+        }
+
         break;
 
     case MotionStates::STATE_DECELERATING:
@@ -159,6 +175,8 @@ void MovementService::fsm_run()
         if (last_state != MotionStates::STATE_STOPPED) {
             Serial.print("FSM: Transitioned to STATE_STOPPED \r\n");
             last_state = MotionStates::STATE_STOPPED;
+
+            acceleration_avg_ref->fill(zero_calib_value);
         }
         set_state(STATE_MONITORING);
         break;
