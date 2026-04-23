@@ -24,8 +24,10 @@ void setup_alarm()
     pinMode(PIN_PIEZO, OUTPUT);
     digitalWrite(PIN_PIEZO, LOW);
 
-//    pinMode(PIN_RED_LED, OUTPUT);
-//    digitalWrite(PIN_RED_LED, LOW);
+    pinMode(PIN_RED_LED_PWM, OUTPUT);
+    pinMode(PIN_RED_LED_EN, OUTPUT);
+    digitalWrite(PIN_RED_LED_PWM, LOW);
+    digitalWrite(PIN_RED_LED_EN, LOW);
 
     pinMode(PIN_CHASE_LED, OUTPUT);
     digitalWrite(PIN_CHASE_LED, HIGH);
@@ -65,12 +67,14 @@ void check_for_active_alarm()
     if (beep)
     {
         digitalWrite(PIN_PIEZO, HIGH);
-//        digitalWrite(PIN_RED_LED, HIGH);
+        digitalWrite(PIN_RED_LED_PWM, HIGH);
+        digitalWrite(PIN_RED_LED_EN, HIGH);
     }
     else
     {
         digitalWrite(PIN_PIEZO, LOW);
-//        digitalWrite(PIN_RED_LED, LOW);
+        digitalWrite(PIN_RED_LED_PWM, LOW);
+        digitalWrite(PIN_RED_LED_EN, LOW);
     }
 
     return; 
@@ -111,10 +115,10 @@ void disable_alarm()
      * Turn OFF the alarm & RED LED
      */
     digitalWrite(PIN_PIEZO, LOW);
-//    digitalWrite(PIN_RED_LED, LOW);
-
     digitalWrite(PIN_CHASE_LED, HIGH);
     digitalWrite(PIN_CHASE_LED, LOW);
+    digitalWrite(PIN_RED_LED_PWM, LOW);
+    digitalWrite(PIN_RED_LED_EN, LOW);
 
     alarm_status_g = 0;
 }

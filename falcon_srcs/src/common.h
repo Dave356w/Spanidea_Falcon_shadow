@@ -42,7 +42,8 @@
     #define PIN_CHASE_LED                       PIN_PC5 // Testing of this pin in progress
     #define PIN_CHASE_CLK                       PIN_PB1
     #define PIN_PIEZO                           PIN_PD5  // Buzzer pin
-    #define PIN_RED_LED                         PIN_PB1 // TBD
+    #define PIN_RED_LED_PWM                     PIN_PD6 // TBD
+    #define PIN_RED_LED_EN                      PIN_PD7
 
 #endif
 
