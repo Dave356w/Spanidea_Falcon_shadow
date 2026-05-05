@@ -1,3 +1,16 @@
+/*
+ ***********************************************************
+ * File   : alarm.h
+ * Author : Biju Nair
+ *
+ *
+ * Copyright : CreeperNET Consulting 2025-26
+ ***********************************************************
+ */
+
+#ifndef _ALARM_H_
+#define _ALARM_H_
+
 #include <Arduino.h>
 #include "common.h"
 
@@ -11,3 +24,4 @@ void enable_alarm();
 void disable_alarm();
 uint8_t get_alarm_status();
 
+#endif

@@ -1,3 +1,16 @@
+/*
+ ***********************************************************
+ * File   : main.h
+ * Author : Biju Nair
+ *
+ *
+ * Copyright : CreeperNET Consulting 2025-26
+ ***********************************************************
+ */
+
+ #ifndef _MAIN_H_
+ #define _MAIN_H_
+
 #include <Arduino.h>
 #include <RollingAvg.h>
 #include <Mcp320x.h>
@@ -59,3 +72,5 @@ enum SystemStates
   SYSTEM_STATE_HOLD,                    // intermediate state after an alarm to shut alarm down before transitioning to NOMINAL
   SYSTEM_HEALTH_CRITICAL_SHUTDOWN  // state used to shut down due to some critical health check error
 };
+
+#endif
