@@ -157,8 +157,6 @@ int configure_adc_channel()
  */
 uint16_t read_adc_pc2()
 {
-//    digitalWrite(BAT_ADC_ENABLE, HIGH);
-
     // Start ADC conversion
     ADCSRA |= (1 << ADSC);
     
@@ -172,7 +170,6 @@ uint16_t read_adc_pc2()
     uint16_t adc_result = ADCL;           // Read low byte first
     adc_result |= (ADCH << 8);            // Read high byte and combine
     
-//    digitalWrite(BAT_ADC_ENABLE, LOW);
     return adc_result;
 }
 
@@ -195,6 +192,7 @@ uint16_t read_adc_pc2_voltage()
     Serial.print("\r\n");
     return voltage_mv;
 }
+
 void setup() {
 
     /*
