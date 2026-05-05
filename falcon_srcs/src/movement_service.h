@@ -39,6 +39,7 @@ class MovementService {
     float vel_threshold;
     float variance_acc, variance_pres;
     float zero_calib_value;
+    float threshold_value;
     
     MovementService(RollingAvg<float> *acc_avg, float *acc_mss, float *adj_acc, float *vel_ms, RollingAvg<float> *pres_avg);
 
