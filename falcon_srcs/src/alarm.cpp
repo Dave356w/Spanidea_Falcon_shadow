@@ -34,6 +34,13 @@ void setup_alarm()
     digitalWrite(PIN_CHASE_LED, LOW);
 
     pinMode(PIN_CHASE_CLK, OUTPUT);
+
+    /*
+     * Enable battery ADC channel
+     */
+//    pinMode(BAT_ADC_ENABLE, OUTPUT);
+//    digitalWrite(BAT_ADC_ENABLE, HIGH);
+
 }
 
 void check_for_active_alarm()

@@ -1,5 +1,9 @@
 #include "movement_service.h"
 
+#define DEFAULT_THRESHOLD_VALUE 0.005
+
+extern float get_threshold_data();
+
 MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, float *adj_acc, float *vel_ms, RollingAvg<float> *pres_avg)
 {
     acc_varience_counter = 0;
@@ -81,10 +85,15 @@ void MovementService::fsm_run()
 
         if ((millis() - start_timer) > CALIB_TIMEOUT_MS) {
             zero_calib_value = acceleration_avg_ref->avg();
+            threshold_value = DEFAULT_THRESHOLD_VALUE;
+
             set_state(STATE_MONITORING);
             Serial.print("-------------------------------------\r\n");
             Serial.print("Zero-Calib-Value : ");
             Serial.print(zero_calib_value, 6);
+            Serial.print("\r\n");
+            Serial.print("Threshold-Value  : ");
+            Serial.print(threshold_value, 6);
             Serial.print("\r\n");
             Serial.print("-------------------------------------\r\n");
             disable_alarm();
@@ -111,6 +120,7 @@ void MovementService::fsm_run()
          */
 
         if (delta_accel > 0.01) {
+//        if (delta_accel > threshold_value) {
             start_timer = millis();
             set_state(STATE_MOVEMENT_DETECTED);
         }

@@ -48,6 +48,8 @@ uint8_t read_pressure();
 void check_for_battery_voltage();
 void log_data();
 void init_pressure_sensor();
+uint16_t read_adc_pc2();
+uint16_t read_adc_pc2_voltage();
 
 
 enum SystemStates
