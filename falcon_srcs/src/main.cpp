@@ -95,12 +95,10 @@ void initialization()
 
         temp_timer = millis();
         battery_avg.add(read_battery_voltage());
+//        battery_avg.add(0);
     }
 
     if (millis() - init_time_g > INIT_TIME_MS) {
-
-//        adj_acc_g = acceleration_avg_g.avg() * -1;
-//        acceleration_avg_g.fill(read_acceleration_mss() + adj_acc_g);
 
         state = SystemStates::SYSTEM_STATE_NOMINAL;
         enable_timer();
@@ -126,7 +124,6 @@ void initialization()
 void loop() 
 {
     static int  bma_read_counter = 0;
-    static unsigned int adc_loop_counter = 0;
 
     switch (state) {
 
@@ -142,18 +139,7 @@ void loop()
             bma_read_counter = 0;
         }
 
-//        check_for_battery_voltage();
-        adc_loop_counter++;
-
-        if (adc_loop_counter == 10000) {
-            digitalWrite(BAT_ADC_ENABLE, HIGH);
-        }
-
-        if (adc_loop_counter == 10100) {
-            adc_loop_counter = 0;
-            read_adc_pc2_voltage();
-            digitalWrite(BAT_ADC_ENABLE, LOW);
-        }
+        check_for_battery_voltage();
 
         check_for_active_alarm();
         break;
@@ -258,16 +244,12 @@ ISR(TIMER1_COMPA_vect)
      * be used inside this function
      */
     interrupts();
-#if 1
+
     if (get_alarm_status()) {
         Serial.print("Skipping Sensor Read \r\n");
-//        acceleration_avg_g.fill(1);
     } else {
         read_acceleration_mss();
     }
-#endif
-
-//    read_acceleration_mss();
 
     /*
      * Turn off interrupts so we can't be interrupted while 
@@ -286,19 +268,6 @@ void log_data()
     static int index = 1;
 
     if (loop_cnt++ > 100) {
-#if 0
-        Serial.print("\r\n Index: ");
-        Serial.print(index);
-        Serial.print(" X: ");
-        Serial.print(x);
-        Serial.print(" Y: ");
-        Serial.print(y);
-        Serial.print(" Z: ");
-        Serial.print(z);
-        Serial.print("\r\n Accl: ");
-        Serial.print(acceleration_avg_g.avg());
-
-#endif
         loop_cnt = 0; 
         index++;
     }
@@ -313,7 +282,6 @@ void debug_log(char *p_log)
 
 inline uint16_t read_battery_voltage() 
 {
-
     float vol_temp = (((float) adc.read(BATT_SENSE) / 4096.0) * 3300) * (VBATT_CONST) * (1.06);
 
     return (uint16_t)vol_temp;
@@ -324,51 +292,25 @@ inline uint16_t read_battery_voltage()
  */
 void check_for_battery_voltage() 
 {
-    static unsigned long status_timer = 0;
+    static unsigned int adc_loop_counter = 0;
+    uint16_t  battery_v = 0;
 
-    if(ms.state != MotionStates::STATE_NOT_MOVING || alarm_status_g == 1) {
-        return ;
+    adc_loop_counter++;
+
+    if (adc_loop_counter == 30000) {
+        digitalWrite(BAT_ADC_ENABLE, HIGH);
     }
 
-    if (millis() - status_timer < 1000) {
-        return; 
-    }
+    if (adc_loop_counter == 30100) {
+        adc_loop_counter = 0;
+        battery_v = read_adc_pc2_voltage();
+        battery_avg.add(battery_v);
+        digitalWrite(BAT_ADC_ENABLE, LOW);
+#if 0
+        if (battery_avg.avg() < VOLTAGE_THRESHOLD) {
 
-    status_timer = millis(); 
-    uint16_t battery_voltage = read_battery_voltage();
-    battery_avg.add(battery_voltage);
 
-    if (battery_avg.avg() > VOLTAGE_THRESHOLD) {
-
-        /*
-         * If the battery voltage is > 3.7 v
-         */
-
-        digitalWrite(PIN_GREEN_LED, HIGH);   
-        delay(BATTERY_BLINK_DURATION_MS);     
-        digitalWrite(PIN_GREEN_LED, LOW); 
-
-    } else if ((battery_avg.avg() > VOLTAGE_LOW) && 
-               (battery_avg.avg() < VOLTAGE_THRESHOLD)) 
-    {
-
-        /*
-         * If the Battery voltage is between 3.0V and 3.7V)
-         */
-
-//        digitalWrite(PIN_RED_LED, HIGH);
-//        digitalWrite(PIN_PIEZO, HIGH);
-        delay(BATTERY_BLINK_DURATION_MS);
-//        digitalWrite(PIN_RED_LED, LOW);
-//        digitalWrite(PIN_PIEZO, LOW);
-
-    } else 
-    {
-        /*
-         * If the Battery voltage is < 3.0V
-         */
-
-//        digitalWrite(PIN_RED_LED, HIGH);
-//        digitalWrite(PIN_PIEZO, HIGH);
+        }
+#endif
     }
 }
