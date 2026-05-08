@@ -11,7 +11,9 @@
 #include "alarm.h"
 
 static uint32_t alarm_timer;
-static bool beep;
+static uint32_t battery_alarm_timer;
+static bool beep, beep_a;
+static uint8_t counter_a = 0;
 static uint8_t counter_b = 0;
 
 inline void advance_chase_leds();
@@ -84,6 +86,44 @@ void check_for_active_alarm()
     return; 
 }
 
+void check_for_battery_alarm()
+{
+    /*
+     * Check if the alarm flag is enabled. If not, then bail out
+     */
+    if (battery_alarm_status_g == 0) {
+        return ;
+    }
+
+    if (millis() - battery_alarm_timer > BATTERY_FLASH_TIME_MS)
+    {
+        battery_alarm_timer = millis();
+        counter_a = (counter_a % 6) + 1;
+
+        // it keeps buzzer and led on for 200 ms, and buzzer and led off for 300ms
+        if (counter_a < 4) {
+            beep_a = 1;
+        } else {
+            beep_a = 0;
+        }
+
+    }
+
+    /*
+     * Turn on RED-LED & Buzzer
+     */
+    if (beep_a)
+    {
+        digitalWrite(PIN_PIEZO, HIGH);
+    }
+    else
+    {
+        digitalWrite(PIN_PIEZO, LOW);
+    }
+
+    return; 
+}
+
 void enable_alarm()
 {
     /*
@@ -101,9 +141,25 @@ void enable_alarm()
     alarm_status_g = 1;
 }
 
+void enable_battery_alarm()
+{
+    /*
+     * Check if alarm-flag is already enabled. If so, it means
+     * that the alarm is already active.
+     */
+
+    if (battery_alarm_status_g == 1) {
+        return ;
+    }
+
+    battery_alarm_status_g = 1;
+}
+
+
 uint8_t get_alarm_status()
 {
-    return (alarm_status_g);
+    uint8_t al_status = alarm_status_g | battery_alarm_status_g;
+    return (al_status);
 }
 
 void disable_alarm()
@@ -125,6 +181,25 @@ void disable_alarm()
     digitalWrite(PIN_RED_LED_EN, LOW);
 
     alarm_status_g = 0;
+}
+
+void disable_battery_alarm()
+{
+    /*
+     * Check if alarm-flag is already disabled. If so, it means
+     * that the alarm is already disabled.
+     */
+
+    if (alarm_status_g == 0) {
+        return ;
+    }
+
+    /*
+     * Turn OFF the alarm & RED LED
+     */
+
+    digitalWrite(PIN_PIEZO, LOW);
+    battery_alarm_status_g = 0;
 }
 
 inline void advance_chase_leds()
