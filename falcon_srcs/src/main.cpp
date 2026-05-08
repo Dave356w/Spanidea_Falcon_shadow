@@ -13,6 +13,7 @@
 uint16_t x_axis_1, x_axis_2, y_axis_1, y_axis_2, z_axis_1, z_axis_2;
 uint8_t sensor_value_updated = 0;
 uint8_t alarm_status_g = 0;
+uint8_t battery_alarm_status_g = 0;
 uint32_t temp_timer = 0;
 uint32_t init_time_g = 0;
 float acc_mss_g = 0.0, vel_ms_g = 0.0, adj_acc_g = 0.0;
@@ -48,8 +49,10 @@ void setup() {
     /*
      * Configure the ADC chip-select line here
     */
+#if 0
     pinMode(PIN_ADC_CS, OUTPUT);
     digitalWrite(PIN_ADC_CS, HIGH);
+#endif
 
     /*
      * Configure the ADC chip here for SPI protocol.
@@ -57,7 +60,6 @@ void setup() {
     SPISettings settings(ADC_CLK, MSBFIRST, SPI_MODE0);
     SPI.begin();
     SPI.beginTransaction(settings);
-
     Serial.print("Configured SPI interface \r\n");
 
     // read_calib_data_from_eeprom();
@@ -94,8 +96,8 @@ void initialization()
     if (millis() - temp_timer > INIT_TIMER_MS) {
 
         temp_timer = millis();
+//        read_battery_voltage();
         battery_avg.add(read_battery_voltage());
-//        battery_avg.add(0);
     }
 
     if (millis() - init_time_g > INIT_TIME_MS) {
@@ -142,6 +144,7 @@ void loop()
         check_for_battery_voltage();
 
         check_for_active_alarm();
+        check_for_battery_alarm();
         break;
 
     default:

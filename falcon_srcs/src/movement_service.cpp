@@ -119,8 +119,8 @@ void MovementService::fsm_run()
          * STATE_MOVEMENT_DETECTED state.
          */
 
-        if (delta_accel > 0.01) {
-//        if (delta_accel > threshold_value) {
+//        if (delta_accel > 0.01) {
+        if (delta_accel > DEFAULT_THRESHOLD_VALUE) {
             start_timer = millis();
             set_state(STATE_MOVEMENT_DETECTED);
         }
