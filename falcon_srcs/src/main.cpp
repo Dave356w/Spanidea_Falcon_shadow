@@ -167,18 +167,13 @@ float read_acceleration_mss()
     g_value = z / 16384.0;
     accel_value = g_value * 9.81;
 
-    Serial.print(" Data : ");
 #if 0
-    Serial.print(x, 6);
-    Serial.print(" ");
-    Serial.print(y, 6);
-    Serial.print(" ");
-#endif
+    Serial.print(" Data : ");
     Serial.print(z, 6);
-
     Serial.print("  G value : ");
     Serial.print(accel_value, 6);
     Serial.print("\r\n");
+#endif
 
     acceleration_avg_g.add(accel_value);
 
@@ -249,7 +244,7 @@ ISR(TIMER1_COMPA_vect)
     interrupts();
 
     if (get_alarm_status()) {
-        Serial.print("Skipping Sensor Read \r\n");
+//        Serial.print("Skipping Sensor Read \r\n");
     } else {
         read_acceleration_mss();
     }
@@ -307,13 +302,19 @@ void check_for_battery_voltage()
     if (adc_loop_counter == 30100) {
         adc_loop_counter = 0;
         battery_v = read_adc_pc2_voltage();
+
+        Serial.print("  Voltage value : ");
+        Serial.print(battery_v);
+        Serial.print("\r\n");
+
         battery_avg.add(battery_v);
         digitalWrite(BAT_ADC_ENABLE, LOW);
-#if 0
-        if (battery_avg.avg() < VOLTAGE_THRESHOLD) {
 
+//        if (battery_avg.avg() < 1660) {
+        if (battery_v < 1600) {
+            Serial.print("  LOW Battery detected \r\n");
+            enable_battery_alarm();
 
         }
-#endif
     }
 }

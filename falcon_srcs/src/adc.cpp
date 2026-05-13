@@ -36,7 +36,8 @@ int configure_adc_channel()
     
     // ADCSRA: Enable ADC, set prescaler to 128 (for 8MHz clock: 8MHz/128 = 62.5kHz)
     ADCSRA = (1 << ADEN) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
-    
+   
+    DIDR0 |= (1 << ADC2D);
     // External ADC chip initialization (kept for compatibility)
 //    adc.begin();
     
@@ -78,11 +79,8 @@ uint16_t read_adc_pc2_voltage()
     // Convert 10-bit ADC result to voltage
     // Voltage = (ADC_result / 1023) * VREF
     // For 3.3V reference: Voltage_mV = (ADC_result * 3300) / 1023
-    uint16_t voltage_mv = (uint32_t)adc_result * 3300 / 1023;
+    uint16_t voltage_mv = (uint32_t)adc_result * 3100 / 1023;
     
-    Serial.print("  Voltage value : ");
-    Serial.print(voltage_mv);
-    Serial.print("\r\n");
     return voltage_mv;
 }
 

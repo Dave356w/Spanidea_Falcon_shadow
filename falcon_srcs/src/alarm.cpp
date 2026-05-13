@@ -190,7 +190,7 @@ void disable_battery_alarm()
      * that the alarm is already disabled.
      */
 
-    if (alarm_status_g == 0) {
+    if (battery_alarm_status_g == 0) {
         return ;
     }
 
