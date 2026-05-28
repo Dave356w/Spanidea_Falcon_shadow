@@ -167,7 +167,7 @@ float read_acceleration_mss()
     g_value = z / 16384.0;
     accel_value = g_value * 9.81;
 
-#if 0
+#if 1
     Serial.print(" Data : ");
     Serial.print(z, 6);
     Serial.print("  G value : ");
@@ -179,7 +179,7 @@ float read_acceleration_mss()
 
     return (bosch_acceleration_avg_g.avg());
 }
-#if 0
+#if 1
 void enable_timer()
 {
     cli();
@@ -196,6 +196,7 @@ void enable_timer()
 }
 #endif
 
+#if 0
 void enable_timer()
 {
     cli();
@@ -218,7 +219,7 @@ void enable_timer()
 
     sei();
 }
-
+#endif
 void disable_timer1()
 {
     // reset Control Register to disable timer
