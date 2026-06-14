@@ -15,6 +15,7 @@ static uint32_t battery_alarm_timer;
 static bool beep, beep_a;
 static uint8_t counter_a = 0;
 static uint8_t counter_b = 0;
+static bool buzzer_on = false;
 
 inline void advance_chase_leds();
 
@@ -75,12 +76,14 @@ void check_for_active_alarm()
         digitalWrite(PIN_PIEZO, HIGH);
         digitalWrite(PIN_RED_LED_PWM, HIGH);
         digitalWrite(PIN_RED_LED_EN, HIGH);
+        buzzer_on = true;
     }
     else
     {
         digitalWrite(PIN_PIEZO, LOW);
         digitalWrite(PIN_RED_LED_PWM, LOW);
         digitalWrite(PIN_RED_LED_EN, LOW);
+        buzzer_on = false;
     }
 
     return; 
@@ -115,10 +118,12 @@ void check_for_battery_alarm()
     if (beep_a)
     {
         digitalWrite(PIN_PIEZO, HIGH);
+        buzzer_on = true;
     }
     else
     {
         digitalWrite(PIN_PIEZO, LOW);
+        buzzer_on = false;
     }
 
     return; 
@@ -155,6 +160,10 @@ void enable_battery_alarm()
     battery_alarm_status_g = 1;
 }
 
+bool get_buzzer_status()
+{
+    return (buzzer_on);
+}
 
 uint8_t get_alarm_status()
 {
