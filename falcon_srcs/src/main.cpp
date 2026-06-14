@@ -37,6 +37,7 @@ MovementService ms(&acceleration_avg_g, &acc_mss_g, &adj_acc_g, &vel_ms_g, &pres
 uint16_t read_battery_voltage();
 extern int configure_adc_channel();
 extern uint16_t read_adc_pc2_voltage();
+extern bool get_buzzer_status();
 
 void setup() {
 
@@ -245,7 +246,9 @@ ISR(TIMER1_COMPA_vect)
     interrupts();
 
     if (get_alarm_status()) {
-//        Serial.print("Skipping Sensor Read \r\n");
+        if (get_buzzer_status() == false) {
+            read_acceleration_mss();
+        }
     } else {
         read_acceleration_mss();
     }

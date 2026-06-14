@@ -119,7 +119,6 @@ void MovementService::fsm_run()
          * STATE_MOVEMENT_DETECTED state.
          */
 
-//        if (delta_accel > 0.01) {
         if (delta_accel > DEFAULT_THRESHOLD_VALUE) {
             start_timer = millis();
             set_state(STATE_MOVEMENT_DETECTED);
@@ -144,26 +143,38 @@ void MovementService::fsm_run()
             Serial.print("FSM: Transitioned to STATE_MOVING \r\n");
             last_state = MotionStates::STATE_MOVING;
         }
-#if 0
+
         /*
-         * In this state, if the movement stops, then we start
-         * a timer, which will decide when to stop.
+         * In this state, if the timeout happens, then we check whether
+         * the average reading is still high. This is to because when the
+         * buzzer is triggered, there is some vibration and this used to
+         * keep adding into the averaging logic.
          */
-        present_accel = acceleration_avg_ref->avg();
-        delta_accel = 0.0;
 
-        if (present_accel > zero_calib_value)
-            delta_accel = present_accel - zero_calib_value;
-        else if (present_accel < zero_calib_value)
-            delta_accel = zero_calib_value - present_accel;
-
-        if (delta_accel < 0.01) {
-            start_timer = millis();
-            set_state(STATE_DECELERATING);
-        }
-#endif
         if ((millis() - movement_start_timer) > STOP_TIMEOUT_MS) {
+
             Serial.print("FSM: Alarm timeout happened \r\n");
+            present_accel = acceleration_avg_ref->avg();
+            delta_accel = 0.0;
+
+
+            if (present_accel > zero_calib_value)
+                delta_accel = present_accel - zero_calib_value;
+            else if (present_accel < zero_calib_value)
+                delta_accel = zero_calib_value - present_accel;
+
+            Serial.print("FSM: Average : ");
+            Serial.print(present_accel, 6);
+            Serial.print("\r\n");
+            Serial.print("FSM: Delta   : ");
+            Serial.print(delta_accel, 6);
+            Serial.print("\r\n");
+
+            if (delta_accel > DEFAULT_THRESHOLD_VALUE) {
+                Serial.print("FSM: Still in movement \r\n");
+                movement_start_timer = millis();
+                break;
+            }
             set_state(STATE_DECELERATING);
         }
 
