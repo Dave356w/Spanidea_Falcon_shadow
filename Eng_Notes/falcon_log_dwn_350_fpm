@@ -1,0 +1,104 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2026.07.15 12:29:14 =~=~=~=~=~=~=~=~=~=~=~=
+ Data : 996.215820  G value : 0.596489
+ Data : 996.276855  G value : 0.596526
+ Data : 997.436523  G value : 0.597220
+ Data : 997.619628  G value : 0.597330
+ Data : 995.605468  G value : 0.596124
+ Data : 996.948242  G value : 0.596928
+ Data : 998.718261  G value : 0.597987
+ Data : 997.131347  G value : 0.597037
+ Data : 998.779296  G value : 0.598024
+ Data : 996.826171  G value : 0.596855
+ Data : 999.511718  G value : 0.598463
+  Voltage value : 2196
+ Data : 1000.061035  G value : 0.598791
+ Data : 996.582031  G value : 0.596708
+ Data : 995.300292  G value : 0.595941
+ Data : 996.276855  G value : 0.596526
+ Data : 997.009277  G value : 0.596964
+ Data : 999.816894  G value : 0.598645
+ Data : 998.291015  G value : 0.597732
+ Data : 996.948242  G value : 0.596928
+ Data : 997.741699  G value : 0.597403
+ Data : 997.070312  G value : 0.597001
+ Data : 994.567871  G value : 0.595502
+ Data : 970.886230  G value : 0.581323
+ Data : 941.833496  G value : 0.563927
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ Data : 944.152832  G value : 0.565316
+ Data : 930.847167  G value : 0.557349
+ Data : 936.035156  G value : 0.560456
+FSM: Transitioned to STATE_MOVING 
+ Data : 942.077636  G value : 0.564074
+ Data : 939.941406  G value : 0.562794
+ Data : 939.086914  G value : 0.562283
+ Data : 954.895019  G value : 0.571748
+ Data : 993.103027  G value : 0.594625
+ Data : 993.286132  G value : 0.594735
+ Data : 996.704101  G value : 0.596781
+ Data : 1003.540039  G value : 0.600874
+ Data : 999.450683  G value : 0.598426
+ Data : 993.469238  G value : 0.594845
+ Data : 998.718261  G value : 0.597987
+ Data : 999.206542  G value : 0.598280
+ Data : 1005.615234  G value : 0.602117
+ Data : 1002.502441  G value : 0.600253
+ Data : 987.609863  G value : 0.591336
+ Data : 989.807128  G value : 0.592652
+  Voltage value : 2063
+ Data : 1017.211914  G value : 0.609061
+ Data : 999.145507  G value : 0.598243
+ Data : 989.135742  G value : 0.592250
+ Data : 991.394042  G value : 0.593602
+ Data : 992.248535  G value : 0.594114
+FSM: Alarm timeout happened 
+FSM: Average : 0.594552
+FSM: Delta   : 0.002631
+FSM: Transitioned to STATE_DECELERATING 
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to ST TE_MONITORING 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ Data : 1048.828125  G value : 0.627991
+ Data : 1058.898925  G value : 0.634021
+ Data : 1065.551757  G value : 0.638004
+FSM: Transitioned to STATE_MOVING 
+ Data : 1061.523437  G value : 0.635592
+ Data : 1059.997558  G value : 0.634679
+ Data : 1055.480957  G value : 0.631974
+ Data : 1010.803222  G value : 0.605223
+ Data : 998.229980  G value : 0.597695
+ Data : 992.248535  G value : 0.594114
+ Data : 994.445800  G value : 0.595429
+ Data : 994.750976  G value : 0.595612
+ Data : 997.009277  G value : 0.596964
+ Data : 995.544433  G value : 0.596087
+ Data : 997.070312  G value : 0.597001
+ Data : 998.168945  G value : 0.597659
+ Data : 996.704101  G value : 0.596781
+ Data : 995.849609  G value : 0.596270
+ Data : 996.704101  G value : 0.596781
+ Data : 995.117187  G value : 0.595831
+ Data : 995.300292  G value : 0.595941
+ Data : 1005.371093  G value : 0.601971
+ Data : 997.253417  G value : 0.597110
+  Voltage value : 2060
+ Data : 997.985839  G value : 0.597549
+ Data : 997.619628  G value : 0.597330
+FSM: Alarm timeout happened 
+FSM: Average : 0.598490
+FSM: Delta   : 0.001306
+FSM: Transitioned to STATE_DECELERATING 
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitione  to STATE_MONITORING 
+ Data : 995.422363  G value : 0.596014
+ Data : 995.727539  G value : 0.596197
+ Data : 997.985839  G value : 0.597549
+ Data : 995.971679  G value : 0.596343
+ Data : 996.520996  G value : 0.596672
+ Data : 996.887207  G value : 0.596891
+ Data : 996.337890  G value : 0.596562
+ Data : 997.436523  G value : 0.597220
+ Data : 995.544433  G value : 0.596087
+ Data : 995.971679  G value : 0.596343
+ Data : 996.154785  G value : 0.596453
+ 
