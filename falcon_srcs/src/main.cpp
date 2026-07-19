@@ -10,6 +10,31 @@
 #include "common.h"
 #include <EEPROM.h>
 
+/*
+ * FreeRTOS (feilipu/Arduino_FreeRTOS_Library).
+ * Must be included before any other FreeRTOS header. The kernel tick is driven
+ * by the Watchdog Timer, so Timer1 remains free for the accelerometer sampling
+ * ISR (see enable_timer() / ISR(TIMER1_COMPA_vect) below). Arduino millis()/
+ * delay()/Serial continue to work unchanged.
+ */
+#include <Arduino_FreeRTOS.h>
+#include <task.h>
+
+/*
+ * Main application task. This is the first, minimal-wrap step of the FreeRTOS
+ * migration: the body is the former loop() verbatim, now running as a single
+ * FreeRTOS task. The Watchdog tick preempts it for time-slicing, so it runs
+ * free (no vTaskDelay) to preserve the original loop-iteration timing that the
+ * counter thresholds below depend on. Subsequent phases can decompose this into
+ * dedicated sensor / FSM / alarm / battery tasks communicating via queues.
+ */
+static void TaskFalconMain(void *pvParameters);
+
+/* Stack depth in words (AVR word = 2 bytes). fsm_run() + Serial float prints
+ * are stack-heavy, so give it headroom above configMINIMAL_STACK_SIZE. Confirm
+ * against the build's RAM report; SRAM on the ATmega328PB is only 2 KB. */
+#define FALCON_MAIN_TASK_STACK   160
+
 uint16_t x_axis_1, x_axis_2, y_axis_1, y_axis_2, z_axis_1, z_axis_2;
 uint8_t sensor_value_updated = 0;
 uint8_t alarm_status_g = 0;
@@ -84,6 +109,20 @@ void setup() {
     */
 
     configure_adc_channel();
+
+    /*
+     * Create the single application task holding the former loop() logic.
+     * The feilipu library starts the scheduler automatically once setup()
+     * returns, so no explicit vTaskStartScheduler() call is needed and loop()
+     * is left empty.
+     */
+    xTaskCreate(
+        TaskFalconMain,           // task entry point
+        "Falcon",                 // human-readable name (debug only)
+        FALCON_MAIN_TASK_STACK,   // stack depth in words
+        NULL,                     // no parameters
+        tskIDLE_PRIORITY + 1,     // one level above idle
+        NULL);                    // no handle needed
 }
 
 void initialization()
@@ -124,35 +163,47 @@ void initialization()
 }
 
 
-void loop() 
+static void TaskFalconMain(void *pvParameters)
 {
+    (void) pvParameters;
+
     static int  bma_read_counter = 0;
 
-    switch (state) {
+    for (;;) {
 
-    case SystemStates::SYSTEM_STATE_INITIALIZING:
-        initialization();
-        break;
+        switch (state) {
 
-    case SystemStates::SYSTEM_STATE_NOMINAL:
-        ms.fsm_run();
+        case SystemStates::SYSTEM_STATE_INITIALIZING:
+            initialization();
+            break;
 
-        if (bma_read_counter++ > 1000 ) {
-            log_data();
-            bma_read_counter = 0;
+        case SystemStates::SYSTEM_STATE_NOMINAL:
+            ms.fsm_run();
+
+            if (bma_read_counter++ > 1000 ) {
+                log_data();
+                bma_read_counter = 0;
+            }
+
+            check_for_battery_voltage();
+
+            check_for_active_alarm();
+            check_for_battery_alarm();
+            break;
+
+        default:
+            state = SystemStates::SYSTEM_STATE_HOLD;
+            break;
         }
-
-        check_for_battery_voltage();
-
-        check_for_active_alarm();
-        check_for_battery_alarm();
-        break;
-
-    default:
-        state = SystemStates::SYSTEM_STATE_HOLD;
-        break;
     }
+}
 
+/*
+ * Empty: all work happens in FreeRTOS tasks. The scheduler is started
+ * automatically by the library after setup() returns and never reaches here.
+ */
+void loop()
+{
 }
 
 /*
