@@ -14,7 +14,8 @@
 #include <Arduino.h>
 #include "common.h"
 
-#define BEEP_FLASH_TIME_MS        100
+//#define BEEP_FLASH_TIME_MS        100
+#define BEEP_FLASH_TIME_MS        50
 #define BATTERY_FLASH_TIME_MS     600
 
 extern uint8_t alarm_status_g;

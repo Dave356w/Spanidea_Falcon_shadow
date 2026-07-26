@@ -1,6 +1,7 @@
 #include "movement_service.h"
 
-#define DEFAULT_THRESHOLD_VALUE 0.005
+//#define DEFAULT_THRESHOLD_VALUE 0.005
+#define DEFAULT_THRESHOLD_VALUE 0.40
 
 extern float get_threshold_data();
 

@@ -55,7 +55,7 @@ void check_for_active_alarm()
     if (millis() - alarm_timer > BEEP_FLASH_TIME_MS)
     {
         alarm_timer = millis();
-        counter_b = (counter_b % 5) + 1;
+        counter_b = (counter_b % 8) + 1;
 
         // it keeps buzzer and led on for 200 ms, and buzzer and led off for 300ms
         if (counter_b < 3) {
@@ -73,14 +73,14 @@ void check_for_active_alarm()
      */
     if (beep)
     {
-        digitalWrite(PIN_PIEZO, HIGH);
+//        digitalWrite(PIN_PIEZO, HIGH);
         digitalWrite(PIN_RED_LED_PWM, HIGH);
         digitalWrite(PIN_RED_LED_EN, HIGH);
         buzzer_on = true;
     }
     else
     {
-        digitalWrite(PIN_PIEZO, LOW);
+//        digitalWrite(PIN_PIEZO, LOW);
         digitalWrite(PIN_RED_LED_PWM, LOW);
         digitalWrite(PIN_RED_LED_EN, LOW);
         buzzer_on = false;
