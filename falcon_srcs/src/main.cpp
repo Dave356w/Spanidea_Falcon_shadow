@@ -165,14 +165,16 @@ float read_acceleration_mss()
     bma456.getAcceleration(&x, &y, &z);
 
 
-    g_value = z / 16384.0;
+    g_value = z / 1000.0;
     accel_value = g_value * 9.81;
 
 #if 1
-    Serial.print(" Data : ");
-    Serial.print(z, 6);
+//    Serial.print(" Data : ");
+//    Serial.print(z, 6);
     Serial.print("  G value : ");
     Serial.print(accel_value, 6);
+    Serial.print(" Ave : ");
+    Serial.print(acceleration_avg_g.avg(), 6);
     Serial.print("\r\n");
 #endif
 
