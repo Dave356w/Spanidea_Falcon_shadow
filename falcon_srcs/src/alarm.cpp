@@ -11,10 +11,12 @@
 #include "alarm.h"
 
 static uint32_t alarm_timer;
+static uint32_t chase_led_timer;
 static uint32_t battery_alarm_timer;
-static bool beep, beep_a;
+static bool beep, beep_a, led_on;
 static uint8_t counter_a = 0;
 static uint8_t counter_b = 0;
+static uint8_t counter_c = 0;
 static bool buzzer_on = false;
 
 inline void advance_chase_leds();
@@ -43,6 +45,8 @@ void setup_alarm()
 
 }
 
+#if 0
+
 void check_for_active_alarm()
 {
     /*
@@ -55,7 +59,7 @@ void check_for_active_alarm()
     if (millis() - alarm_timer > BEEP_FLASH_TIME_MS)
     {
         alarm_timer = millis();
-        counter_b = (counter_b % 8) + 1;
+        counter_b = (counter_b % 5) + 1;
 
         // it keeps buzzer and led on for 200 ms, and buzzer and led off for 300ms
         if (counter_b < 3) {
@@ -87,6 +91,91 @@ void check_for_active_alarm()
     }
 
     return; 
+}
+#endif
+
+void check_for_buzzer_alert()
+{
+    /*
+     * Check if the alarm flag is enabled. If not, then bail out
+     */
+    if (alarm_status_g == 0) {
+        return ;
+    }
+
+    if (millis() - alarm_timer > BEEP_FLASH_TIME_MS)
+    {
+        alarm_timer = millis();
+        counter_b = (counter_b % 5) + 1;
+
+        // it keeps buzzer and led on for 200 ms, and buzzer and led off for 300ms
+        if (counter_b < 3) {
+            beep = 1;
+        } else {
+            beep = 0;
+        }
+
+    }
+
+    if (beep)
+    {
+        digitalWrite(PIN_PIEZO, HIGH);
+        buzzer_on = true;
+    }
+    else
+    {
+        digitalWrite(PIN_PIEZO, LOW);
+//        buzzer_on = false;
+        buzzer_on = true;
+    }
+
+}
+
+void check_for_chase_led_alert()
+{
+    /*
+     * Check if the CHASE-LED flag is enabled. If not, then bail out
+     */
+    if (chase_led_status_g == 0) {
+        return ;
+    }
+
+    if (millis() - chase_led_timer > BEEP_FLASH_TIME_MS)
+    {
+        chase_led_timer = millis();
+        counter_c = (counter_c % 5) + 1;
+
+        if (counter_c < 3) {
+            led_on = 1;
+        } else {
+            led_on = 0;
+        }
+
+        // Toggle the chase LED pin, 100ms once it advance the chase LED
+        advance_chase_leds();
+
+    }
+
+    if (led_on)
+    {
+        digitalWrite(PIN_RED_LED_PWM, HIGH);
+        digitalWrite(PIN_RED_LED_EN, HIGH);
+    }
+    else
+    {
+        digitalWrite(PIN_RED_LED_PWM, LOW);
+        digitalWrite(PIN_RED_LED_EN, LOW);
+    }
+
+}
+
+void check_for_active_alarm()
+{
+    check_for_buzzer_alert();
+    check_for_chase_led_alert();
+
+    return; 
+
 }
 
 void check_for_battery_alarm()
@@ -127,6 +216,16 @@ void check_for_battery_alarm()
     }
 
     return; 
+}
+
+void enable_chase_leds()
+{
+    if (chase_led_status_g == 1) {
+        return ;
+    }
+
+    chase_led_status_g = 1;
+
 }
 
 void enable_alarm()
@@ -184,12 +283,34 @@ void disable_alarm()
      * Turn OFF the alarm & RED LED
      */
     digitalWrite(PIN_PIEZO, LOW);
+    buzzer_on = false;
+
+//    digitalWrite(PIN_CHASE_LED, HIGH);
+//    digitalWrite(PIN_CHASE_LED, LOW);
+//    digitalWrite(PIN_RED_LED_PWM, LOW);
+//    digitalWrite(PIN_RED_LED_EN, LOW);
+
+    alarm_status_g = 0;
+}
+
+void disable_chase_leds()
+{
+    /*
+     * Check if alarm-flag is already disabled. If so, it means
+     * that the alarm is already disabled.
+     */
+    if (chase_led_status_g == 0) {
+      return ;
+    }
+    /*
+     * Turn OFF the alarm & RED LED
+     */
     digitalWrite(PIN_CHASE_LED, HIGH);
     digitalWrite(PIN_CHASE_LED, LOW);
     digitalWrite(PIN_RED_LED_PWM, LOW);
     digitalWrite(PIN_RED_LED_EN, LOW);
 
-    alarm_status_g = 0;
+    chase_led_status_g = 0;
 }
 
 void disable_battery_alarm()

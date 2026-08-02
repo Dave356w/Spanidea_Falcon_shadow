@@ -9,7 +9,7 @@
 #define MOVING_ACC_THRESHOLD           (0.05)
 #define CALIB_TIMEOUT_MS               10000
 #define MOVEMENT_DETECTION_TIMEOUT_MS  1000
-#define STOP_TIMEOUT_MS                10000
+#define STOP_TIMEOUT_MS                15000
 
 
 enum MotionStates
@@ -33,6 +33,7 @@ class MovementService {
   public:
     MotionStates state;
     MotionStates last_state;
+    bool log_printed;
     RollingAvg<float> *pressure_avg_ref;
     RollingAvg<float> *acceleration_avg_ref;
     float *vel_ms_ref, *adj_acc_ref, *acc_mss_ref;
@@ -45,6 +46,8 @@ class MovementService {
 
 //    void run(void);
     void fsm_run(void);
+    int  get_state();
+
   private:
     uint8_t acc_varience_counter, pressure_varience_counter;
     uint32_t timer_ms;
@@ -52,6 +55,7 @@ class MovementService {
     uint32_t reset_counter;
     uint32_t start_timer;
     uint32_t movement_start_timer;
+    uint32_t current_time;
 
     void reset_counters();
     void setErrorResetState();
