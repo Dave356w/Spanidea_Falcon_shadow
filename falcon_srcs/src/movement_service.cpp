@@ -24,6 +24,7 @@ MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, flo
 
     state = MotionStates::STATE_ERROR_RESET;
     last_state = MotionStates::STATE_ERROR_RESET;
+    log_printed = 0;
 
     monitor_state = MonitorStates::MONITORING;
 }
@@ -64,7 +65,6 @@ void MovementService::reset_counters(void)
 void MovementService::fsm_run()
 {
     float    present_accel = 0.0, delta_accel = 0.0;
-
 
     switch (state) {
 
@@ -135,6 +135,7 @@ void MovementService::fsm_run()
         if ((millis() - start_timer) > MOVEMENT_DETECTION_TIMEOUT_MS) {
             movement_start_timer = millis();
             enable_alarm();
+            enable_chase_leds();
             set_state(STATE_MOVING);
         }
         break;
@@ -146,15 +147,45 @@ void MovementService::fsm_run()
         }
 
         /*
-         * In this state, if the timeout happens, then we check whether
-         * the average reading is still high. This is to because when the
-         * buzzer is triggered, there is some vibration and this used to
-         * keep adding into the averaging logic.
+         * In this state, there are 2 timeouts. They are
+         * a. Buzzer Timeout
+         * b. Chase LED timeout
+         * 
+         * After Buzzer timeout happens, we will stop the buzzer, but the chase 
+         * LED will continue to blink, till the chase LED timeout happens.
+         * This is to because when the buzzer is triggered, there is still some 
+         * vibration and this will keep adding to the averaging logic.
+         *
          */
+
+        current_time = millis();
+
+        /*
+         * If the movement has stopped, then we will stop the buzzer and chase LED
+         * after 5 seconds. This is to avoid false alarm.
+         *
+         * If the movement has not stopped, then we will keep the buzzer and chase LED
+         * on for 30 seconds. After that, we will stop the buzzer and chase LED.
+         *
+         * If the movement has not stopped even after 30 seconds, then we will 
+         * transition to STATE_DECELERATING state.
+         *
+        */
+        if ((current_time - movement_start_timer) > (STOP_TIMEOUT_MS - 5000) &&
+            (current_time - movement_start_timer) < (STOP_TIMEOUT_MS)) {
+#if 1
+            if (log_printed == 0) {
+                Serial.print("FSM: Buzzer timeout happened \r\n");
+                log_printed = 1;
+            }
+#endif
+            disable_alarm();
+        }
 
         if ((millis() - movement_start_timer) > STOP_TIMEOUT_MS) {
 
-            Serial.print("FSM: Alarm timeout happened \r\n");
+            log_printed = 0;
+            Serial.print("FSM: Chase-LED timeout happened \r\n");
             present_accel = acceleration_avg_ref->avg();
             delta_accel = 0.0;
 
@@ -174,6 +205,7 @@ void MovementService::fsm_run()
             if (delta_accel > DEFAULT_THRESHOLD_VALUE) {
                 Serial.print("FSM: Still in movement \r\n");
                 movement_start_timer = millis();
+                enable_alarm();
                 break;
             }
             set_state(STATE_DECELERATING);
@@ -188,7 +220,8 @@ void MovementService::fsm_run()
         }
 
         if ((millis() - start_timer) > STOP_TIMEOUT_MS) {
-            disable_alarm();
+//            disable_alarm();
+            disable_chase_leds();
             set_state(STATE_STOPPED);
         }
         break;
@@ -347,4 +380,9 @@ void MovementService::setErrorResetState()
 void MovementService::set_state(int arg_state)
 {
     state = arg_state;
+}
+
+int MovementService::get_state()
+{
+    return (state);
 }

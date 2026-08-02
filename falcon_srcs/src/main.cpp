@@ -13,6 +13,7 @@
 uint16_t x_axis_1, x_axis_2, y_axis_1, y_axis_2, z_axis_1, z_axis_2;
 uint8_t sensor_value_updated = 0;
 uint8_t alarm_status_g = 0;
+uint8_t chase_led_status_g = 0;
 uint8_t battery_alarm_status_g = 0;
 uint32_t temp_timer = 0;
 uint32_t init_time_g = 0;
@@ -175,6 +176,8 @@ float read_acceleration_mss()
     Serial.print(accel_value, 6);
     Serial.print(" Ave : ");
     Serial.print(acceleration_avg_g.avg(), 6);
+    Serial.print(" State : ");
+    Serial.print(ms.get_state());
     Serial.print("\r\n");
 #endif
 
