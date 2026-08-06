@@ -141,14 +141,25 @@ void BMA456::stepCounterEnable(MA456_PLATFORM_CONF conf, bool cmd) {
     bma456_feature_enable(BMA456_STEP_CNTR, cmd, &accel);
 }
 
-void BMA456::getAcceleration(float* x, float* y, float* z) {
+uint16_t BMA456::getAcceleration(float* x, float* y, float* z) {
     struct bma4_accel sens_data;
+    uint16_t          rslt;
 
-    bma4_read_accel_xyz(&sens_data, &accel);
+    rslt = bma4_read_accel_xyz(&sens_data, &accel);
+
+    if (rslt != BMA4_OK) {
+        /*
+         * Leave the outputs alone. Writing zeros here is what made a dead
+         * sensor indistinguishable from a stationary one.
+         */
+        return (rslt);
+    }
 
     *x = (float)sens_data.x * devRange / 32768;
     *y = (float)sens_data.y * devRange / 32768;
     *z = (float)sens_data.z * devRange / 32768;
+
+    return (BMA4_OK);
 }
 
 int32_t BMA456::getTemperature(void) {

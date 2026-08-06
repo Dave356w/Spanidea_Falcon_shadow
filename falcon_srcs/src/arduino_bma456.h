@@ -87,7 +87,13 @@ class BMA456 {
 
     void stepCounterEnable(MA456_PLATFORM_CONF conf = WRIST_CONFIG, bool cmd = true);
 
-    void getAcceleration(float* x, float* y, float* z);
+    /*
+     * Returns BMA4_OK on success. On failure the outputs are left untouched,
+     * so the caller must check the result rather than trusting the values it
+     * passed in. A non-responding sensor previously produced a valid-looking
+     * 0.0, which the FSM reads as "perfectly still" — see Eng_Notes §10.2.
+     */
+    uint16_t getAcceleration(float* x, float* y, float* z);
 
     int32_t getTemperature(void);
 
