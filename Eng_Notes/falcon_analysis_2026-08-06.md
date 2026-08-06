@@ -1,14 +1,20 @@
 # Falcon firmware — analysis and roadmap
 
-**Date:** 2026-08-06
-**Baseline:** `Falcon_Rel_EFT` @ `59e945f` ("Added a workaround")
-**Evidence:** the eight PuTTY captures on `eft-results-2026-07-15`, plus source reading
+**Date:** 2026-08-06 · **Revised:** 2026-08-06 (bench session, PR #1 flashed)
+**Baseline:** `Falcon_Rel_EFT` @ `41b8996` (PR #1 merged; was `59e945f`)
+**Evidence:** the eight PuTTY captures on `eft-results-2026-07-15`, source reading,
+and a bench session on 2026-08-06 with PR #1 running on hardware
 **Status of each item is marked** ✅ fixed · 🔧 in progress · ⬜ not started
 
 This document exists so the reasoning survives independently of any one work
 session. Every claim below is either derived from the source or measured from
 the July captures; anything unverified is marked **ASSUMPTION** with the check
 needed to confirm it.
+
+**2026-08-06 bench session** flashed PR #1 and confirmed two predictions (the
+1 MHz fuse, the 3.13 Hz rate) while turning up four defects the log-only analysis
+could not see — three of them field-reliability problems that outrank the
+detection tuning this document originally focused on. See §10.
 
 ---
 
@@ -39,9 +45,18 @@ being set to it):
 `millis()`, which scales with the same oscillator, so the ratio cancels and it
 only confirms the compile-time constant.
 
-⬜ **To confirm definitively:** `avrdude -c stk500 -P COM4 -p m328pb -U lfuse:r:-:h`
-→ `0x62` confirms. `0xFF` means external crystal and much of the arithmetic
-below needs redoing.
+✅ **Confirmed on the bench, 2026-08-06.** `avrdude -c stk500 -P COM6 -p m328pb
+-U lfuse:r:-:h` →
+
+```
+avrdude: device signature = 0x1e9516 (probably m328pb)
+avrdude: reading lfuse memory ...
+0x62
+```
+
+`lfuse = 0x62` is `CKSEL=0010` (8 MHz internal RC) with `CKDIV8` programmed, so
+the part runs at 1 MHz. The signature also confirms a genuine ATmega328PB. All
+arithmetic in this document stands on a measured clock, not an assumed one.
 
 `compile_commands.json` is committed and says `F_CPU=16000000L`. It is a stale
 artifact from an older build and should be ignored — it caused a wrong turn
@@ -74,6 +89,17 @@ Two independent bugs, multiplying to 32×:
 
 `1e6 / 1024 / (2 × 156)` = **3.13 Hz**. Measured 3.0. The disabled `#if 0` block
 twenty lines below has the correct `TCCR1B |= (1 << WGM12)` (CTC mode 4).
+
+✅ **Confirmed to three digits, 2026-08-06.** PR #1's `millis()` timestamps make
+the rate directly measurable instead of inferred from operator-observed
+transitions. Consecutive `t=` deltas alternate 311 / 328 ms — mean **319.5 ms =
+3.130 Hz**, against 3.13 Hz predicted.
+
+This is now a real confirmation rather than the circular one §1 warned about. The
+July 3.0 Hz figure was derived against `millis()` on an *assumed* clock; this one
+is measured against `millis()` on a clock confirmed by fuse read, so the
+oscillator no longer cancels out of the comparison. Both bugs are real and the
+32× error is exactly as described.
 
 ### Why this breaks slow-speed detection
 
@@ -227,6 +253,32 @@ every one inside a state-transition burst (`STA E_MONITORING`,
 Fixed: the ISR publishes a snapshot, `loop()` prints. New format adds `millis()`
 timestamps, I²C read duration (`rd=`) and an ISR overrun counter (`ov=`).
 
+The timestamps and `rd=` both earned their keep immediately — §2's rate is now
+confirmed to three digits and `rd=` turned out to be a usable sensor-health
+signal (§10.2). But the overrun counter does not work.
+
+### 🔴 6a. `ov=` does not detect the decimation it exists to detect
+
+Printed samples arrive in bursts of ~6 followed by a gap of 1917 or 2229 ms.
+1917 ms is exactly 6 × 319.5 ms — six missing samples, so **roughly half of all
+samples never reach the log**. Across every bench run `ov` read exactly **6**:
+identical with good batteries, with a dead sensor, and with no batteries at all.
+A counter that reports the same value under every condition is not counting.
+
+`ov` was added specifically so that "non-zero means the log is being silently
+decimated". It is non-zero, it is not tracking the decimation, and its constancy
+makes it look like a stable startup artifact rather than an active problem.
+
+⬜ **Not yet diagnosed.** The two candidates are (a) the ISR genuinely stops
+firing during the gaps, in which case nothing is overrun and the samples are
+never published, or (b) `sample_pending` is being cleared such that the overrun
+branch is unreachable. (a) would be the more serious finding, since it would mean
+the timer stalls for ~2 s at a time and no timing measured from these logs can be
+trusted. Distinguish by incrementing a free-running counter in the ISR itself and
+printing it alongside `ov`.
+
+This is a defect in PR #1, not in the firmware it instrumented.
+
 ---
 
 ## 7. Threshold analysis
@@ -289,37 +341,68 @@ No (threshold, sustain) combination recovers a departure from this data.
 
 ## 8. Roadmap
 
+**Resequenced 2026-08-06.** The original roadmap was ordered around making
+detection *better*. The bench session found three defects that make the unit lie
+about whether it works at all (§10), and those now come first. A 100 Hz detector
+on a sensor that silently reports zero is still a dead unit.
+
 | # | Change | Status | Notes |
 |---|---|---|---|
-| 1 | Move `Serial.print` out of the ISR; add timestamps | ✅ PR #1 | |
+| 1 | Move `Serial.print` out of the ISR; add timestamps | ✅ PR #1 | `ov=` is defective, see 3a |
 | 2 | Fix `TWI_FREQ`; instrument I²C read time | ✅ PR #1 | sensor was never affected — it's on TWI1 |
-| 3 | **Fix Timer1: CTC mode (`WGM12`), prescaler 64 → 100 Hz** | ⬜ | **the** fix; everything else assumes it |
-| 4 | Delete the dead pressure path | ⬜ | §4 |
-| 5 | Restore `buzzer_on = false` on beep-off phase | ⬜ | §5 |
-| 6 | Departure-latch / decel-release FSM, no timeout | ⬜ | §3 |
-| 7 | Sustain-gated threshold, recomputed at 100 Hz | ⬜ | §7 |
-| 8 | Cleanups: `#if 0` block, `movement_service.cpp.original`, `current_time` member, missing EOF newline, untrack `.pio/` + `compile_commands.json` | ⬜ | |
+| 3 | **Check the `bma4_read_accel_xyz()` return code; fault instead of reporting 0.0** | ⬜ | §10.2. Silent failure of the core function |
+| 3a | Fix `ov=` so decimation is actually detected | ⬜ | §6a. Blocks trusting any log timing |
+| 4 | **Call `disable_battery_alarm()` when voltage recovers; average before latching** | ⬜ | §10.3. One bad sample = permanent beeping |
+| 5 | **Fix Timer1: CTC mode (`WGM12`), prescaler 64 → 100 Hz** | ⬜ | **the** detection fix; everything below assumes it |
+| 6 | Delete the dead pressure path | ⬜ | §4 |
+| 7 | Restore `buzzer_on = false` on beep-off phase | ⬜ | §5 |
+| 8 | Departure-latch / decel-release FSM, no timeout | ⬜ | §3 |
+| 9 | Sustain-gated threshold, recomputed at 100 Hz | ⬜ | §7 |
+| 10 | Cleanups: `#if 0` block, `movement_service.cpp.original`, `current_time` member, missing EOF newline, untrack `.pio/` + `compile_commands.json`, stray `falcon_srcs.code-workspace` in `src/` | ⬜ | |
 
-**Sequencing note:** re-run the EFT after 3–5 and before 6–7. At 100 Hz with a
+**Sequencing note:** re-run the EFT after 5–7 and before 8–9. At 100 Hz with a
 40 ms average window the detector may behave so differently that the tuning
 question changes completely. Every number in the July report describes a system
 running 32× slower than designed.
 
+**Item 5 is no longer a free change.** A working I²C read costs 6144 µs (§10.4),
+which is 61% of a 10 ms period before any float math or FSM work. Raising the ISR
+to 100 Hz at F_CPU = 1 MHz will not fit. Either raise F_CPU to 8 MHz alongside
+the timer fix — at a battery-life cost that has not been budgeted — or move the
+sensor read out of the ISR. Measure before committing to either.
+
 ### Open questions
 
-- ⬜ Confirm `lfuse = 0x62` (1 MHz) on the bench.
-- ⬜ Measure `rd=` — expect ~1400 µs. Near 40,000 means the sensor is not on
-  TWI1 as read here.
+- ✅ Confirm `lfuse = 0x62` (1 MHz) on the bench. **Done 2026-08-06, §1.**
+- ✅ Measure `rd=`. **Done 2026-08-06: 6144 µs, not the ~1400 predicted.** The
+  sensor *is* on TWI1 as read (nowhere near 40,000), but the read is 4.4× more
+  expensive than estimated. See §10.4 — this is the binding constraint on
+  roadmap item 5.
+- ⬜ Why is `rd=` 4.4× the estimate? The 1400 µs figure came from 8 bytes ×
+  9 bits ÷ 62.5 kHz plus overhead. Candidates: `bma4_read_accel_xyz()` issuing
+  more transactions than assumed, per-byte overhead in the `Wire1` path, or
+  `TWBR1 = 0` not actually yielding 62.5 kHz. A scope on SCL settles it.
 - ⬜ `TWBR1 = 0` violates the datasheet's "TWBR ≥ 10 in Master mode". Left
-  unchanged deliberately; measure before touching.
+  unchanged deliberately; measure before touching. Now also a suspect for the
+  `rd=` overrun above.
+- ⬜ Is the ~2 s sample gap (§6a) a logging artifact or a genuine timer stall?
+  Blocks trusting any timing measured from these logs.
 - ⬜ Ask Biju **why 0.40** specifically, and whether `59e945f` has had any
   hoistway time yet.
 - ⬜ Does `Falcon_Rel_EFT_FreeRTOS` or `Anymotion` supersede any of this?
   `Anymotion` may be a BMA456 hardware-interrupt experiment, which would be a
   genuine alternative to §5.
-- ⬜ At 1 MHz, is there CPU headroom for a 100 Hz ISR doing an I²C read plus
-  float math? If not, raising F_CPU to 8 MHz is the lever — at the cost of
-  battery life.
+- 🔧 At 1 MHz, is there CPU headroom for a 100 Hz ISR doing an I²C read plus
+  float math? **Largely answered: no.** The read alone is 61% of the budget
+  (§10.4). Raising F_CPU to 8 MHz is the lever — at the cost of battery life,
+  which given §10.3 is now a sensitive number. Moving the read out of the ISR is
+  the alternative worth costing.
+- ⬜ Is the serial back-feed (§10.1) present on production units, or an artifact
+  of this particular CH340 adapter? Changes whether it is a bench-procedure note
+  or a hardware fix.
+- ⬜ What is `Voltage value` actually in? Raw ADC counts, not mV — the threshold
+  is `< 1600` in code while `Release.txt` describes 3.2 V. The scale factor has
+  not been established, so no reading in this document can be converted to volts.
 
 ---
 
@@ -335,3 +418,132 @@ rate, `RollingAvg(4)` span, stationary noise floor, the firmware's own delta,
 I²C read time against the ISR budget, overrun growth and corrupted lines.
 
 Source captures: branch `eft-results-2026-07-15`, `Eng_Notes/falcon_log_*_fpm`.
+
+---
+
+## 10. Bench session 2026-08-06 — power and failure modes
+
+PR #1 was flashed to hardware (`avrdude` verified 21110 bytes) and run on the
+bench. Everything below was measured that session. §1 and §2 record the two
+predictions it confirmed; this section records what it found that log-only
+analysis could not.
+
+The theme: **§2–§7 are about detecting elevator motion better. These are about
+the unit failing without saying so.** In a hoistway, a device that silently
+reports "no motion" is worse than one that detects motion badly.
+
+### 10.1 🔴 The serial cable back-powers the board
+
+With **batteries removed** and only the USB-serial cable attached, the device
+boots, runs the FSM at 3.13 Hz, prints clean telemetry, and drives the piezo
+(faintly). Confirmed by direct test.
+
+The adapter idles TX high. That voltage reaches the ATmega's RX pin, forward-
+biases the internal ESD clamp diode into VCC, and back-feeds the rail; GND is the
+return path. The board sits near (TX − 0.6 V), current-limited by what one I/O
+pin can source — hence the weak piezo.
+
+Consequences:
+
+- **Any battery reading taken with serial attached is measuring a contested
+  rail.** The divider cannot distinguish battery current from adapter current.
+  This is why fresh cells read *lower* (2372) than the depleted ones they
+  replaced (2500).
+- **The rail can sit in the band where the ATmega runs but the BMA456 does
+  not** — see §10.2.
+- Pulling the batteries does **not** power-cycle the device while the cable is
+  connected. Anything latched stays latched (§10.3).
+
+**Bench procedure:** power the device first, connect serial second, disconnect
+serial before any battery swap, and discard the first `Voltage value` after boot.
+To force a true cold boot, remove batteries *and* cable.
+
+### 10.2 🔴 A dead sensor is reported as a valid reading of 0.0
+
+`getAcceleration()` discards the return code:
+
+```c
+void BMA456::getAcceleration(float* x, float* y, float* z) {
+    struct bma4_accel sens_data;
+    bma4_read_accel_xyz(&sens_data, &accel);   // return code never checked
+```
+
+`read_acceleration_mss()` zeroes `x = y = z = 0` before the call, so a failed
+read is indistinguishable from a genuine reading of zero — and zero is exactly
+what the FSM interprets as "perfectly still". The unit reports the all-clear.
+
+Observed twice, in both cases with the rail compromised per §10.1: 55+ seconds of
+well-formed telemetry, correct timestamps, FSM in `STATE_MONITORING`, and
+`a=0.0000 avg=0.0000` throughout.
+
+**`rd=` distinguishes the two states, which PR #1 did not anticipate:**
+
+| Condition | `rd=` | `a=` |
+|---|---|---|
+| Weak cells + cable | **4736** | 0.0000 |
+| Good batteries | 6080–6272 | 9.74 |
+| No batteries, cable only | **4736** | 0.0000 |
+
+4736 µs to the microsecond in both failure cases — the transaction aborting at
+the same point every time because the sensor never acknowledges. A working read
+costs ~6144 µs. `rd=` is a usable health signal, but the correct fix is checking
+the return code and raising a fault (roadmap item 3).
+
+At rest a healthy unit reads **9.74 m/s²** against 9.81 nominal, ~0.7% low, which
+is unremarkable for an uncalibrated part.
+
+### 10.3 🔴 The battery alarm latches permanently and cannot clear
+
+```
+value : 1545
+  LOW Battery detected
+```
+
+`main.cpp` tests `battery_v < 1600` on a **single instantaneous sample** and
+calls `enable_battery_alarm()`. Every subsequent reading that session was
+2324–2390 — the battery was fine.
+
+**`disable_battery_alarm()` is defined in `alarm.cpp` and never called from
+anywhere in the tree.** Once latched, nothing in the firmware clears it. The unit
+beeps until someone performs a true cold boot (§10.1). In a hoistway that is a
+site visit.
+
+Three compounding faults:
+
+1. **No recovery path.** Dead code where the clear should be.
+2. **No averaging.** The commented-out `battery_avg.avg() < 1660` immediately
+   above the live check suggests this was already suspected. `battery_avg` is
+   populated and then not used for the decision.
+3. **The sample is taken at the worst moment.** `adc_loop_counter` enables the
+   divider at 30000 iterations and reads at 30100. Those are loop passes, not
+   milliseconds — a very short settle at 1 MHz — and the first one lands during
+   startup, when the boot buzzer pulse and chase LEDs are loading the rail.
+   The 1545 was the first battery reading after boot.
+
+**Alarm patterns are distinguishable by ear**, which is the fastest field
+diagnostic available:
+
+| Alarm | Period | Pattern |
+|---|---|---|
+| Movement | `BEEP_FLASH_TIME_MS` 100, `counter_b % 5` | 200 ms on / 300 ms off — rapid chirp |
+| Battery | `BATTERY_FLASH_TIME_MS` 600, `counter_a % 6` | **1800 ms on / 1800 ms off — long beep** |
+
+The comment above the battery block claims "200 ms on, and 300 ms off". It is
+copy-pasted from the buzzer function and wrong for a 600 ms period.
+
+### 10.4 🟠 The I²C read costs 61% of the 100 Hz budget
+
+A working `bma4_read_accel_xyz()` measures **6144 µs**, against the ~1400 µs §8
+estimated. Quantized to 64 µs steps, as expected for `micros()` at F_CPU = 1 MHz
+with prescaler 64, so the figure is real and not a measurement artifact.
+
+At the current 319.5 ms period this is 1.9% of the budget and harmless. At the
+intended 10 ms period it is **61%**, before float math, the rolling average, or
+the FSM. Roadmap item 5 does not fit at F_CPU = 1 MHz. See §8 for the options.
+
+### 10.5 Session log inventory
+
+Not committed — the bench runs were monitor sessions rather than PuTTY captures,
+so no log files exist for `parse_falcon_log.py`. Everything above is quoted
+inline. **Capture to file next session**; the parser already reads this format
+and the gap analysis in §6a would be far easier against a real log.
