@@ -436,9 +436,15 @@ sensor read out of the ISR. Measure before committing to either.
   Blocks trusting any timing measured from these logs.
 - ⬜ Ask Biju **why 0.40** specifically, and whether `59e945f` has had any
   hoistway time yet.
-- ⬜ Does `Falcon_Rel_EFT_FreeRTOS` or `Anymotion` supersede any of this?
-  `Anymotion` may be a BMA456 hardware-interrupt experiment, which would be a
-  genuine alternative to §5.
+- ✅ Does `Anymotion` supersede any of this? **Investigated 2026-08-06: no.**
+  See §11. It is a sleep-mode experiment with an any-motion skeleton around it;
+  every any-motion path is `#if 0` or commented out, and the Bosch
+  implementation file is absent. It does **not** block roadmap item 7.
+- ⬜ Does `Falcon_Rel_EFT_FreeRTOS` supersede any of this? Not yet looked at.
+- ⬜ Which MCU pin do `INT1_ACC` / `INT2_ACC` land on? The nets exist and reach
+  `PAGE04:uC` (§11), but the schematic PDFs store their text as vector outlines
+  so the pin assignment could not be extracted. Needs eyes on page 4. Determines
+  whether hardware-interrupt work is possible without a board respin.
 - 🔧 At 1 MHz, is there CPU headroom for a 100 Hz ISR doing an I²C read plus
   float math? **Largely answered: no.** The read alone is 61% of the budget
   (§10.4). Raising F_CPU to 8 MHz is the lever — at the cost of battery life,
@@ -594,3 +600,80 @@ Not committed — the bench runs were monitor sessions rather than PuTTY capture
 so no log files exist for `parse_falcon_log.py`. Everything above is quoted
 inline. **Capture to file next session**; the parser already reads this format
 and the gap analysis in §6a would be far easier against a real log.
+
+---
+
+## 11. The `Anymotion` branch — investigated 2026-08-06
+
+§8 asked whether `Anymotion` was a BMA456 hardware-interrupt experiment that
+would supersede §5. **It is not, and it does not.** The name is aspirational.
+
+### What is actually on the branch
+
+A single commit, `0e35726` ("Added Anymotion branch", Dec 2025), branching from
+`6ec6980` — which predates both the ATmega328PB port and the BMA456 TWI1 patch.
+
+Every any-motion path is inert:
+
+| Piece | State |
+|---|---|
+| Sensor-side any-motion config (`bma456_map_interrupt`, `bma456_configure_anymotion`) | inside `#if 0` |
+| `attachInterrupt(digitalPinToInterrupt(BMS456_INTERRUPT), bosch_interrupt, RISING)` | commented out |
+| Interrupt-status polling in `loop()` | inside `#if 0` |
+| `bma456_configure_anymotion()` | **defined nowhere in the tree** |
+| `bma456_an_read_int_status()`, `bma456_an_set_any_mot_config()` | declared in `bma456_an.h`, **defined in no `.c` file** |
+
+The branch carries Bosch's any-motion *header* but not the matching
+`bma456_an.c`; `bma456.c` is still the base variant. Nothing live calls the
+missing functions, which is why the undefined references never break the build.
+
+What *is* active is unrelated to any-motion: `SLEEP_MODE_PWR_DOWN` with
+`sleep_cpu()`, `RollingAvg` sizes cut from 8/4 to 1, DPS310 commented out, and
+serial gated behind `SERIAL_EN`. **It is a power-down sleep experiment.**
+
+It is also on the wrong baseline — `[env:ATmega328P]`, sensor on `Wire`/TWI0, no
+`board_build.f_cpu`. There is nothing mergeable. Current `Falcon_Rel_EFT` does
+not carry `bma456_an.h` at all.
+
+### Consequences
+
+**Roadmap item 7 is unblocked.** Restoring `buzzer_on = false` on the beep-off
+phase remains the real fix for §5, and item 8 cannot proceed without it.
+
+**Any-motion would not dodge §5's root cause anyway.** Reads are blanked because
+piezo vibration couples mechanically into the accelerometer, and the sensor's own
+any-motion engine sits behind the same physics — it would see the buzzer too. The
+work would move the threshold decision from firmware into the sensor, not escape
+the coupling. It may still win, because the sensor's threshold and duration are
+tunable independently of the FSM and any-motion is a *transient* detector, which
+suits §3's latch-on-departure / release-on-decel design better than polling does.
+That is a hypothesis to test, not a free pass.
+
+**The sleep work is relevant elsewhere.** If the Timer1 fix forces F_CPU to 8 MHz
+(§10.4), battery life is the cost, and power-down between samples is the obvious
+offset. Someone has already prototyped it here. Worth reading before costing that
+option.
+
+### Hardware: the interrupt lines exist
+
+`common.h` on the branch defines `BMS456_INTERRUPT = PIN_PD2`, with `PIN_PD3`
+commented as an alternative. PD2 is INT0 and PD3 is INT1 — the ATmega328PB's only
+two external interrupt pins.
+
+The OrCAD design file `HW_Docs/02_Desing files/RTC1273R2.DSN` confirms the
+accelerometer interrupts are brought out as named nets:
+
+- `BMA456_1` carries pins `VDDIO ASDA INT1 INT2 GNDIO ASCL`
+- Nets **`INT1_ACC`** and **`INT2_ACC`** appear on `PAGE05:SENSOR` **and** on
+  `PAGE04:uC`
+
+So the lines are routed to the microcontroller rather than left floating — the
+hardware does not rule out interrupt-driven operation.
+
+⬜ **Unresolved: which MCU pin.** Both schematic PDFs (`Schematics/Ver_2/`,
+`HW_Docs/02_Desing files/RTC1273R2_SCH.pdf`) store their text as vector outlines,
+so no text extraction is possible and no PDF rasteriser was available on the bench
+machine. The `PIN_PD2` in `common.h` is a firmware author's assumption, not a
+verified fact. **Confirm by eye on PAGE04:uC before any interrupt work**, and
+check whether the net reaches PD2/PD3 or some pin without external-interrupt
+capability — the latter would mean pin-change interrupts or a respin.
