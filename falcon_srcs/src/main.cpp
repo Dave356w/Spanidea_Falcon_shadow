@@ -35,6 +35,38 @@ MovementService ms(&acceleration_avg_g, &acc_mss_g, &adj_acc_g, &vel_ms_g, &pres
 
 #define EN_3_AXIS_SENS 1
 
+/*
+ * Sample telemetry.
+ *
+ * Serial.print() must never be called from inside the timer ISR. HardwareSerial
+ * drains its TX ring buffer from the UART interrupt, so printing from another
+ * ISR (which re-enables interrupts) races the drain and drops characters. The
+ * 2026-07-15 EFT captures show 14 corrupted lines across 8 runs, every one of
+ * them inside a state-transition burst.
+ *
+ * The ISR now only publishes a snapshot here; loop() does the printing.
+ */
+typedef struct {
+    uint32_t t_ms;          /* millis() at time of sample                   */
+    float    accel;         /* z acceleration, m/s^2                        */
+    float    avg;           /* rolling average after this sample was added  */
+    uint16_t read_us;       /* duration of the bma456 I2C read, microseconds */
+    uint8_t  fsm_state;     /* MovementService state at time of sample      */
+} sample_log_t;
+
+static volatile sample_log_t isr_sample;
+static volatile bool         sample_pending = false;
+static volatile uint16_t     sample_overrun = 0;
+
+/*
+ * Print one line per N published samples. At the current ~3 Hz ISR rate one
+ * line per sample costs about 15% of the 9600 baud budget. Raise this when the
+ * timer is fixed to 100 Hz, or serial becomes the new bottleneck.
+ */
+#define LOG_DECIMATE_N  1
+
+void emit_sample_log();
+
 uint16_t read_battery_voltage();
 extern int configure_adc_channel();
 extern uint16_t read_adc_pc2_voltage();
@@ -138,6 +170,8 @@ void loop()
     case SystemStates::SYSTEM_STATE_NOMINAL:
         ms.fsm_run();
 
+        emit_sample_log();
+
         if (bma_read_counter++ > 1000 ) {
             log_data();
             bma_read_counter = 0;
@@ -162,28 +196,82 @@ void loop()
 
 float read_acceleration_mss()
 {
-    x = y = z = 0;
-    bma456.getAcceleration(&x, &y, &z);
+    uint32_t read_start;
 
+    x = y = z = 0;
+
+    read_start = micros();
+    bma456.getAcceleration(&x, &y, &z);
 
     g_value = z / 1000.0;
     accel_value = g_value * 9.81;
 
-#if 1
-//    Serial.print(" Data : ");
-//    Serial.print(z, 6);
-    Serial.print("  G value : ");
-    Serial.print(accel_value, 6);
-    Serial.print(" Ave : ");
-    Serial.print(acceleration_avg_g.avg(), 6);
-    Serial.print(" State : ");
-    Serial.print(ms.get_state());
-    Serial.print("\r\n");
-#endif
-
     acceleration_avg_g.add(accel_value);
 
+    /*
+     * Publish a snapshot for loop() to print. No serial I/O in here.
+     */
+    if (sample_pending) {
+        /*
+         * loop() has not printed the previous sample yet, so it is about to be
+         * overwritten. A non-zero overrun count means the log is decimated by
+         * something other than LOG_DECIMATE_N and sample timing cannot be
+         * inferred from the log alone.
+         */
+        sample_overrun++;
+    }
+
+    isr_sample.t_ms      = millis();
+    isr_sample.accel     = accel_value;
+    isr_sample.avg       = acceleration_avg_g.avg();
+    isr_sample.read_us   = (uint16_t)(micros() - read_start);
+    isr_sample.fsm_state = (uint8_t)ms.get_state();
+    sample_pending = true;
+
     return (bosch_acceleration_avg_g.avg());
+}
+
+/*
+ * Print the most recently published sample. Called from loop() only.
+ */
+void emit_sample_log()
+{
+    static uint8_t  decimate = 0;
+    sample_log_t    s;
+    uint16_t        overrun;
+
+    if (!sample_pending) {
+        return;
+    }
+
+    /*
+     * Copy the snapshot with interrupts masked so the ISR cannot update it
+     * halfway through the read.
+     */
+    noInterrupts();
+    memcpy(&s, (const void *)&isr_sample, sizeof(s));
+    overrun = sample_overrun;
+    sample_pending = false;
+    interrupts();
+
+    if (++decimate < LOG_DECIMATE_N) {
+        return;
+    }
+    decimate = 0;
+
+    Serial.print(F("t="));
+    Serial.print(s.t_ms);
+    Serial.print(F(" a="));
+    Serial.print(s.accel, 4);
+    Serial.print(F(" avg="));
+    Serial.print(s.avg, 4);
+    Serial.print(F(" st="));
+    Serial.print(s.fsm_state);
+    Serial.print(F(" rd="));
+    Serial.print(s.read_us);
+    Serial.print(F(" ov="));
+    Serial.print(overrun);
+    Serial.print(F("\r\n"));
 }
 #if 1
 void enable_timer()
