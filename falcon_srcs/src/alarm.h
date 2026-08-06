@@ -30,6 +30,7 @@ void enable_chase_leds();
 void enable_battery_alarm();
 void disable_alarm();
 void disable_chase_leds();
+void disable_battery_alarm();
 uint8_t get_alarm_status();
 
 #endif
