@@ -240,6 +240,31 @@ out of band, but the beep *envelope* (200 ms on / 300 ms off) is ~2 Hz, sitting
 directly on the elevator motion band. It cannot be filtered out. Sampling in the
 gaps is the only approach.
 
+### Measured 2026-08-06: coverage during an alarm is zero, not 33%
+
+`tk=` makes the blanking directly observable for the first time. Across a full
+alarm cycle:
+
+```
+t=35454 ... tk=94
+FSM: Buzzer timeout happened
+t=45678 ... tk=95
+```
+
+**10,224 ms elapsed and `tk` advanced by one.** At 3.13 Hz that window should
+hold ~32 samples; 31 were never taken.
+
+This is worse than the 33%-per-15-s figure derived from source above. That
+estimate assumed the 5 s quiet window yields usable coverage. In practice
+sampling does not resume until the buzzer stops entirely, so **while the buzzer
+is running, coverage is zero** — not reduced, absent. A decel transient of 1–3 s
+falling in that window cannot be detected at all, no matter what thresholds are
+used.
+
+Everything else in this section stands. The fix is still to restore
+`buzzer_on = false` on the beep-off phase (roadmap item 7), and the warning
+against low-pass filtering the ~2 Hz beep envelope still applies.
+
 ---
 
 ## 6. ✅ Serial printing from the ISR (fixed in PR #1)
@@ -257,7 +282,28 @@ The timestamps and `rd=` both earned their keep immediately — §2's rate is no
 confirmed to three digits and `rd=` turned out to be a usable sensor-health
 signal (§10.2). But the overrun counter does not work.
 
-### 🔴 6a. `ov=` does not detect the decimation it exists to detect
+### ✅ 6a. `ov=` did not detect the decimation it exists to detect — symptom resolved
+
+**Update, same day, after the reliability fixes.** The gaps are gone. `tk=` (a
+free-running count of read attempts, added to tell the two candidate causes
+apart) advances **1:1 with printed lines across 95 consecutive ticks with no
+holes**, and timestamp deltas hold a steady 311/328 ms throughout. `ov=5` is now
+legitimate: five overruns during init and none since, because `loop()` keeps up.
+
+**Which change fixed it is not established.** The leading candidate is moving
+eleven `Serial.print` string literals to flash with `F()`, which took RAM from
+1676 to 1515 bytes — `RollingAvg` heap-allocates, so at 81.8% the heap and stack
+were 372 bytes apart, and a stack collision would explain erratic ISR behaviour
+that no counter could have diagnosed. But the return-code change touched the same
+function, and the two were not tested in isolation. Reverting only the `F()`
+wraps would settle it, at the cost of the RAM headroom.
+
+Treat the original diagnosis below as unresolved-but-latent rather than fixed. If
+the gaps return, `tk=` is now in place to distinguish the two causes on sight.
+
+The historical description follows.
+
+### 🔴 6a (original) — `ov=` does not detect the decimation it exists to detect
 
 Printed samples arrive in bursts of ~6 followed by a gap of 1917 or 2229 ms.
 1917 ms is exactly 6 × 319.5 ms — six missing samples, so **roughly half of all
@@ -350,9 +396,10 @@ on a sensor that silently reports zero is still a dead unit.
 |---|---|---|---|
 | 1 | Move `Serial.print` out of the ISR; add timestamps | ✅ PR #1 | `ov=` is defective, see 3a |
 | 2 | Fix `TWI_FREQ`; instrument I²C read time | ✅ PR #1 | sensor was never affected — it's on TWI1 |
-| 3 | **Check the `bma4_read_accel_xyz()` return code; fault instead of reporting 0.0** | ⬜ | §10.2. Silent failure of the core function |
-| 3a | Fix `ov=` so decimation is actually detected | ⬜ | §6a. Blocks trusting any log timing |
-| 4 | **Call `disable_battery_alarm()` when voltage recovers; average before latching** | ⬜ | §10.3. One bad sample = permanent beeping |
+| 3 | **Check the `bma4_read_accel_xyz()` return code; fault instead of reporting 0.0** | ✅ PR #2 | §10.2. `a=ERR` path not yet exercised on hardware |
+| 3a | Fix `ov=` so decimation is actually detected | 🔧 PR #2 | §6a. Symptom gone; `tk=` added, cause unproven |
+| 4 | **Call `disable_battery_alarm()` when voltage recovers; average before latching** | ✅ PR #2 | §10.3. Confirmed on the bench |
+| 4a | Decide what the unit should *do* when the sensor is dead | ⬜ | It no longer lies, but raises no user-visible fault. Product decision — ask Biju |
 | 5 | **Fix Timer1: CTC mode (`WGM12`), prescaler 64 → 100 Hz** | ⬜ | **the** detection fix; everything below assumes it |
 | 6 | Delete the dead pressure path | ⬜ | §4 |
 | 7 | Restore `buzzer_on = false` on beep-off phase | ⬜ | §5 |
