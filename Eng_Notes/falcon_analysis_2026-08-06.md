@@ -441,10 +441,13 @@ sensor read out of the ISR. Measure before committing to either.
   every any-motion path is `#if 0` or commented out, and the Bosch
   implementation file is absent. It does **not** block roadmap item 7.
 - ⬜ Does `Falcon_Rel_EFT_FreeRTOS` supersede any of this? Not yet looked at.
-- ⬜ Which MCU pin do `INT1_ACC` / `INT2_ACC` land on? The nets exist and reach
-  `PAGE04:uC` (§11), but the schematic PDFs store their text as vector outlines
-  so the pin assignment could not be extracted. Needs eyes on page 4. Determines
-  whether hardware-interrupt work is possible without a board respin.
+- ✅ Which MCU pin do `INT1_ACC` / `INT2_ACC` land on? **Confirmed from the
+  schematic by Dave, 2026-08-06: `INT1_ACC` → INT0/PD2, `INT2_ACC` → INT1/PD3.**
+  Both external interrupt pins, both accounted for. No respin needed. See §11.
+- ⬜ Can the BMA456 INT pin be configured active-low? Required for wake-from-
+  power-down, which only supports level-triggered INT0/INT1 (§11). Bosch's
+  `bma4_int_pin_config` exposes the polarity; it has not been checked against
+  what the hardware pull-ups allow.
 - 🔧 At 1 MHz, is there CPU headroom for a 100 Hz ISR doing an I²C read plus
   float math? **Largely answered: no.** The read alone is 61% of the budget
   (§10.4). Raising F_CPU to 8 MHz is the lever — at the cost of battery life,
@@ -667,13 +670,55 @@ accelerometer interrupts are brought out as named nets:
 - Nets **`INT1_ACC`** and **`INT2_ACC`** appear on `PAGE05:SENSOR` **and** on
   `PAGE04:uC`
 
-So the lines are routed to the microcontroller rather than left floating — the
-hardware does not rule out interrupt-driven operation.
+✅ **Confirmed from the schematic by Dave, 2026-08-06:**
 
-⬜ **Unresolved: which MCU pin.** Both schematic PDFs (`Schematics/Ver_2/`,
-`HW_Docs/02_Desing files/RTC1273R2_SCH.pdf`) store their text as vector outlines,
-so no text extraction is possible and no PDF rasteriser was available on the bench
-machine. The `PIN_PD2` in `common.h` is a firmware author's assumption, not a
-verified fact. **Confirm by eye on PAGE04:uC before any interrupt work**, and
-check whether the net reaches PD2/PD3 or some pin without external-interrupt
-capability — the latter would mean pin-change interrupts or a respin.
+| Net | MCU pin |
+|---|---|
+| `INT1_ACC` | **INT0 / PD2** |
+| `INT2_ACC` | **INT1 / PD3** |
+
+Both accelerometer interrupt outputs land on true external interrupt pins, and
+between them they consume both of the ATmega328PB's. The `PIN_PD2` in the
+Anymotion branch's `common.h` was right, and the commented `PIN_PD3` alternative
+is the *other* sensor interrupt rather than an alternate route for the same one.
+
+**No board respin is required for interrupt-driven operation.** The hardware has
+been ready the whole time; only the firmware is missing.
+
+### What the two lines make possible
+
+Having *both* interrupts wired is more useful than one. The BMA456 exposes
+any-motion and no-motion as separate features, and each can be mapped to its own
+pin. That maps directly onto the latched FSM §3 argues for:
+
+| §3 phase | Sensor feature | Pin |
+|---|---|---|
+| Departure transient → alarm ON, latch | any-motion | INT1_ACC / PD2 |
+| Constant velocity — *assumed*, not measured | — | — |
+| Arrival → release the latch | no-motion | INT2_ACC / PD3 |
+
+That is the §3 design implemented in silicon, with the sensor doing the
+thresholding continuously and the MCU only reacting to edges. It also sidesteps
+§2's problem for the *detection* path specifically: the sensor runs its own
+100 Hz ODR internally regardless of how slowly the firmware's timer ticks.
+
+It does **not** sidestep §5. The piezo still couples mechanically into the
+accelerometer, and the sensor's engine sits behind the same physics — it would
+see the buzzer too. But the discrimination moves into tunable sensor registers
+(threshold plus duration) instead of a rolling average the buzzer has to be
+blanked around, which is a better place to fight it.
+
+### ⚠️ Constraint if this is combined with sleep
+
+`SLEEP_MODE_PWR_DOWN` stops the I/O clock, so **only a low-level-triggered INT0 /
+INT1 can wake the part — edge detection does not work in power-down.** The
+Anymotion branch's commented-out line asks for `RISING`:
+
+```c
+//    attachInterrupt(digitalPinToInterrupt(BMS456_INTERRUPT), bosch_interrupt, RISING);
+```
+
+That would never have woken the MCU from the `sleep_cpu()` on the same branch.
+Anyone reviving this needs the BMA456 INT pin configured active-low and
+`attachInterrupt(..., LOW)`, or the sleep and the interrupt will silently fail to
+work together.
