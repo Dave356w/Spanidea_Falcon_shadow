@@ -1034,3 +1034,81 @@ the months a unit sits in a hoistway.
 all `ACC-INT` / `ACC-STAT` lines as "corrupted lines — serial contention", and
 its stationary-noise figures are inflated because its window spans whole runs
 including the motion. Fix before trusting its summary.
+
+---
+
+## 13. ✅ Item 8 validated in the hoistway, 2026-08-07
+
+Three consecutive runs, latched FSM, threshold 32 / duration 5 / Z axis only.
+**All three latched on departure, held the alarm through cruise, and released on
+arrival.** No failsafe, no mid-ride release, no double alarm.
+
+| Run | Departure | Arrival | Alarm held | Released by |
+|---|---|---|---|---|
+| A | t=172294 | t=179159 | 6.9 s | clustered any-motion, 2 edges |
+| B | t=188284 | t=270024 | **81.7 s** | clustered any-motion, 2 edges |
+| C | t=280051 | t=366772 | **86.7 s** | polled, delta 0.520 |
+
+This is the §3 design doing what it was written for: latch on departure, assume
+constant velocity, release on the arrival transient. The original complaint —
+the alarm stopping part-way through a slow run — is fixed.
+
+### 13.1 Cruise held for 80+ seconds with zero false releases
+
+Runs B and C cruised for 80.5 s and 84.7 s. Across the whole of run B's cruise
+**not one any-motion edge was raised** (`im=6` from t=188825 to t=269975), and
+the polled average never came near the 0.30 arrival threshold.
+
+That is the behaviour every earlier attempt failed at. For comparison, the same
+stretch would previously have been cut short by:
+
+- the fixed 10 s buzzer / 15 s LED timeout (the original design)
+- the 60 s failsafe (fired mid-ride, split one trip into two alarms)
+- the stillness release (fired at 15 s, twice)
+- a buzzer-raised edge completing an arrival cluster (fired at ~10 s)
+
+Both runs also exceed the 60 s failsafe that was in place this morning, so
+raising it to 180 s was necessary, not merely cautious.
+
+### 13.2 Both arrival paths earned their place
+
+Two runs released on clustered any-motion; **run C released on the polled
+backup**, because only one quiet edge had arrived before the averaged delta
+crossed 0.30.
+
+That is the case the secondary path was kept for. Deleting it — which the
+sensitivity comparison in §12 would have justified on its own — would have left
+run C running to the failsafe.
+
+### 13.3 The buzzer-edge filter did its job
+
+Run A raised `ACC-INT n=2 t=173686 st=4 bz=1` four seconds into the alarm. Under
+the previous build that edge was eligible to form a cluster; on 2026-08-07 an
+edge exactly like it released an alarm mid-ride. It was discarded here, and the
+real arrival still registered two clean edges 5 s later.
+
+Notably, runs B and C raised **no** buzzer edges at all during 165 s of combined
+alarming. Earlier runs saw roughly one per 6–10 s. That variability is itself
+worth noting: the coupling is mounting- and ride-dependent, so the filter should
+not be removed just because a given session happens not to need it.
+
+### 13.4 What is still not established
+
+⬜ **One unit, one shaft, one afternoon.** Three arrivals is not a sample. The
+arrival logic in particular was rewritten three times today, each revision
+prompted by the previous run's failure, and it now rests on five observed
+arrivals total. Departure detection is on much firmer ground.
+
+⬜ **No long stationary soak.** Still the oldest open item. At threshold 32 with
+a latch that holds indefinitely, a single false departure while parked means an
+alarm until the 180 s failsafe. Hours of parked logging would be worth more than
+another run.
+
+⬜ **Battery.** Runs B and C sounded the buzzer continuously for 80+ seconds.
+`Voltage value` fell from 2287 to 2200 across this session. Nobody has costed
+what the latched design does to battery life, and §10.3 showed this pack is
+already sensitive.
+
+⬜ **Item 7a** — `check_for_battery_alarm()` still drives the piezo without
+setting `buzzer_on`, so a battery alarm blanks nothing and could raise
+any-motion edges that look like a departure.
