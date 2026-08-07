@@ -20,36 +20,37 @@
 /*
  * Buzzer duty cycle, in units of BEEP_FLASH_TIME_MS (100 ms).
  *
- *   BUZZER_ON_STEPS / BUZZER_CYCLE_STEPS = 2/10 = 200 ms on, 800 ms off
+ *   BUZZER_ON_STEPS / BUZZER_CYCLE_STEPS = 2/5 = 200 ms on, 300 ms off
  *
- * Was 2/5 (200 ms on, 300 ms off). The change is about detection, not sound.
+ * ⚠️ DO NOT LOWER THE DUTY TO WIN BACK ARRIVAL SIGNAL. It was tried on
+ * 2026-08-07 (2/10, 200 ms on / 800 ms off) and had to be reverted the same
+ * afternoon. The reasoning was sound and the result was a regression.
  *
- * buzzer_on gates BOTH the accelerometer read (§5 item 7) and whether an
- * any-motion edge is trusted for arrival clustering. At 2/5, with the 50 ms
- * ringdown on top, the piezo owned 250 ms of every 500 ms -- half the time --
- * so roughly half of a real arrival's interrupt edges were raised while the
- * buzzer was driving and had to be discarded. On the 2026-08-07 50 fpm down
- * run the arrival produced exactly two edges 656 ms apart; one carried bz=1,
- * was rejected, and the arrival went undetected.
+ * buzzer_on gates whether an any-motion edge is trusted for arrival
+ * clustering, so at 2/5 roughly half of every arrival's edges were being
+ * discarded -- which looked like pure loss. Raising the quiet fraction from
+ * 0.50 to 0.75 did make arrivals cluster reliably. It also made CRUISE
+ * cluster:
  *
- * With 2 edges at an arrival, the chance both land in a quiet window is q^2:
+ *              runs held    released by     quiet edges/min while alarming
+ *   2/5        68.4, 70.6 s   polled                 1.8 - 4.5
+ *   2/10        5.4,  4.1 s   any-motion            31.3
  *
- *      duty            quiet fraction q    P(both quiet)
- *   2/5  + ringdown          0.50              25%
- *   2/10 + ringdown          0.75              56%
+ * At 50 fpm the car's own vibration keeps any-motion asserted continuously,
+ * so every 1 s status poll raises an edge and two consecutive polls look
+ * exactly like an arrival. Measured cluster gaps were 1016 ms during cruise
+ * against 802-1671 ms at real arrivals -- the same number, because both mean
+ * "still asserted". No window or count separates them.
  *
- * It cuts in the other direction too: buzzer-induced edges can only occur
- * while the piezo is driven, so less driving means fewer false ones. On the
- * up run six were raised and discarded, including a 196 ms pair that would
- * otherwise have released the alarm mid-ride.
+ * The 50% duty was not merely avoiding false positives; it was randomly
+ * decimating cruise edges and that decimation is what kept consecutive polls
+ * from pairing. It is doing real work. Leave it at 2/5.
  *
- * Side benefit: the piezo draws current for a quarter of the time instead of
- * half, which matters for a latch that can now sound for 80+ seconds (§13.4).
- *
- * ⚠️ This changes what the product SOUNDS like -- same beep length, half as
- * often. That is a user-facing change, not just a tuning constant.
+ * If arrival sensitivity needs improving, do it somewhere that does not also
+ * amplify cruise -- the polled margin was 4% on the 2026-08-07 down run
+ * (0.312 against a 0.30 threshold) and that is the number worth attacking.
  */
-#define BUZZER_CYCLE_STEPS        10
+#define BUZZER_CYCLE_STEPS        5
 #define BUZZER_ON_STEPS           2
 #define BATTERY_FLASH_TIME_MS     600
 
