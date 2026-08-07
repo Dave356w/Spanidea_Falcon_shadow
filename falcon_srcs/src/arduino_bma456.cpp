@@ -176,12 +176,20 @@ uint16_t BMA456::configureAnyMotion(uint16_t threshold, uint16_t duration,
     }
 
     /*
-     * Elevator motion is along Z. X and Y are enabled as well for this first
-     * test so that a hand-wave registers -- it makes the interrupt easy to
-     * exercise on the bench without a hoistway. Narrow to BMA456_Z_AXIS_EN
-     * before drawing any conclusion about real detection performance.
+     * Z axis only.
+     *
+     * All three axes were enabled for the first bench test so that a hand-wave
+     * would register without needing a hoistway. That is the wrong setting for
+     * real measurement: in a car, X and Y pick up doors, passengers shifting
+     * and the car rocking in the rails, none of which a vertical-motion
+     * detector should count. Every one of those would raise an ACC-INT and make
+     * the hoistway data impossible to interpret.
+     *
+     * Z is the axis the polled detector already uses (read_acceleration_mss()
+     * derives accel_value from z alone), so this also makes the two detectors
+     * directly comparable on the same signal.
      */
-    rslt = bma456_anymotion_enable_axis(BMA456_ALL_AXIS_EN, &accel);
+    rslt = bma456_anymotion_enable_axis(BMA456_Z_AXIS_EN, &accel);
     if (rslt != BMA4_OK) {
         return (rslt);
     }
