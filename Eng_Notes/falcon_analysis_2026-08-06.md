@@ -535,9 +535,18 @@ sensor read out of the ISR. Measure before committing to either.
   Blocks trusting any timing measured from these logs.
 - ⬜ Ask Biju **why 0.40** specifically, and whether `59e945f` has had any
   hoistway time yet.
-- ⬜ Does `Falcon_Rel_EFT_FreeRTOS` or `Anymotion` supersede any of this?
-  `Anymotion` may be a BMA456 hardware-interrupt experiment, which would be a
-  genuine alternative to §5.
+- ✅ Does `Anymotion` supersede any of this? **Investigated 2026-08-06: no.**
+  See §11. It is a sleep-mode experiment with an any-motion skeleton around it;
+  every any-motion path is `#if 0` or commented out, and the Bosch
+  implementation file is absent. It does **not** block roadmap item 7.
+- ⬜ Does `Falcon_Rel_EFT_FreeRTOS` supersede any of this? Not yet looked at.
+- ✅ Which MCU pin do `INT1_ACC` / `INT2_ACC` land on? **Confirmed from the
+  schematic by Dave, 2026-08-06: `INT1_ACC` → INT0/PD2, `INT2_ACC` → INT1/PD3.**
+  Both external interrupt pins, both accounted for. No respin needed. See §11.
+- ⬜ Can the BMA456 INT pin be configured active-low? Required for wake-from-
+  power-down, which only supports level-triggered INT0/INT1 (§11). Bosch's
+  `bma4_int_pin_config` exposes the polarity; it has not been checked against
+  what the hardware pull-ups allow.
 - 🔧 At 1 MHz, is there CPU headroom for a 100 Hz ISR doing an I²C read plus
   float math? **Largely answered: no.** The read alone is 61% of the budget
   (§10.4). Raising F_CPU to 8 MHz is the lever — at the cost of battery life,
@@ -722,6 +731,125 @@ so no log files exist for `parse_falcon_log.py`. Everything above is quoted
 inline. **Capture to file next session**; the parser already reads this format
 and the gap analysis in §6a would be far easier against a real log.
 
+---
+
+## 11. The `Anymotion` branch — investigated 2026-08-06
+
+§8 asked whether `Anymotion` was a BMA456 hardware-interrupt experiment that
+would supersede §5. **It is not, and it does not.** The name is aspirational.
+
+### What is actually on the branch
+
+A single commit, `0e35726` ("Added Anymotion branch", Dec 2025), branching from
+`6ec6980` — which predates both the ATmega328PB port and the BMA456 TWI1 patch.
+
+Every any-motion path is inert:
+
+| Piece | State |
+|---|---|
+| Sensor-side any-motion config (`bma456_map_interrupt`, `bma456_configure_anymotion`) | inside `#if 0` |
+| `attachInterrupt(digitalPinToInterrupt(BMS456_INTERRUPT), bosch_interrupt, RISING)` | commented out |
+| Interrupt-status polling in `loop()` | inside `#if 0` |
+| `bma456_configure_anymotion()` | **defined nowhere in the tree** |
+| `bma456_an_read_int_status()`, `bma456_an_set_any_mot_config()` | declared in `bma456_an.h`, **defined in no `.c` file** |
+
+The branch carries Bosch's any-motion *header* but not the matching
+`bma456_an.c`; `bma456.c` is still the base variant. Nothing live calls the
+missing functions, which is why the undefined references never break the build.
+
+What *is* active is unrelated to any-motion: `SLEEP_MODE_PWR_DOWN` with
+`sleep_cpu()`, `RollingAvg` sizes cut from 8/4 to 1, DPS310 commented out, and
+serial gated behind `SERIAL_EN`. **It is a power-down sleep experiment.**
+
+It is also on the wrong baseline — `[env:ATmega328P]`, sensor on `Wire`/TWI0, no
+`board_build.f_cpu`. There is nothing mergeable. Current `Falcon_Rel_EFT` does
+not carry `bma456_an.h` at all.
+
+### Consequences
+
+**Roadmap item 7 is unblocked.** Restoring `buzzer_on = false` on the beep-off
+phase remains the real fix for §5, and item 8 cannot proceed without it.
+
+**Any-motion would not dodge §5's root cause anyway.** Reads are blanked because
+piezo vibration couples mechanically into the accelerometer, and the sensor's own
+any-motion engine sits behind the same physics — it would see the buzzer too. The
+work would move the threshold decision from firmware into the sensor, not escape
+the coupling. It may still win, because the sensor's threshold and duration are
+tunable independently of the FSM and any-motion is a *transient* detector, which
+suits §3's latch-on-departure / release-on-decel design better than polling does.
+That is a hypothesis to test, not a free pass.
+
+**The sleep work is relevant elsewhere.** If the Timer1 fix forces F_CPU to 8 MHz
+(§10.4), battery life is the cost, and power-down between samples is the obvious
+offset. Someone has already prototyped it here. Worth reading before costing that
+option.
+
+### Hardware: the interrupt lines exist
+
+`common.h` on the branch defines `BMS456_INTERRUPT = PIN_PD2`, with `PIN_PD3`
+commented as an alternative. PD2 is INT0 and PD3 is INT1 — the ATmega328PB's only
+two external interrupt pins.
+
+The OrCAD design file `HW_Docs/02_Desing files/RTC1273R2.DSN` confirms the
+accelerometer interrupts are brought out as named nets:
+
+- `BMA456_1` carries pins `VDDIO ASDA INT1 INT2 GNDIO ASCL`
+- Nets **`INT1_ACC`** and **`INT2_ACC`** appear on `PAGE05:SENSOR` **and** on
+  `PAGE04:uC`
+
+✅ **Confirmed from the schematic by Dave, 2026-08-06:**
+
+| Net | MCU pin |
+|---|---|
+| `INT1_ACC` | **INT0 / PD2** |
+| `INT2_ACC` | **INT1 / PD3** |
+
+Both accelerometer interrupt outputs land on true external interrupt pins, and
+between them they consume both of the ATmega328PB's. The `PIN_PD2` in the
+Anymotion branch's `common.h` was right, and the commented `PIN_PD3` alternative
+is the *other* sensor interrupt rather than an alternate route for the same one.
+
+**No board respin is required for interrupt-driven operation.** The hardware has
+been ready the whole time; only the firmware is missing.
+
+### What the two lines make possible
+
+Having *both* interrupts wired is more useful than one. The BMA456 exposes
+any-motion and no-motion as separate features, and each can be mapped to its own
+pin. That maps directly onto the latched FSM §3 argues for:
+
+| §3 phase | Sensor feature | Pin |
+|---|---|---|
+| Departure transient → alarm ON, latch | any-motion | INT1_ACC / PD2 |
+| Constant velocity — *assumed*, not measured | — | — |
+| Arrival → release the latch | no-motion | INT2_ACC / PD3 |
+
+That is the §3 design implemented in silicon, with the sensor doing the
+thresholding continuously and the MCU only reacting to edges. It also sidesteps
+§2's problem for the *detection* path specifically: the sensor runs its own
+100 Hz ODR internally regardless of how slowly the firmware's timer ticks.
+
+It does **not** sidestep §5. The piezo still couples mechanically into the
+accelerometer, and the sensor's engine sits behind the same physics — it would
+see the buzzer too. But the discrimination moves into tunable sensor registers
+(threshold plus duration) instead of a rolling average the buzzer has to be
+blanked around, which is a better place to fight it.
+
+### ⚠️ Constraint if this is combined with sleep
+
+`SLEEP_MODE_PWR_DOWN` stops the I/O clock, so **only a low-level-triggered INT0 /
+INT1 can wake the part — edge detection does not work in power-down.** The
+Anymotion branch's commented-out line asks for `RISING`:
+
+```c
+//    attachInterrupt(digitalPinToInterrupt(BMS456_INTERRUPT), bosch_interrupt, RISING);
+```
+
+That would never have woken the MCU from the `sleep_cpu()` on the same branch.
+Anyone reviving this needs the BMA456 INT pin configured active-low and
+`attachInterrupt(..., LOW)`, or the sleep and the interrupt will silently fail to
+work together.
+
 ### Bench results, 2026-08-07 — the interrupt path works, and it does not escape §5
 
 The any-motion engine was armed at threshold 96 / duration 5, mapped to
@@ -796,6 +924,11 @@ change. But it inherits §5 rather than solving it, so it is not a shortcut arou
 the existing roadmap — it is an alternative detector that still requires item 7,
 and still cannot observe constant velocity (§3 is a physical constraint, not an
 implementation one).
+
+**Item 7 has since landed** (§5), restoring ~45% coverage during an alarm with
+clean samples. That removes the blocker for both architectures rather than
+favouring either, so the choice between them still rests on the open question
+below.
 
 ⬜ **Open:** does any-motion catch an 18 fpm departure? Only a hoistway run can
 answer it, and it is the question that decides whether this approach is worth
