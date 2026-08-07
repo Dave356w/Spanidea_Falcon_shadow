@@ -16,6 +16,41 @@
 
 #define BEEP_FLASH_TIME_MS        100
 //#define BEEP_FLASH_TIME_MS        50
+
+/*
+ * Buzzer duty cycle, in units of BEEP_FLASH_TIME_MS (100 ms).
+ *
+ *   BUZZER_ON_STEPS / BUZZER_CYCLE_STEPS = 2/10 = 200 ms on, 800 ms off
+ *
+ * Was 2/5 (200 ms on, 300 ms off). The change is about detection, not sound.
+ *
+ * buzzer_on gates BOTH the accelerometer read (§5 item 7) and whether an
+ * any-motion edge is trusted for arrival clustering. At 2/5, with the 50 ms
+ * ringdown on top, the piezo owned 250 ms of every 500 ms -- half the time --
+ * so roughly half of a real arrival's interrupt edges were raised while the
+ * buzzer was driving and had to be discarded. On the 2026-08-07 50 fpm down
+ * run the arrival produced exactly two edges 656 ms apart; one carried bz=1,
+ * was rejected, and the arrival went undetected.
+ *
+ * With 2 edges at an arrival, the chance both land in a quiet window is q^2:
+ *
+ *      duty            quiet fraction q    P(both quiet)
+ *   2/5  + ringdown          0.50              25%
+ *   2/10 + ringdown          0.75              56%
+ *
+ * It cuts in the other direction too: buzzer-induced edges can only occur
+ * while the piezo is driven, so less driving means fewer false ones. On the
+ * up run six were raised and discarded, including a 196 ms pair that would
+ * otherwise have released the alarm mid-ride.
+ *
+ * Side benefit: the piezo draws current for a quarter of the time instead of
+ * half, which matters for a latch that can now sound for 80+ seconds (§13.4).
+ *
+ * ⚠️ This changes what the product SOUNDS like -- same beep length, half as
+ * often. That is a user-facing change, not just a tuning constant.
+ */
+#define BUZZER_CYCLE_STEPS        10
+#define BUZZER_ON_STEPS           2
 #define BATTERY_FLASH_TIME_MS     600
 
 /*

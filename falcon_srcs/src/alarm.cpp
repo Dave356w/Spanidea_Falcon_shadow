@@ -114,10 +114,10 @@ void check_for_buzzer_alert()
     if (millis() - alarm_timer > BEEP_FLASH_TIME_MS)
     {
         alarm_timer = millis();
-        counter_b = (counter_b % 5) + 1;
+        counter_b = (counter_b % BUZZER_CYCLE_STEPS) + 1;
 
-        // it keeps buzzer and led on for 200 ms, and buzzer and led off for 300ms
-        if (counter_b < 3) {
+        /* 200 ms on, 800 ms off -- see BUZZER_CYCLE_STEPS in alarm.h */
+        if (counter_b <= BUZZER_ON_STEPS) {
             beep = 1;
         } else {
             beep = 0;
