@@ -72,6 +72,13 @@
  * two edges inside this window means the any-motion condition survived more
  * than one poll -- sustained motion, not an isolated spike. Both observed
  * arrivals produced 3 edges inside 1.8 s; cruise produced isolated singles.
+ *
+ * ONLY EDGES RAISED WHILE THE BUZZER IS OFF COUNT. See notify_any_motion().
+ * On 2026-08-07 a cluster made of one buzzer-raised edge plus one quiet edge
+ * released an alarm mid-ride. Eng_Notes §11 recorded the buzzer triggering
+ * any-motion continuously at threshold 96 with all three axes; at Z-only/32 it
+ * is sporadic instead -- roughly one edge per 6-10 s -- which is rare enough to
+ * look harmless and frequent enough to break a 2-edge rule.
  */
 #define ARRIVAL_EDGE_COUNT             2
 #define ARRIVAL_EDGE_WINDOW_MS         2500
