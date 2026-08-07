@@ -27,7 +27,32 @@ MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, flo
     log_printed = 0;
 
     monitor_state = MonitorStates::MONITORING;
+
+#if LATCHED_FSM
+    any_motion_pending = false;
+    arrival_seen       = false;
+    stop_confirm_timer = 0;
+#endif
 }
+
+#if LATCHED_FSM
+/*
+ * Record that the BMA456 any-motion interrupt fired.
+ *
+ * Only STATE_MONITORING acts on it. That matters: the buzzer triggers
+ * any-motion continuously while it sounds (Eng_Notes §11), so once the alarm is
+ * running these arrive constantly. Latching only from MONITORING makes those
+ * harmless -- there is nothing for them to do.
+ *
+ * Called from loop(), not from the ISR. The ISR does nothing but count.
+ */
+void MovementService::notify_any_motion(void)
+{
+    if (state == MotionStates::STATE_MONITORING) {
+        any_motion_pending = true;
+    }
+}
+#endif
 
 void MovementService::reset_counters(void)
 {
@@ -124,6 +149,26 @@ void MovementService::fsm_run()
             start_timer = millis();
             set_state(STATE_MOVEMENT_DETECTED);
         }
+#if LATCHED_FSM
+        /*
+         * Departure via the BMA456 any-motion interrupt.
+         *
+         * This is the path that actually catches slow departures. The threshold
+         * test above operates on a 4-sample average at 3.13 Hz, which spans
+         * 1.28 s and flattens a 1-2 s departure ramp to nothing -- it has never
+         * detected a departure in any hoistway run (§12.3). The sensor's own
+         * engine runs at 100 Hz and caught an 18 fpm departure of -0.116 m/s^2.
+         *
+         * Both paths are kept: the threshold test still catches violent events
+         * the sensor might somehow miss, and costs nothing to leave in.
+         */
+        if (any_motion_pending) {
+            any_motion_pending = false;
+            Serial.print("FSM: Departure latched (any-motion) \r\n");
+            start_timer = millis();
+            set_state(STATE_MOVEMENT_DETECTED);
+        }
+#endif
         break;
 
     case MotionStates::STATE_MOVEMENT_DETECTED:
@@ -134,6 +179,9 @@ void MovementService::fsm_run()
 
         if ((millis() - start_timer) > MOVEMENT_DETECTION_TIMEOUT_MS) {
             movement_start_timer = millis();
+#if LATCHED_FSM
+            arrival_seen = false;
+#endif
             enable_alarm();
             enable_chase_leds();
             set_state(STATE_MOVING);
@@ -160,6 +208,58 @@ void MovementService::fsm_run()
 
         current_time = millis();
 
+#if LATCHED_FSM
+        /*
+         * Latched: the alarm holds from departure until an arrival transient is
+         * seen. No timeout -- a 3-minute express run alarms for 3 minutes, which
+         * is the §3 design and the answer to the original complaint.
+         *
+         * Constant velocity is deliberately NOT tested for. It cannot be: a car
+         * cruising at 350 fpm and a car parked both read 1 g on Z (§3). The
+         * middle phase is assumed, not measured.
+         *
+         * Arrival is detected on the polled average rather than any-motion,
+         * because the buzzer triggers any-motion continuously while sounding
+         * (§11) -- there is no usable edge. The polled path can do it: item 7
+         * restored ~45% sample coverage during an alarm (§5), and arrivals are
+         * large (raw 1.9-4.8 m/s^2 measured).
+         */
+        present_accel = acceleration_avg_ref->avg();
+        delta_accel = 0.0;
+
+        if (present_accel > zero_calib_value)
+            delta_accel = present_accel - zero_calib_value;
+        else if (present_accel < zero_calib_value)
+            delta_accel = zero_calib_value - present_accel;
+
+        /*
+         * MIN_TRAVEL_MS keeps the departure transient itself from satisfying the
+         * arrival test and releasing the latch immediately after setting it.
+         */
+        if (!arrival_seen &&
+            (current_time - movement_start_timer) > MIN_TRAVEL_MS &&
+            delta_accel > ARRIVAL_THRESHOLD_VALUE) {
+
+            arrival_seen = true;
+            Serial.print("FSM: Arrival transient, delta ");
+            Serial.print(delta_accel, 6);
+            Serial.print("\r\n");
+            start_timer = millis();
+            set_state(STATE_DECELERATING);
+            break;
+        }
+
+        /*
+         * Failsafe only. Reaching this means an arrival was never detected, which
+         * is a fault -- log it as one so it is not mistaken for a normal release.
+         */
+        if ((current_time - movement_start_timer) > LATCH_FAILSAFE_MS) {
+            Serial.print("FSM: FAILSAFE - no arrival detected, releasing latch \r\n");
+            start_timer = millis();
+            set_state(STATE_DECELERATING);
+        }
+        break;
+#else
         /*
          * If the movement has stopped, then we will stop the buzzer and chase LED
          * after 5 seconds. This is to avoid false alarm.
@@ -167,7 +267,7 @@ void MovementService::fsm_run()
          * If the movement has not stopped, then we will keep the buzzer and chase LED
          * on for 30 seconds. After that, we will stop the buzzer and chase LED.
          *
-         * If the movement has not stopped even after 30 seconds, then we will 
+         * If the movement has not stopped even after 30 seconds, then we will
          * transition to STATE_DECELERATING state.
          *
         */
@@ -212,19 +312,64 @@ void MovementService::fsm_run()
         }
 
         break;
+#endif
 
     case MotionStates::STATE_DECELERATING:
         if (last_state != MotionStates::STATE_DECELERATING) {
             Serial.print("FSM: Transitioned to STATE_DECELERATING \r\n");
             last_state = MotionStates::STATE_DECELERATING;
+#if LATCHED_FSM
+            stop_confirm_timer = millis();
+#endif
         }
 
+#if LATCHED_FSM
+        /*
+         * Confirm the car has actually settled before silencing, rather than
+         * silencing on a fixed timer. The arrival transient is followed by
+         * ringing and door operation; releasing on the first quiet sample would
+         * clear the alarm while the car is still rocking.
+         *
+         * The window restarts on any excursion, so the average has to stay
+         * inside the band continuously.
+         */
+        present_accel = acceleration_avg_ref->avg();
+        delta_accel = 0.0;
+
+        if (present_accel > zero_calib_value)
+            delta_accel = present_accel - zero_calib_value;
+        else if (present_accel < zero_calib_value)
+            delta_accel = zero_calib_value - present_accel;
+
+        if (delta_accel > ARRIVAL_THRESHOLD_VALUE) {
+            stop_confirm_timer = millis();
+        }
+
+        if ((millis() - stop_confirm_timer) > STOP_CONFIRM_MS) {
+            disable_alarm();
+            disable_chase_leds();
+            set_state(STATE_STOPPED);
+        }
+
+        /*
+         * Backstop: never sit in DECELERATING indefinitely if the car keeps
+         * moving enough to restart the confirm window.
+         */
+        if ((millis() - start_timer) > LATCH_FAILSAFE_MS) {
+            Serial.print("FSM: FAILSAFE - never settled, forcing stop \r\n");
+            disable_alarm();
+            disable_chase_leds();
+            set_state(STATE_STOPPED);
+        }
+        break;
+#else
         if ((millis() - start_timer) > STOP_TIMEOUT_MS) {
 //            disable_alarm();
             disable_chase_leds();
             set_state(STATE_STOPPED);
         }
         break;
+#endif
 
     case MotionStates::STATE_STOPPED:
         if (last_state != MotionStates::STATE_STOPPED) {
