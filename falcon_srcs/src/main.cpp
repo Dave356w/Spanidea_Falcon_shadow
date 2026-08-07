@@ -156,6 +156,10 @@ static volatile bool         accel_avg_primed = false;
  * arrival transient. The 18 fpm departure was below the noise floor in July and
  * may not trigger at any threshold -- that is one of the things being tested.
  *
+ * Z AXIS ONLY as of the hoistway run. The raw a= samples are logged regardless,
+ * so parse_falcon_log.py can sweep thresholds after the fact and one run tests
+ * many values; ACC-INT tells you what the sensor actually did at 96.
+ *
  * Duration is in 50 Hz samples: 5 = 100 ms. This is the hardware equivalent of
  * §7's sustain gating, which found N>=3 consecutive samples eliminated every
  * false fire.
