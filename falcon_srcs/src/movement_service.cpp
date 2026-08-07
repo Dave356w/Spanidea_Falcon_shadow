@@ -35,7 +35,6 @@ MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, flo
     monitor_entered_ms = 0;
     arrival_edge_count = 0;
     arrival_edge_first = 0;
-    still_since_ms     = 0;
 #endif
 }
 
@@ -245,7 +244,6 @@ void MovementService::fsm_run()
             arrival_seen       = false;
             arrival_edge_count = 0;
             arrival_edge_first = 0;
-            still_since_ms     = millis();
 #endif
             enable_alarm();
             enable_chase_leds();
@@ -333,27 +331,6 @@ void MovementService::fsm_run()
                 break;
             }
 
-            /*
-             * 3. BACKSTOP -- sustained stillness.
-             *
-             * Without this, a latch set while the car is stationary can never
-             * clear: the release conditions above both need motion, and no
-             * motion is coming. The failsafe would be the only way out, which
-             * means minutes of alarming at rest.
-             *
-             * A moving car in rails does not stay this quiet -- cruise breaks a
-             * 0.08 band within about 3 s -- so this should only be reachable
-             * when genuinely stopped.
-             */
-            if (delta_accel > STILL_BAND_VALUE || arrival_edge_count > 0) {
-                still_since_ms = current_time;      /* not still; restart */
-            } else if ((current_time - still_since_ms) > STILL_RELEASE_MS) {
-                arrival_seen = true;
-                Serial.print(F("FSM: Released on stillness, no arrival seen \r\n"));
-                start_timer = millis();
-                set_state(STATE_DECELERATING);
-                break;
-            }
         }
 
         /*
