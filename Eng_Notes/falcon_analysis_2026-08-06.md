@@ -306,9 +306,54 @@ is running, coverage is zero** — not reduced, absent. A decel transient of 1�
 falling in that window cannot be detected at all, no matter what thresholds are
 used.
 
-Everything else in this section stands. The fix is still to restore
-`buzzer_on = false` on the beep-off phase (roadmap item 7), and the warning
-against low-pass filtering the ~2 Hz beep envelope still applies.
+Everything else in this section stands.
+
+### ✅ Fixed 2026-08-07 (roadmap item 7) — and the samples are clean
+
+`buzzer_on` now goes false on the beep-off phase after a `BUZZER_RINGDOWN_MS`
+(50 ms) blanking window measured from the falling edge of `PIN_PIEZO`. The piezo
+does keep ringing mechanically after the drive pin drops — that part of
+`b795dd2`'s reasoning was sound — but the remaining 250 ms of each 300 ms
+off-phase is usable.
+
+Measured over two alarms in one session:
+
+| Window | Elapsed | Samples |
+|---|---|---|
+| `tk=59` → `tk=73` | 9,896 ms | **14** |
+| `tk=125` → `tk=139` | 9,274 ms | **14** |
+
+Against **1** before — roughly 45% coverage, close to the 50% predicted. Sample
+intervals during the alarm are 639 or 950 ms, exactly 2× or 3× the 319.5 ms tick,
+which is what beating a 319.5 ms sampler against a 500 ms beep cycle produces.
+`bz=0` now appears on `ACC-INT` lines during `st=4`, confirming `buzzer_on`
+actually toggles.
+
+**The critical question was whether those in-gap samples are usable. They are:**
+
+| | Range |
+|---|---|
+| Quiet baseline | 9.65 – 9.71 m/s² |
+| During buzzer | 9.64 – 9.71 m/s² |
+
+No measurable piezo contamination. **50 ms of ringdown blanking is sufficient —
+do not raise it without evidence**, since every extra millisecond costs listening
+time. The warning against low-pass filtering the ~2 Hz beep envelope still
+applies and is now moot: sampling in the gaps works.
+
+Both alarms cleared normally (Delta 0.0596 / 0.0539), so restoring the reads has
+not destabilised the FSM. Self-calibration is now sampled through its own "ready"
+beep as well, where it previously went blind for the final second.
+
+**This unblocks roadmap item 8.** The latched departure/arrival FSM now has
+something listening while the alarm sounds, which §3 identified as "the hard
+part" and §11 confirmed any-motion cannot provide.
+
+⬜ **Not addressed:** `check_for_battery_alarm()` drives `PIN_PIEZO` directly and
+never touches `buzzer_on`, so during a battery alarm the piezo sounds for 1.8 s
+at a stretch with the accelerometer entirely unblanked. The FSM would read that
+vibration as motion and could raise a spurious movement alarm on top of the
+battery one. Different alarm path, different timing — worth its own fix.
 
 ---
 
@@ -452,11 +497,12 @@ on a sensor that silently reports zero is still a dead unit.
 | 3 | **Check the `bma4_read_accel_xyz()` return code; fault instead of reporting 0.0** | ✅ PR #2 | §10.2. `a=ERR` path not yet exercised on hardware |
 | 3a | Fix `ov=` so decimation is actually detected | 🔧 PR #2 | §6a. Symptom gone; `tk=` added, cause unproven |
 | 4 | **Call `disable_battery_alarm()` when voltage recovers; average before latching** | ✅ PR #2 | §10.3. Confirmed on the bench |
+| 7a | Blank the sensor during the battery alarm too — `check_for_battery_alarm()` never sets `buzzer_on` | ⬜ | §5. 1.8 s of unblanked piezo could raise a spurious movement alarm |
 | 4a | Decide what the unit should *do* when the sensor is dead | ⬜ | It no longer lies, but raises no user-visible fault. Product decision — ask Biju |
 | 5 | **Fix Timer1: CTC mode (`WGM12`), prescaler 64 → 100 Hz** | ⬜ | **the** detection fix; everything below assumes it |
 | 6 | Delete the dead pressure path | ⬜ | §4 |
-| 7 | Restore `buzzer_on = false` on beep-off phase | ⬜ | §5 |
-| 8 | Departure-latch / decel-release FSM, no timeout | ⬜ | §3 |
+| 7 | Restore `buzzer_on = false` on beep-off phase | ✅ PR #4 | §5. ~45% coverage, samples clean. Unblocks item 8 |
+| 8 | Departure-latch / decel-release FSM, no timeout | ⬜ | §3. **Now unblocked** by item 7 |
 | 9 | Sustain-gated threshold, recomputed at 100 Hz | ⬜ | §7 |
 | 10 | Cleanups: `#if 0` block, `movement_service.cpp.original`, `current_time` member, missing EOF newline, untrack `.pio/` + `compile_commands.json`, stray `falcon_srcs.code-workspace` in `src/` | ⬜ | |
 
