@@ -141,26 +141,64 @@ static volatile bool         accel_avg_primed = false;
  *      so any-motion is expected to see the buzzer too. Measuring how badly is
  *      the point.
  *
- * THRESHOLD ARITHMETIC -- treat as a starting point, not a tuned value.
+ * THRESHOLD -- set from the 2026-08-07 38 fpm down run, not from arithmetic.
  *
- * The field is 11 bits (BMA456_ANY_NO_MOTION_THRES_MSK = 0x07FF) spanning
- * roughly 1 g at the configured RANGE_2G, giving ~0.488 mg per count. That LSB
- * is derived from the mask width, NOT read off the datasheet -- confirm against
- * Datasheet/ before trusting any number computed from it.
+ * The first value, 96, was derived from an assumed ~0.488 mg per count (the
+ * 11-bit BMA456_ANY_NO_MOTION_THRES_MSK spanning roughly 1 g at RANGE_2G). That
+ * LSB has still NOT been confirmed against Datasheet/, so everything below is
+ * expressed as a RATIO to the threshold actually used, which stays valid even
+ * if the mg-per-count figure is wrong.
  *
- * Against the July captures:
- *   arrival transient  +1.35 m/s^2 = 138 mg  ~= 282 counts
- *   stationary noise   +/-0.16 m/s^2 = 16 mg ~=  33 counts
+ * Measured on the 38 fpm down run at threshold 96:
  *
- * 96 counts (~47 mg) sits comfortably above the noise floor and well below the
- * arrival transient. The 18 fpm departure was below the noise floor in July and
- * may not trigger at any threshold -- that is one of the things being tested.
+ *   departure   -0.317 m/s^2   0.67x threshold   MISSED
+ *   cruise      +/-0.09 m/s^2  0.19x threshold   silent (correct)
+ *   arrival     +0.646 m/s^2   1.37x threshold   DETECTED
+ *   stationary  +/-0.02 m/s^2  0.04x threshold   silent (correct)
+ *
+ * The stationary noise floor turned out to be +/-0.02 m/s^2, eight times quieter
+ * than the +/-0.16 measured in July, so there is far more room to drop the
+ * threshold than the original analysis assumed.
+ *
+ * At 48 a departure was detected for the first time: -0.345 m/s^2 at 1.5x
+ * threshold, while the polled FSM missed it entirely (its RollingAvg(4) delta
+ * was 0.107 against a 0.400 trigger). The FSM alarmed only on the arrival,
+ * which at +3.25 m/s^2 raw was large enough to survive the averaging window.
+ *
+ * Dropped again to 32 for more slow-speed margin. Against the worst non-event
+ * excursions recorded so far -- cruise vibration +/-0.09 m/s^2 and stationary
+ * noise +/-0.05:
+ *
+ *   threshold   departure(0.345)   cruise(0.09)   stationary(0.05)
+ *      48           1.5x              0.39x           0.22x
+ *      32           2.2x              0.58x           0.33x     <- here
+ *      24           3.0x              0.78x           0.43x
+ *      16           4.5x              1.17x           0.65x
+ *
+ * 24 and below run into cruise vibration. A threshold that fires mid-ride is
+ * worse than one that misses a departure: it destroys the latched FSM's ability
+ * to tell a departure from hoistway noise, which is the whole point of §3.
+ *
+ * If false fires do appear at 32, raise ANYMOTION_DURATION rather than the
+ * threshold. Vibration spikes are brief; a departure ramp lasts 1-2 s and will
+ * still sustain a longer gate. Raising the threshold instead gives back the
+ * slow-speed sensitivity this change exists to buy.
+ *
+ * ⬜ UNTESTED AT 18 FPM. The transient depends on the acceleration ramp rather
+ * than the top speed, so an 18 fpm departure may be similar to the 38 fpm one
+ * or may be half of it. If it is half (~0.17 m/s^2) that is 1.1x at this
+ * threshold -- marginal -- and 24 would be the next step, accepting the cruise
+ * risk above. That run is what decides whether any-motion can solve §3.
+ *
+ * Z AXIS ONLY. The raw a= samples are logged regardless, so
+ * parse_falcon_log.py can sweep thresholds after the fact and one run tests
+ * many values; ACC-INT records what the sensor actually did at this setting.
  *
  * Duration is in 50 Hz samples: 5 = 100 ms. This is the hardware equivalent of
  * §7's sustain gating, which found N>=3 consecutive samples eliminated every
  * false fire.
  */
-#define ANYMOTION_THRESHOLD       96
+#define ANYMOTION_THRESHOLD       32
 #define ANYMOTION_DURATION        5
 #define ANYMOTION_INT_LINE        BMA4_INTR1_MAP
 
@@ -642,6 +680,19 @@ void emit_acc_int_log()
         return;
     }
     last_reported = count;
+
+#if LATCHED_FSM
+    /*
+     * Hand the departure to the FSM. It only acts on this in STATE_MONITORING,
+     * so the constant stream of interrupts the buzzer raises while alarming
+     * (Eng_Notes §11) is harmless.
+     *
+     * Done here rather than in the ISR so the FSM is only ever touched from
+     * loop() -- §6 is what happens when this codebase does work in interrupt
+     * context.
+     */
+    ms.notify_any_motion(when);
+#endif
 
     Serial.print(F("ACC-INT n="));
     Serial.print(count);
