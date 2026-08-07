@@ -92,6 +92,12 @@ static volatile uint16_t     sensor_err_total = 0;
 static volatile uint8_t      sensor_err_run   = 0;
 
 /*
+ * Cleared until acceleration_avg_g has been primed from a real sample. See
+ * read_acceleration_mss() for why an unprimed window is dangerous.
+ */
+static volatile bool         accel_avg_primed = false;
+
+/*
  * Print one line per N published samples. At the current ~3 Hz ISR rate one
  * line per sample costs about 15% of the 9600 baud budget. Raise this when the
  * timer is fixed to 100 Hz, or serial becomes the new bottleneck.
@@ -120,6 +126,53 @@ static volatile uint8_t      sensor_err_run   = 0;
  * top of the averaging. See the comment in check_for_battery_voltage().
  */
 #define BATTERY_SETTLE_SAMPLES    2
+
+/*
+ * Any-motion interrupt test (Eng_Notes §11).
+ *
+ * OBSERVATION ONLY. The interrupt runs alongside the existing polled detector
+ * and changes no FSM behaviour; it exists to answer three questions before any
+ * architecture decision is made:
+ *
+ *   1. Does the INT1_ACC -> PD2 path work at all on this hardware?
+ *   2. Does the sensor flag real elevator departures and arrivals?
+ *   3. Does the piezo trigger it? §5 says the buzzer couples mechanically into
+ *      the accelerometer, and the sensor's engine sits behind the same physics,
+ *      so any-motion is expected to see the buzzer too. Measuring how badly is
+ *      the point.
+ *
+ * THRESHOLD ARITHMETIC -- treat as a starting point, not a tuned value.
+ *
+ * The field is 11 bits (BMA456_ANY_NO_MOTION_THRES_MSK = 0x07FF) spanning
+ * roughly 1 g at the configured RANGE_2G, giving ~0.488 mg per count. That LSB
+ * is derived from the mask width, NOT read off the datasheet -- confirm against
+ * Datasheet/ before trusting any number computed from it.
+ *
+ * Against the July captures:
+ *   arrival transient  +1.35 m/s^2 = 138 mg  ~= 282 counts
+ *   stationary noise   +/-0.16 m/s^2 = 16 mg ~=  33 counts
+ *
+ * 96 counts (~47 mg) sits comfortably above the noise floor and well below the
+ * arrival transient. The 18 fpm departure was below the noise floor in July and
+ * may not trigger at any threshold -- that is one of the things being tested.
+ *
+ * Duration is in 50 Hz samples: 5 = 100 ms. This is the hardware equivalent of
+ * §7's sustain gating, which found N>=3 consecutive samples eliminated every
+ * false fire.
+ */
+#define ANYMOTION_THRESHOLD       96
+#define ANYMOTION_DURATION        5
+#define ANYMOTION_INT_LINE        BMA4_INTR1_MAP
+
+/* How often to read/clear the sensor interrupt status, milliseconds. */
+#define ACC_INT_POLL_MS           1000
+
+static volatile uint16_t     acc_int_count = 0;
+static volatile uint32_t     acc_int_last_ms = 0;
+
+void acc_int1_isr();
+void emit_acc_int_log();
+void poll_acc_int_status();
 
 void emit_sample_log();
 
@@ -166,6 +219,31 @@ void setup() {
 
     bma456.initialize(RANGE_2G, ODR_100_HZ, NORMAL_AVG4, CONTINUOUS);
     Serial.print(F("Configured BMA456 \r\n"));
+
+    /*
+     * Arm the any-motion engine and listen on INT1_ACC / PD2. Observation only
+     * -- see the ANYMOTION_* block above.
+     */
+    {
+        uint16_t rslt = bma456.configureAnyMotion(ANYMOTION_THRESHOLD,
+                                                  ANYMOTION_DURATION,
+                                                  BMA4_DISABLE,
+                                                  ANYMOTION_INT_LINE);
+        if (rslt != BMA4_OK) {
+            Serial.print(F("AnyMotion config FAILED : "));
+            Serial.print(rslt);
+            Serial.print(F("\r\n"));
+        } else {
+            Serial.print(F("AnyMotion armed thr="));
+            Serial.print(ANYMOTION_THRESHOLD);
+            Serial.print(F(" dur="));
+            Serial.print(ANYMOTION_DURATION);
+            Serial.print(F("\r\n"));
+        }
+    }
+
+    pinMode(PIN_ACC_INT1, INPUT);
+    attachInterrupt(digitalPinToInterrupt(PIN_ACC_INT1), acc_int1_isr, RISING);
 
     /*
      * Configure the ADC channel for battery voltage measurement using PC2 (ADC2).
@@ -227,6 +305,8 @@ void loop()
         ms.fsm_run();
 
         emit_sample_log();
+        emit_acc_int_log();
+        poll_acc_int_status();
 
         if (bma_read_counter++ > 1000 ) {
             log_data();
@@ -294,7 +374,32 @@ float read_acceleration_mss()
     g_value = z / 1000.0;
     accel_value = g_value * 9.81;
 
-    acceleration_avg_g.add(accel_value);
+    /*
+     * Prime the window from the first good sample instead of letting it fill
+     * from zero.
+     *
+     * RollingAvg initialises every slot to init_val (0.0 here), so an unprimed
+     * acceleration_avg_g(4) reports 0.00, 2.43, 4.86, 7.29 and only then the
+     * true ~9.72 as the window fills. That ramp is indistinguishable from a
+     * large upward acceleration, and on 2026-08-06 it produced a false
+     * STATE_MOVEMENT_DETECTED on a device sitting still on a bench.
+     *
+     * It then got stuck: the FSM captured its baseline at 2.4265 (one sample
+     * into the unprimed window, 9.7152/4) and compared against it forever,
+     * giving "FSM: Delta : 7.294032" and "Still in movement" on every cycle
+     * with no way back to STATE_MONITORING. The alarm never cleared.
+     *
+     * Priming makes the average correct from the first sample onward. This is
+     * the same defect that was fixed in battery_avg -- see
+     * check_for_battery_voltage() -- and the acceleration path is the more
+     * damaging place to have it.
+     */
+    if (!accel_avg_primed) {
+        accel_avg_primed = true;
+        acceleration_avg_g.fill(accel_value);
+    } else {
+        acceleration_avg_g.add(accel_value);
+    }
 
     /*
      * Publish a snapshot for loop() to print. No serial I/O in here.
@@ -378,6 +483,8 @@ void emit_sample_log()
     Serial.print(overrun);
     Serial.print(F(" tk="));
     Serial.print(ticks);
+    Serial.print(F(" im="));
+    Serial.print(acc_int_count);
 
     if (err_total) {
         Serial.print(F(" et="));
@@ -392,13 +499,41 @@ void enable_timer()
     cli();
     TCCR1B = 0;
 
-    // enable the internal clock with 1024 prescale
-    TCCR1B |= ((1 << CS12) | (1 <<CS10));
+    /*
+     * Clear the counter and load OCR1A BEFORE the waveform mode and the clock
+     * are selected. Two hazards, both observed on the bench 2026-08-06:
+     *
+     * 1. TCNT1 was never cleared. In mode 9 the counter cannot reach a TOP that
+     *    is below it, so if TCNT1 held a large value it had to run all the way
+     *    to 0xFFFF and wrap first. At F_CPU/1024 = 976 Hz that is up to 67
+     *    seconds before the first compare match.
+     *
+     * 2. OCR1A is DOUBLE BUFFERED in mode 9. Writing it after the mode bits, as
+     *    this function used to, does not take effect until the counter reaches
+     *    the *previous* TOP -- so the first period is governed by whatever
+     *    OCR1A happened to hold, not by 156. Written here while TCCR1B is still
+     *    0 (normal mode), the write is immediate and unbuffered.
+     *
+     * The symptom was one sensor read at t=5275 and the next at t=72335, then
+     * a perfectly regular 3.13 Hz. The 10-second self-calibration in between
+     * ran on that single sample: Zero-Calib-Value came out as exactly the one
+     * reading taken at t=5275.
+     *
+     * NOTE: the prescaler and waveform mode are deliberately left as they are.
+     * Both are wrong (Eng_Notes §2) and fixing them is roadmap item 5, which
+     * changes the sample rate 32x and invalidates every tuning number in the
+     * document. This change is only about the timer STARTING predictably, so
+     * the rate stays at 3.13 Hz and detection behaviour is unchanged.
+     */
+    TCNT1 = 0;
+    OCR1A = 156;
 
-    // enable overflow interrupt 
+    // enable overflow interrupt
     TIMSK1 |= (1 << OCIE1A);
     TCCR1B |= (1 << WGM13);
-    OCR1A = 156;
+
+    // enable the internal clock with 1024 prescale -- start it last
+    TCCR1B |= ((1 << CS12) | (1 <<CS10));
     sei();
 }
 #endif
@@ -468,6 +603,110 @@ ISR(TIMER1_COMPA_vect)
     sensor_value_updated = 1;
     in_isr = false;
     return;
+}
+
+/*
+ * Any-motion interrupt handler. Deliberately trivial: no I2C, no serial, no
+ * FSM. The sensor's status register is not read here -- that would be an I2C
+ * transaction from an ISR, and §6 is what happens when this codebase does I/O
+ * from interrupt context. loop() reports the count; the sensor latches its own
+ * status until read, so nothing is lost by not reading it immediately.
+ */
+void acc_int1_isr()
+{
+    acc_int_count++;
+    acc_int_last_ms = millis();
+}
+
+/*
+ * Report new any-motion edges. Called from loop() only.
+ *
+ * The buzzer state is printed alongside because §5's mechanical coupling is the
+ * main thing that could sink this approach: if bz=1 accompanies most edges, the
+ * sensor is detecting its own piezo rather than the car, and the threshold has
+ * to discriminate between them -- or it cannot be used while alarming, which is
+ * exactly the deadlock the polled version already has.
+ */
+void emit_acc_int_log()
+{
+    static uint16_t last_reported = 0;
+    uint16_t        count;
+    uint32_t        when;
+
+    noInterrupts();
+    count = acc_int_count;
+    when  = acc_int_last_ms;
+    interrupts();
+
+    if (count == last_reported) {
+        return;
+    }
+    last_reported = count;
+
+    Serial.print(F("ACC-INT n="));
+    Serial.print(count);
+    Serial.print(F(" t="));
+    Serial.print(when);
+    Serial.print(F(" st="));
+    Serial.print(ms.get_state());
+    Serial.print(F(" bz="));
+    Serial.print(get_buzzer_status() ? 1 : 0);
+    Serial.print(F(" pin="));
+    Serial.print(digitalRead(PIN_ACC_INT1));
+    Serial.print(F("\r\n"));
+}
+
+/*
+ * Poll and clear the sensor's interrupt status.
+ *
+ * BMA4_NON_LATCH_MODE alone did not re-arm the pin on the bench: one edge at
+ * t=35471 and then nothing across three handling events the polled detector
+ * caught easily. Either the mode is being overwritten by the feature-config
+ * write or it is not doing what the datasheet implies, so this reads the status
+ * register periodically, which clears the condition explicitly and drops the
+ * pin so the next motion produces a fresh rising edge.
+ *
+ * The pin level is logged alongside because it distinguishes the two failure
+ * modes at a glance:
+ *
+ *   pin=1 persistently  -> the interrupt IS asserted and stuck; latching is the
+ *                          problem and this poll should fix it
+ *   pin=0 with s=0      -> the sensor is not re-asserting at all; the threshold
+ *                          is wrong, or any-motion is not actually enabled
+ *
+ * Rate-limited because each read is a ~6 ms I2C transaction (§10.4).
+ */
+void poll_acc_int_status()
+{
+    static uint32_t last_poll = 0;
+    uint16_t        status = 0;
+    uint16_t        rslt;
+
+    if (millis() - last_poll < ACC_INT_POLL_MS) {
+        return;
+    }
+    last_poll = millis();
+
+    rslt = bma456.readInterruptStatus(&status);
+
+    /*
+     * Only speak up when there is something to say: a live status bit, a stuck
+     * pin, or a failed read. Otherwise this would add a line every second.
+     */
+    if (rslt != BMA4_OK) {
+        Serial.print(F("ACC-STAT read FAILED\r\n"));
+        return;
+    }
+
+    if (status != 0 || digitalRead(PIN_ACC_INT1) != 0) {
+        Serial.print(F("ACC-STAT s=0x"));
+        Serial.print(status, HEX);
+        Serial.print(F(" pin="));
+        Serial.print(digitalRead(PIN_ACC_INT1));
+        Serial.print(F(" n="));
+        Serial.print(acc_int_count);
+        Serial.print(F("\r\n"));
+    }
 }
 
 void log_data()
