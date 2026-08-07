@@ -325,14 +325,26 @@ void MovementService::fsm_run()
         if (!arrival_seen && (current_time - movement_start_timer) > MIN_TRAVEL_MS) {
 
             /*
-             * 1. PRIMARY -- clustered any-motion. See notify_any_motion().
+             * 1. PRIMARY -- clustered any-motion, CORROBORATED by the polled
+             *    average. See notify_any_motion() and ARRIVAL_CLUSTER_DELTA.
+             *
+             * A cluster on its own is not sufficient. At 58 fpm the car's own
+             * vibration keeps any-motion asserted, so consecutive status polls
+             * pair up and look exactly like an arrival -- on 2026-08-07 that
+             * released an alarm 12 s into a 54 s ride. Requiring the average to
+             * be elevated as well rejects that case (0.175) while still
+             * accepting a real arrival the polled path alone would have missed
+             * (0.278 against its own 0.30 threshold).
              */
             if (arrival_edge_count >= ARRIVAL_EDGE_COUNT &&
-                (uint32_t)(current_time - arrival_edge_first) <= ARRIVAL_EDGE_WINDOW_MS) {
+                (uint32_t)(current_time - arrival_edge_first) <= ARRIVAL_EDGE_WINDOW_MS &&
+                delta_accel > ARRIVAL_CLUSTER_DELTA) {
 
                 arrival_seen = true;
                 Serial.print(F("FSM: Arrival (any-motion), edges "));
                 Serial.print(arrival_edge_count);
+                Serial.print(F(" delta "));
+                Serial.print(delta_accel, 3);
                 Serial.print(F("\r\n"));
                 start_timer = millis();
                 set_state(STATE_DECELERATING);

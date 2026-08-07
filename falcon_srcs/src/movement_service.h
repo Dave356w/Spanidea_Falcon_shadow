@@ -84,6 +84,35 @@
 #define ARRIVAL_EDGE_WINDOW_MS         2500
 
 /*
+ * A cluster alone is not enough -- the polled average must corroborate it.
+ *
+ * The two detectors fail in OPPOSITE places, which is what makes this work:
+ *
+ *   speed     cruise asserts?          polled arrival margin
+ *   18 fpm    no, 0.4 edges/min        0.312 vs cruise 0.271  = 1.15x
+ *   58 fpm    YES, 999 ms pair         brake set 1.275        = comfortable
+ *
+ * So clustering is safe at low speed but does not fire there (an 18 fpm
+ * arrival produced a single edge), while at 58 fpm it fires when it should
+ * not -- on 2026-08-07 it released 12 s into a 54 s ride. Polled is the
+ * mirror image: marginal slow, strong fast.
+ *
+ * Requiring both weak signals to agree covers the range without weakening
+ * either. Measured against every case that day:
+ *
+ *   case                     cluster   delta    result
+ *   real arrival, descent      yes     0.278    fires (polled alone missed it)
+ *   FALSE release, 58 fpm      yes     0.175    REJECTED
+ *   18 fpm arrival             no      0.312    fires on polled alone
+ *   brake set                  no      1.275    fires on polled alone
+ *
+ * 0.20 sits above the 0.175 false case and below the 0.278 real one. That is
+ * a 1.14x / 1.39x margin on four samples -- thin, and the first thing to
+ * revisit as more speeds are measured.
+ */
+#define ARRIVAL_CLUSTER_DELTA          (0.20)
+
+/*
  * ⛔ NO STILLNESS BACKSTOP -- do not reintroduce one.
  *
  * A "release the latch if the signal has been quiet for N seconds" path was
@@ -135,12 +164,17 @@
  * transient looked like a fresh departure and the unit alarmed twice for one
  * trip. The run was about two floors.
  *
- * 180 s covers roughly five floors at 18 fpm while still bounding a genuinely
- * stuck alarm to three minutes. Raise it further if slower or longer runs turn
- * up in service; the symptom to watch for is a FAILSAFE line followed shortly
+ * Raised again to 300 s on measurement, not reasoning. A full 18 fpm descent
+ * on 2026-08-07 held the alarm for 171.6 s -- 95% of the 180 s budget. That is
+ * an ordinary slow run, not a fault, and one more floor would have tripped the
+ * failsafe mid-travel and split the trip into two alarms.
+ *
+ *   18 fpm: 300 s covers ~27 m, roughly 8 floors
+ *
+ * The symptom that it is still too short is a FAILSAFE line followed shortly
  * by a second departure latch.
  */
-#define LATCH_FAILSAFE_MS              180000
+#define LATCH_FAILSAFE_MS              300000
 
 /*
  * How long the average must stay inside STOP_BAND_VALUE of the zero
