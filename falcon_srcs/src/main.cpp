@@ -691,7 +691,7 @@ void emit_acc_int_log()
      * loop() -- §6 is what happens when this codebase does work in interrupt
      * context.
      */
-    ms.notify_any_motion();
+    ms.notify_any_motion(when);
 #endif
 
     Serial.print(F("ACC-INT n="));
