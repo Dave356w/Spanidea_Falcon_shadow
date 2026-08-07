@@ -930,6 +930,107 @@ clean samples. That removes the blocker for both architectures rather than
 favouring either, so the choice between them still rests on the open question
 below.
 
-⬜ **Open:** does any-motion catch an 18 fpm departure? Only a hoistway run can
-answer it, and it is the question that decides whether this approach is worth
-pursuing over fixing the polled path.
+✅ **Answered 2026-08-07 in the hoistway: yes.** See §12.
+
+---
+
+## 12. ✅ Hoistway results, 2026-08-07 — the 18 fpm departure is detectable
+
+The question this document has carried since July — why the unit cannot detect a
+slow-speed departure, and whether anything can — is answered. **The sensor's own
+any-motion engine detects an 18 fpm departure. The polled detector never has.**
+
+Capture: `logs/device-monitor-260807-102954.log`, 18 fpm down, threshold 32,
+duration 5, Z axis only.
+
+### 12.1 The run
+
+Stationary baseline over the 4 s before departure: 9.6938–9.7639 m/s²,
+spread **±0.035**.
+
+| Event | t (ms) | `a=` | Δ from baseline | Any-motion | Polled FSM |
+|---|---|---|---|---|---|
+| **Departure** | 762462 | 9.6166 | **−0.116** | ✅ n=38, 39 | ❌ |
+| Cruise, 20.3 s | 763–783 k | 9.55–9.94 | ±0.19 | ❌ silent ✅ | ❌ silent ✅ |
+| **Arrival** | 783663 | 8.2473 → 11.6434 | −1.49 / +1.91 | ✅ n=40–42 | ✅ t=785301 |
+
+**−0.116 m/s² is a third the size of the 38 fpm departure measured earlier the
+same day, and it fired.** §3 concluded from the July captures that the 18 fpm
+departure sat below the noise floor and that "no (threshold, sustain)
+combination recovers a departure from this data". That conclusion was correct
+*for the polled path at 3.13 Hz through a `RollingAvg(4)`*. It does not hold for
+the sensor running its own engine at 100 Hz.
+
+### 12.2 ⚠️ Amplitude is not what discriminates — duration is
+
+The most important result here is easy to miss:
+
+**Cruise excursions reached ±0.19 m/s², larger than the 0.116 departure, and
+produced no interrupts at all.**
+
+On a pure-amplitude model — which is how the threshold was picked, including the
+ratio tables in `main.cpp` — cruise should have fired well before the departure
+did. It did not. The discriminator is the **100 ms duration gate**: a departure
+is a sustained acceleration ramp that holds above threshold, while hoistway
+vibration is brief spikes that do not.
+
+Consequences:
+
+- **Do not lower the threshold further.** 32 detects the smallest transient yet
+  recorded. There is no case for 24, and going lower begins to expose the spikes
+  that duration is currently filtering out.
+- **`ANYMOTION_DURATION` is the real tuning knob**, not the threshold. If false
+  fires appear, raise it.
+- Detectability **cannot be inferred from the 3.13 Hz `a=` peaks**. The polled
+  samples undersample a 1–2 s event badly; the sensor sees a waveform the log
+  does not show.
+
+### 12.3 The two detectors are complementary
+
+Across every hoistway and bench run at 32:
+
+| | Departure | Cruise | Arrival |
+|---|---|---|---|
+| **Any-motion** | ✅ down to −0.116 | silent | ✅ |
+| **Polled FSM** | ❌ never | silent | ✅ every time |
+
+The polled path misses departures structurally, not by mistuning: a
+`RollingAvg(4)` at 3.13 Hz spans 1.28 s and flattens a 1–2 s ramp. On the 38 fpm
+run it reduced a raw +3.25 m/s² arrival to a delta of 0.755, and on an earlier
+run reduced +1.31 to 0.32 — below the 0.400 trigger, so even a *large* event was
+erased. It detects arrivals only because they are violent enough to survive that.
+
+**The unit therefore alarms when a car arrives, not when it departs.** That is
+backwards for the product, and it is a consequence of §2, not of any threshold
+setting.
+
+### 12.4 What this means for the roadmap
+
+**It decouples item 8 from item 5.** The 100 Hz timer fix was needed because
+polling at 3.13 Hz cannot see departures. If departure detection moves into the
+sensor, the firmware sample rate stops being the blocker — which matters, because
+item 5 is still stuck behind the unbudgeted F_CPU/battery decision (§10.4).
+
+The design the data supports is a **hybrid**, playing each detector to its
+demonstrated strength:
+
+| Phase | Detector | Action |
+|---|---|---|
+| Departure | any-motion interrupt | alarm ON, latch IN_TRANSIT |
+| Constant velocity | — | *assumed*, no timeout (§3) |
+| Arrival | polled FSM | release the latch |
+
+This also resolves the release problem §11 identified. Any-motion cannot release
+the alarm because the buzzer triggers it continuously — but it does not need to,
+because release comes from the polled side, which item 7 gave ~45% listening
+coverage during an alarm (§5).
+
+⬜ **Open: a long stationary soak.** The quiet stretches measured so far are
+seconds to minutes. §7's caveat stands and applies harder at threshold 32: a
+false-fire rate that looks like zero over minutes may look very different over
+the months a unit sits in a hoistway.
+
+⬜ **Open: `parse_falcon_log.py` does not know the new log lines.** It reports
+all `ACC-INT` / `ACC-STAT` lines as "corrupted lines — serial contention", and
+its stationary-noise figures are inflated because its window spans whole runs
+including the motion. Fix before trusting its summary.
