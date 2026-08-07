@@ -3,3 +3,12 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# Serial captures from `pio device monitor --filter log2file`.
+#
+# These are working data, not evidence: a session produces hundreds of KB and
+# every reflash restarts millis(), so a file is only meaningful alongside the
+# notes describing which runs it holds. Captures worth keeping are quoted
+# inline in Eng_Notes/ with the numbers already extracted, the way the July
+# EFT captures were.
+logs/
