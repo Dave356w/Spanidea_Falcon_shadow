@@ -457,7 +457,7 @@ void MovementService::fsm_run()
         else if (present_accel < zero_calib_value)
             delta_accel = zero_calib_value - present_accel;
 
-        if (delta_accel > ARRIVAL_THRESHOLD_VALUE) {
+        if (delta_accel > STOP_BAND_VALUE) {
             stop_confirm_timer = millis();
         }
 

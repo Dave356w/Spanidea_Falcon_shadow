@@ -143,15 +143,34 @@
 #define LATCH_FAILSAFE_MS              180000
 
 /*
- * How long the average must stay inside ARRIVAL_THRESHOLD_VALUE of the zero
+ * How long the average must stay inside STOP_BAND_VALUE of the zero
  * calibration before the alarm is silenced. The window restarts on any
  * excursion, so this is continuous quiet, not elapsed time.
  *
- * 2 s covers the ringing and door operation that follow an arrival. Too short
- * and the alarm clears while the car is still rocking; too long and it keeps
- * sounding after the passenger has left.
+ * Raised 2000 -> 5000 on 2026-08-07. Two seconds was short enough that
+ * LEVELLING qualified as "stopped": on a terminal-floor approach the arrival
+ * cluster fired during levelling, the 2 s confirm elapsed while the car was
+ * still settling in, the alarm silenced, and the actual brake set 3.5 s later
+ * was read as a fresh departure. That latched an alarm which then ran for
+ * 73 seconds with the car provably stationary (a flat at 9.69-9.77).
+ *
+ * Five seconds holds the alarm through levelling. The cost is that the alarm
+ * keeps sounding ~3 s longer after a genuine stop.
  */
-#define STOP_CONFIRM_MS                2000
+#define STOP_CONFIRM_MS                5000
+
+/*
+ * The band STATE_DECELERATING calls "stopped", m/s^2 from zero calibration.
+ *
+ * Previously this reused ARRIVAL_THRESHOLD_VALUE (0.30), which is far too
+ * loose for the job: it is sized to detect an arrival TRANSIENT, whereas this
+ * has to decide the car is no longer moving at all. Levelling motion sits well
+ * under 0.30, so it never reset the confirm timer.
+ *
+ * 0.10 is above the +/-0.04 seen on a genuinely parked car and below the
+ * excursions levelling produces.
+ */
+#define STOP_BAND_VALUE                (0.10)
 
 /*
  * How long after entering STATE_MONITORING an any-motion edge is ignored.
@@ -166,10 +185,16 @@
  * the moment right after that.
  *
  * The cost is that a genuine departure within this window of the previous
- * arrival is missed. Door dwell is normally several seconds, so 2 s is
- * comfortably inside the gap between a stop and the next start.
+ * arrival is missed. Door dwell is normally several seconds, so this stays
+ * inside the gap between a stop and the next start.
+ *
+ * Raised 2000 -> 6000 on 2026-08-07. A terminal-floor brake set re-latched
+ * 3.5 s after the FSM returned to MONITORING -- already outside the 2 s
+ * window -- and produced a 73-second alarm on a stationary car. This is the
+ * backstop rather than the fix; STOP_CONFIRM_MS above is what stops the
+ * premature silence that created the opportunity.
  */
-#define MONITOR_REARM_MS               2000
+#define MONITOR_REARM_MS               6000
 
 
 enum MotionStates
