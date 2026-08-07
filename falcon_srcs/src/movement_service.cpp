@@ -82,6 +82,29 @@ void MovementService::notify_any_motion(uint32_t edge_ms)
      * Both observed arrivals gave 3 edges inside 1.8 s.
      */
     if (state == MotionStates::STATE_MOVING) {
+        /*
+         * Discard edges raised while the piezo is driven.
+         *
+         * An edge that arrives with the buzzer on is not evidence about the
+         * car -- the alarm shakes the accelerometer, and the sensor's own
+         * engine sits behind the same mechanical coupling the polled path does
+         * (§5, §11). This is the interrupt-domain equivalent of the ringdown
+         * blanking item 7 applies to sampling.
+         *
+         * Measured 2026-08-07, edges that formed arrival clusters:
+         *
+         *   run 1  n=3 bz=0, n=4 bz=0   real arrival, a fell to 5.29
+         *   run 2  n=7 bz=1, n=8 bz=0   FALSE -- released mid-ride
+         *   run 3  n=13 bz=0, n=14 bz=1 polled path caught it first
+         *
+         * Counting quiet edges only leaves run 1 detected and run 2 rejected.
+         * Item 7 leaves ~45% of each beep cycle quiet, so a real arrival still
+         * has ample opportunity to register -- run 1's did, twice over.
+         */
+        if (get_buzzer_status()) {
+            return;
+        }
+
         if (arrival_edge_count == 0 ||
             (uint32_t)(edge_ms - arrival_edge_first) > ARRIVAL_EDGE_WINDOW_MS) {
             /* First edge, or the previous window has expired -- start again. */
