@@ -168,6 +168,31 @@ statistics to EEPROM during the job, dump them over serial afterwards with the
 car parked and the hoistway safe. ~8 bytes per run gives ~100 runs of history in
 the 1 KB available.
 
+### 5.1a Arrival detection has a floor that no threshold clears
+
+Late on 2026-08-07 a smooth 18 fpm stop produced an arrival of **0.058**
+averaged — against a **0.103** ceiling measured on a *parked* device during the
+17.6-minute soak (§14.7).
+
+**The arrival was smaller than the device's own stationary noise.** There is no
+gap to place a threshold in: anything low enough to catch it sits under a level
+a parked unit crosses on its own, and that same floor is what departure
+detection must stay above.
+
+It is not a speed effect. Two 18 fpm arrivals the same day measured 0.312 and
+0.058 — a 5× spread — while two 123 fpm arrivals agreed to three decimals
+(§14.8). Slow running does not weaken arrivals; it gives the machine room to
+stop gently. A minimum-speed specification narrows this exposure without closing
+it.
+
+The conclusion (§14.9) is that arrival detection should stop being tuned. The
+honest options are to let the alarm run to the failsafe, or to have the mechanic
+silence it — the latter being deterministic and unable to fail dangerously.
+
+**Departure detection is unaffected.** It caught −0.116 m/s² at 18 fpm and 0.838
+later the same day, and has worked at every speed and configuration since the
+threshold was set to 32. The half that protects someone is the half that works.
+
 ### 5.2 The arrival threshold is fragile in a way we understand
 
 `ARRIVAL_CLUSTER_DELTA = 0.20` works across every run measured, but cruise peak
@@ -199,11 +224,14 @@ worked across every speed and configuration since the threshold was set to 32.
 
 ## 6. Recommended next steps
 
-1. **Decide whether automatic release should exist at all.** A mechanic beside
-   the device can silence it. The device deciding from a 3 Hz accelerometer that
-   the counterweight has stopped is a judgement with no ground truth, and it is
-   the source of nearly every difficult problem in this project. "Runs until
-   silenced" solves the original complaint too and cannot fail dangerously.
+1. **Decide whether automatic release should exist at all — now the top
+   question.** §14.7 shows a real arrival measuring *below* the device's own
+   parked noise floor, so this is no longer a tuning gap that more data closes.
+   A mechanic beside the device can silence it; the device deciding from a 3 Hz
+   accelerometer that the counterweight has stopped is a judgement with no
+   ground truth, and it is the source of nearly every difficult problem in this
+   project. "Runs until silenced" solves the original complaint too and cannot
+   fail dangerously.
 2. **Build the on-device black box** (item 11) before any counterweight
    deployment, so its thresholds can be set from evidence.
 3. **If a counterweight test happens first**, set the arrival gates unreachable

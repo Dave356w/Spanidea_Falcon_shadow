@@ -527,7 +527,8 @@ on a sensor that silently reports zero is still a dead unit.
 | 6 | Delete the dead pressure path | ⬜ | §4 |
 | 7 | Restore `buzzer_on = false` on beep-off phase | ✅ PR #4 | §5. ~45% coverage, samples clean. Unblocks item 8 |
 | 8 | Departure-latch / decel-release FSM, no timeout | ✅ PR #5 | §13, §14. Validated 18–123 fpm, both directions |
-| 8a | Arrival release: replace the duration-fragile `ARRIVAL_CLUSTER_DELTA` with a statistic that does not degrade as runs get longer | ⬜ | §14.3. Works today, wrong in principle |
+| 8a | Arrival release: replace the duration-fragile `ARRIVAL_CLUSTER_DELTA` with a statistic that does not degrade as runs get longer | ⬜ | §14.3. Works today, wrong in principle. **Do 8c first** — it may make this moot |
+| 8c | **Decide whether automatic release should exist at all** | ⬜ | §14.9. Top open question. A gentle 18 fpm arrival measured *below* the parked noise floor, so no threshold can reach it. Manual silence cannot fail dangerously |
 | 8b | Counterweight characterisation — and logging is not possible safely there | ⬜ | §14.5. Largest remaining risk. Needs on-device recording, see 11 |
 | 9 | Sustain-gated threshold, recomputed at 100 Hz | ⬜ | §7. Superseded in practice by the sensor-side threshold+duration gate |
 | 11 | On-device black box: record per-run stats to EEPROM, dump over serial afterwards | ⬜ | The only way to characterise the counterweight without a cable in a live hoistway |
@@ -1310,3 +1311,93 @@ the same limitation and does not detect reboots.
 
 - [ ] Teach parse_falcon_log.py to split on "Device Booted" and analyse the
   last section by default, or refuse to run across a reboot.
+
+### 14.7 A gentle 18 fpm arrival is smaller than the device's own noise
+
+Later on 2026-08-07, an 18 fpm descent to a midpoint stop. Departure detected
+normally; **arrival missed entirely**, and the alarm held until the failsafe.
+
+| Event | Time after departure | Raw | Averaged |
+|---|---|---|---|
+| Departure | +1.3 s | 0.838 | 0.462 |
+| **Arrival** | **+91.7 s** | **0.116** | **0.058** |
+
+Between them, across 144 seconds, **not one raw sample exceeded 0.12** and the
+mean averaged delta was 0.021. The run was that smooth.
+
+The arrival is not merely below the thresholds -- it is below the noise the
+device produces sitting still:
+
+| | Averaged delta |
+|---|---|
+| This arrival | **0.058** |
+| Parked noise ceiling, 17.6 min soak (14.6) | **0.103** |
+| Corroboration gate | 0.20 |
+| Polled arrival threshold | 0.30 |
+
+**There is no gap to place a threshold in.** Anything low enough to catch 0.058
+sits under a level a parked device crosses on its own, so it would release
+constantly while stationary -- and that same noise floor is what departure
+detection has to stay above.
+
+### 14.8 Speed does not predict arrival strength; stop abruptness does
+
+Arrival deltas measured on 2026-08-07:
+
+| Speed | Arrival delta | Outcome |
+|---|---|---|
+| 18 fpm | **0.312** | detected (polled, 4% margin) |
+| 18 fpm | **0.058** | **missed** |
+| ~50 fpm | 0.278 | detected |
+| 58 fpm | 0.383 | detected |
+| 123 fpm up | 0.362 | detected |
+| 123 fpm down | 0.362 | detected |
+
+Two 18 fpm arrivals differ by **5x**, while the two 123 fpm arrivals agree to
+three decimals. **The variance at one speed exceeds the variance across
+speeds.** Slow running does not produce weak arrivals; it gives the machine room
+to stop gently, and this one did.
+
+That means a minimum-speed specification narrows the exposure without closing
+it. A "30 fpm floor" was discussed: it would exclude the worst case measured,
+but there is no 30 fpm arrival data, and the nearest point (~50 fpm at 0.278) is
+itself below the polled threshold and only released because clustering caught
+it.
+
+### 14.9 Conclusion: stop tuning arrival detection
+
+Sections 14.7 and 14.8 together say the target is not reliably there. This is a
+physical limit of detecting a soft stop with this accelerometer, not a statistic
+that more data or a better threshold recovers. Section 3 established that
+constant velocity is unobservable; this establishes that a sufficiently gentle
+arrival is too.
+
+Every arrival that worked today was relatively abrupt (0.278 to 1.275). The
+machine can stop softer than that.
+
+Given the failure asymmetry in 14.4 -- where the safe direction is always "alarm
+longer" -- the honest options are:
+
+1. **Let it run to `LATCH_FAILSAFE_MS`.** Annoying, safe, and already the
+   behaviour when detection fails.
+2. **Have the mechanic silence it.** A button, or power-cycling. Deterministic,
+   and it cannot fail dangerously.
+
+Note what is NOT affected: **departure detection, the safety-critical half, has
+no equivalent problem.** It caught -0.116 m/s^2 at 18 fpm and 0.838 later the
+same day, and has worked at every speed and configuration since the threshold
+was set to 32. The half that protects someone is the half that works.
+
+- [ ] Decide with Biju whether automatic release should exist at all. This is
+  now the top open question in the project -- it would delete an entire class of
+  problem rather than tuning it.
+
+- [ ] If automatic release is kept, document the low-speed behaviour honestly:
+  below roughly 30 fpm, expect the alarm to run to the failsafe rather than
+  self-clear.
+
+- [ ] Does the device need to detect RELEVELING? That is slow automatic movement
+  with a mechanic potentially in the hoistway -- arguably the purest form of the
+  hazard this device exists for. If so, sub-18 fpm departure detection is in
+  scope regardless of any speed floor, and deserves a deliberate test rather
+  than inference from inspection-speed data.
