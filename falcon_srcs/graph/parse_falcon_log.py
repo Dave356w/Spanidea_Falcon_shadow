@@ -337,6 +337,43 @@ def report_runs(cap):
             d = b[0] - a[0]
             gap = d if gap is None or d < gap else gap
 
+        # Split the run into CRUISE and ARRIVAL.
+        #
+        # The arrival window is the last ARRIVAL_TAIL_MS of the run; everything
+        # between MIN_TRAVEL and that is cruise. Edges during cruise are the
+        # number that predicts a mid-travel false release -- at 18 fpm there
+        # were none across 80 s, at 50 fpm the condition asserted every poll
+        # and clustered. Aggregating the two together hides exactly that.
+        ARRIVAL_TAIL_MS = 8000
+        MIN_TRAVEL_MS = 3000
+        cru_lo = t0 + MIN_TRAVEL_MS if t0 is not None else None
+        cru_hi = (t1 - ARRIVAL_TAIL_MS) if t1 is not None else None
+
+        cru_edges = arr_edges = None
+        cru_rate = None
+        if cru_lo is not None and cru_hi is not None and cru_hi > cru_lo:
+            cru_edges = [e for e in quiet if cru_lo <= e[0] <= cru_hi]
+            arr_edges = [e for e in quiet if e[0] > cru_hi]
+            cru_rate = len(cru_edges) * 60000.0 / (cru_hi - cru_lo)
+
+        # closest quiet pair inside cruise only -- a pair here is a false
+        # release waiting to happen
+        cru_gap = None
+        if cru_edges:
+            for a, b in zip(cru_edges, cru_edges[1:]):
+                d = b[0] - a[0]
+                cru_gap = d if cru_gap is None or d < cru_gap else cru_gap
+
+        # peak polled delta split the same way
+        def peak_between(lo, hi):
+            best = 0.0
+            for t, av in zip(cap.t_ms, cap.avg):
+                if t is None or av is None or lo is None or hi is None:
+                    continue
+                if lo <= t <= hi:
+                    best = max(best, abs(av - calib))
+            return best
+
         # peak polled delta during the run
         peak = 0.0
         for t, av in zip(cap.t_ms, cap.avg):
@@ -350,6 +387,18 @@ def report_runs(cap):
               % (len(quiet), loud,
                  ("%d ms" % gap) if gap is not None else "n/a"))
         print("           peak polled delta %.3f  (arrival threshold 0.30)" % peak)
+
+        if cru_rate is not None:
+            risk = ""
+            if cru_gap is not None and cru_gap <= 2500:
+                risk = "   <-- CLUSTERS IN CRUISE, mid-travel release risk"
+            print("           CRUISE  %d quiet edges  %.1f/min  closest pair %s%s"
+                  % (len(cru_edges), cru_rate,
+                     ("%d ms" % cru_gap) if cru_gap is not None else "none",
+                     risk))
+            print("           ARRIVAL %d quiet edges  peak delta %.3f  (cruise peak %.3f)"
+                  % (len(arr_edges), peak_between(cru_hi, t1),
+                     peak_between(cru_lo, cru_hi)))
 
     # cruise edge rate: quiet edges while alarming, per minute
     tot_quiet = sum(1 for e in cap.edges if e[2] == 0 and e[1] == 4)
