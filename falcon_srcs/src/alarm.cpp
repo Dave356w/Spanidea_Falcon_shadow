@@ -217,10 +217,14 @@ void check_for_active_alarm()
 
 void check_for_battery_alarm()
 {
+    static bool     ringdown_a = false;
+    static uint32_t ringdown_a_start = 0;
+
     /*
      * Check if the alarm flag is enabled. If not, then bail out
      */
     if (battery_alarm_status_g == 0) {
+        ringdown_a = false;
         return ;
     }
 
@@ -240,19 +244,46 @@ void check_for_battery_alarm()
 
     /*
      * Turn on RED-LED & Buzzer
+     *
+     * Two things this has to get right, both of which it used to get wrong.
+     *
+     * 1. RINGDOWN. The movement path blanks the accelerometer for
+     *    BUZZER_RINGDOWN_MS after the pin drops, because the piezo keeps
+     *    vibrating mechanically. This path cleared buzzer_on the instant the
+     *    pin went low, so the ringing was sampled unblanked -- and worse,
+     *    counted as a trustworthy any-motion edge for arrival clustering.
+     *
+     * 2. IT MUST NOT SPEAK FOR THE MOVEMENT ALARM. loop() calls
+     *    check_for_active_alarm() and then check_for_battery_alarm(), so this
+     *    function writes buzzer_on last and wins. The battery pattern is
+     *    1800 ms on / 1800 ms off against the movement pattern's 200/300, so
+     *    with both alarms active this would clear buzzer_on for well over a
+     *    second while the movement buzzer was still beeping -- unblanking the
+     *    sensor at exactly the wrong moment. It now only clears the flag when
+     *    the movement alarm is not running.
      */
     if (beep_a)
     {
         digitalWrite(PIN_PIEZO, HIGH);
         buzzer_on = true;
+        ringdown_a = false;
     }
     else
     {
         digitalWrite(PIN_PIEZO, LOW);
-        buzzer_on = false;
+
+        if (!ringdown_a) {
+            ringdown_a = true;
+            ringdown_a_start = millis();
+        }
+
+        if ((millis() - ringdown_a_start) >= BUZZER_RINGDOWN_MS &&
+            alarm_status_g == 0) {
+            buzzer_on = false;
+        }
     }
 
-    return; 
+    return;
 }
 
 void enable_chase_leds()
