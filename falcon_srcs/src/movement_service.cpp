@@ -20,7 +20,7 @@ MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, flo
     reset_counter = 100;
     zero_calib_value = 0.0;
 
-    Serial.print("Initialing FSM \r\n");
+    Serial.print(F("Initialing FSM \r\n"));
 
     state = MotionStates::STATE_ERROR_RESET;
     last_state = MotionStates::STATE_ERROR_RESET;
@@ -32,6 +32,7 @@ MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, flo
     any_motion_pending = false;
     arrival_seen       = false;
     stop_confirm_timer = 0;
+    monitor_entered_ms = 0;
 #endif
 }
 
@@ -45,12 +46,36 @@ MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, flo
  * harmless -- there is nothing for them to do.
  *
  * Called from loop(), not from the ISR. The ISR does nothing but count.
+ *
+ * THE EDGE IS JUDGED BY WHEN IT HAPPENED, NOT WHEN IT ARRIVED HERE.
+ *
+ * Two ways a stop would otherwise re-latch as a departure, alarming twice for
+ * one trip:
+ *
+ *  1. Ordering. loop() calls fsm_run() BEFORE emit_acc_int_log(). An interrupt
+ *     raised while the FSM was still in STATE_DECELERATING can therefore be
+ *     delivered here in the same pass in which the FSM has already reached
+ *     STATE_MONITORING -- so a plain state check would accept an edge that
+ *     belongs to the arrival.
+ *  2. Residual motion. A harsh stop keeps generating any-motion after the FSM
+ *     has decided the car arrived: ringing in the rails, doors, passengers.
+ *
+ * Comparing edge_ms against when MONITORING was entered handles both with one
+ * test. The subtraction is done signed so an edge timestamped before entry
+ * (case 1) goes negative rather than wrapping to a huge positive.
  */
-void MovementService::notify_any_motion(void)
+void MovementService::notify_any_motion(uint32_t edge_ms)
 {
-    if (state == MotionStates::STATE_MONITORING) {
-        any_motion_pending = true;
+    if (state != MotionStates::STATE_MONITORING) {
+        return;
     }
+
+    if ((int32_t)(edge_ms - monitor_entered_ms) < (int32_t)MONITOR_REARM_MS) {
+        Serial.print(F("FSM: any-motion ignored, re-arm blanking \r\n"));
+        return;
+    }
+
+    any_motion_pending = true;
 }
 #endif
 
@@ -95,14 +120,14 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_NOT_MOVING:
         if (last_state != MotionStates::STATE_NOT_MOVING) {
-            Serial.print("FSM: Transitioned to STATE_NOT_MOVING \r\n");
+            Serial.print(F("FSM: Transitioned to STATE_NOT_MOVING \r\n"));
             last_state = MotionStates::STATE_NOT_MOVING;
         }
         break;
 
     case MotionStates::STATE_CALIBERATION:
         if (last_state != MotionStates::STATE_CALIBERATION) {
-            Serial.print("FSM: Performing Self Calibration \r\n");
+            Serial.print(F("FSM: Performing Self Calibration \r\n"));
             last_state = MotionStates::STATE_CALIBERATION;
         }
         if ((millis() - start_timer) > (CALIB_TIMEOUT_MS - 1000)) {
@@ -114,22 +139,30 @@ void MovementService::fsm_run()
             threshold_value = DEFAULT_THRESHOLD_VALUE;
 
             set_state(STATE_MONITORING);
-            Serial.print("-------------------------------------\r\n");
-            Serial.print("Zero-Calib-Value : ");
+            Serial.print(F("-------------------------------------\r\n"));
+            Serial.print(F("Zero-Calib-Value : "));
             Serial.print(zero_calib_value, 6);
-            Serial.print("\r\n");
-            Serial.print("Threshold-Value  : ");
+            Serial.print(F("\r\n"));
+            Serial.print(F("Threshold-Value  : "));
             Serial.print(threshold_value, 6);
-            Serial.print("\r\n");
-            Serial.print("-------------------------------------\r\n");
+            Serial.print(F("\r\n"));
+            Serial.print(F("-------------------------------------\r\n"));
             disable_alarm();
         }
         break;
 
     case MotionStates::STATE_MONITORING:
         if (last_state != MotionStates::STATE_MONITORING) {
-            Serial.print("FSM: Transitioned to STATE_MONITORING \r\n");
+            Serial.print(F("FSM: Transitioned to STATE_MONITORING \r\n"));
             last_state = MotionStates::STATE_MONITORING;
+#if LATCHED_FSM
+            /*
+             * Start the re-arm blanking window, and discard anything already
+             * queued -- it can only have come from the run that just ended.
+             */
+            monitor_entered_ms = millis();
+            any_motion_pending = false;
+#endif
         }
 
         present_accel = acceleration_avg_ref->avg();
@@ -164,7 +197,7 @@ void MovementService::fsm_run()
          */
         if (any_motion_pending) {
             any_motion_pending = false;
-            Serial.print("FSM: Departure latched (any-motion) \r\n");
+            Serial.print(F("FSM: Departure latched (any-motion) \r\n"));
             start_timer = millis();
             set_state(STATE_MOVEMENT_DETECTED);
         }
@@ -173,7 +206,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_MOVEMENT_DETECTED:
         if (last_state != MotionStates::STATE_MOVEMENT_DETECTED) {
-            Serial.print("FSM: Transitioned to STATE_MOVEMENT_DETECTED \r\n");
+            Serial.print(F("FSM: Transitioned to STATE_MOVEMENT_DETECTED \r\n"));
             last_state = MotionStates::STATE_MOVEMENT_DETECTED;
         }
 
@@ -190,7 +223,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_MOVING:
         if (last_state != MotionStates::STATE_MOVING) {
-            Serial.print("FSM: Transitioned to STATE_MOVING \r\n");
+            Serial.print(F("FSM: Transitioned to STATE_MOVING \r\n"));
             last_state = MotionStates::STATE_MOVING;
         }
 
@@ -241,9 +274,9 @@ void MovementService::fsm_run()
             delta_accel > ARRIVAL_THRESHOLD_VALUE) {
 
             arrival_seen = true;
-            Serial.print("FSM: Arrival transient, delta ");
+            Serial.print(F("FSM: Arrival transient, delta "));
             Serial.print(delta_accel, 6);
-            Serial.print("\r\n");
+            Serial.print(F("\r\n"));
             start_timer = millis();
             set_state(STATE_DECELERATING);
             break;
@@ -254,7 +287,7 @@ void MovementService::fsm_run()
          * is a fault -- log it as one so it is not mistaken for a normal release.
          */
         if ((current_time - movement_start_timer) > LATCH_FAILSAFE_MS) {
-            Serial.print("FSM: FAILSAFE - no arrival detected, releasing latch \r\n");
+            Serial.print(F("FSM: FAILSAFE - no arrival detected, releasing latch \r\n"));
             start_timer = millis();
             set_state(STATE_DECELERATING);
         }
@@ -275,7 +308,7 @@ void MovementService::fsm_run()
             (current_time - movement_start_timer) < (STOP_TIMEOUT_MS)) {
 #if 1
             if (log_printed == 0) {
-                Serial.print("FSM: Buzzer timeout happened \r\n");
+                Serial.print(F("FSM: Buzzer timeout happened \r\n"));
                 log_printed = 1;
             }
 #endif
@@ -285,7 +318,7 @@ void MovementService::fsm_run()
         if ((millis() - movement_start_timer) > STOP_TIMEOUT_MS) {
 
             log_printed = 0;
-            Serial.print("FSM: Chase-LED timeout happened \r\n");
+            Serial.print(F("FSM: Chase-LED timeout happened \r\n"));
             present_accel = acceleration_avg_ref->avg();
             delta_accel = 0.0;
 
@@ -295,15 +328,15 @@ void MovementService::fsm_run()
             else if (present_accel < zero_calib_value)
                 delta_accel = zero_calib_value - present_accel;
 
-            Serial.print("FSM: Average : ");
+            Serial.print(F("FSM: Average : "));
             Serial.print(present_accel, 6);
-            Serial.print("\r\n");
-            Serial.print("FSM: Delta   : ");
+            Serial.print(F("\r\n"));
+            Serial.print(F("FSM: Delta   : "));
             Serial.print(delta_accel, 6);
-            Serial.print("\r\n");
+            Serial.print(F("\r\n"));
 
             if (delta_accel > DEFAULT_THRESHOLD_VALUE) {
-                Serial.print("FSM: Still in movement \r\n");
+                Serial.print(F("FSM: Still in movement \r\n"));
                 movement_start_timer = millis();
                 enable_alarm();
                 break;
@@ -316,7 +349,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_DECELERATING:
         if (last_state != MotionStates::STATE_DECELERATING) {
-            Serial.print("FSM: Transitioned to STATE_DECELERATING \r\n");
+            Serial.print(F("FSM: Transitioned to STATE_DECELERATING \r\n"));
             last_state = MotionStates::STATE_DECELERATING;
 #if LATCHED_FSM
             stop_confirm_timer = millis();
@@ -356,7 +389,7 @@ void MovementService::fsm_run()
          * moving enough to restart the confirm window.
          */
         if ((millis() - start_timer) > LATCH_FAILSAFE_MS) {
-            Serial.print("FSM: FAILSAFE - never settled, forcing stop \r\n");
+            Serial.print(F("FSM: FAILSAFE - never settled, forcing stop \r\n"));
             disable_alarm();
             disable_chase_leds();
             set_state(STATE_STOPPED);
@@ -373,7 +406,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_STOPPED:
         if (last_state != MotionStates::STATE_STOPPED) {
-            Serial.print("FSM: Transitioned to STATE_STOPPED \r\n");
+            Serial.print(F("FSM: Transitioned to STATE_STOPPED \r\n"));
             last_state = MotionStates::STATE_STOPPED;
 
             acceleration_avg_ref->fill(zero_calib_value);
@@ -383,11 +416,11 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_ERROR_RESET:
         if (last_state != MotionStates::STATE_ERROR_RESET) {
-            Serial.print("FSM: Transitioned to STATE_ERROR_RESET \r\n");
+            Serial.print(F("FSM: Transitioned to STATE_ERROR_RESET \r\n"));
             last_state = MotionStates::STATE_ERROR_RESET;
         }
 
-        //Serial.print("FSM: Device in ERROR_RESET state \r\n");
+        //Serial.print(F("FSM: Device in ERROR_RESET state \r\n"));
         if (reset_counter == 0) {
             set_state(STATE_CALIBERATION);
             start_timer = millis();

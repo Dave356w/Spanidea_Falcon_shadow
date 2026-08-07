@@ -88,6 +88,24 @@
  */
 #define STOP_CONFIRM_MS                2000
 
+/*
+ * How long after entering STATE_MONITORING an any-motion edge is ignored.
+ *
+ * A harsh stop keeps generating any-motion for a while after the FSM has
+ * decided the car arrived: the car rings in the rails, doors operate,
+ * passengers step out. Without this, the tail of an arrival re-latches as a
+ * fresh departure and the unit alarms twice for one trip.
+ *
+ * STATE_DECELERATING already requires STOP_CONFIRM_MS of continuous quiet
+ * before the alarm is silenced, so this is a second line of defence covering
+ * the moment right after that.
+ *
+ * The cost is that a genuine departure within this window of the previous
+ * arrival is missed. Door dwell is normally several seconds, so 2 s is
+ * comfortably inside the gap between a stop and the next start.
+ */
+#define MONITOR_REARM_MS               2000
+
 
 enum MotionStates
 {
@@ -128,11 +146,14 @@ class MovementService {
 #if LATCHED_FSM
     /*
      * Called from loop() when the BMA456 any-motion interrupt has fired.
+     * edge_ms is when the ISR saw it, NOT when loop() got round to it -- see
+     * the ordering race described in the implementation.
+     *
      * Latches a departure if the FSM is monitoring; ignored in every other
      * state, so an interrupt raised by the buzzer while already alarming
      * (Eng_Notes §11) cannot do anything.
      */
-    void notify_any_motion(void);
+    void notify_any_motion(uint32_t edge_ms);
 #endif
 
   private:
@@ -147,6 +168,7 @@ class MovementService {
     bool     any_motion_pending;   /* departure seen, not yet acted on   */
     bool     arrival_seen;         /* arrival transient seen while MOVING */
     uint32_t stop_confirm_timer;   /* start of the settled-at-1g window   */
+    uint32_t monitor_entered_ms;   /* when STATE_MONITORING was entered   */
 #endif
 
     void reset_counters();
