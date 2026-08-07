@@ -160,14 +160,35 @@ static volatile bool         accel_avg_primed = false;
  * than the +/-0.16 measured in July, so there is far more room to drop the
  * threshold than the original analysis assumed.
  *
- * Halving it to 48 puts the departure at 1.35x -- detectable -- while cruise
- * vibration sits at 0.38x and stationary noise at 0.08x. The 100 ms duration
- * gate below gives further protection against isolated vibration spikes.
+ * At 48 a departure was detected for the first time: -0.345 m/s^2 at 1.5x
+ * threshold, while the polled FSM missed it entirely (its RollingAvg(4) delta
+ * was 0.107 against a 0.400 trigger). The FSM alarmed only on the arrival,
+ * which at +3.25 m/s^2 raw was large enough to survive the averaging window.
+ *
+ * Dropped again to 32 for more slow-speed margin. Against the worst non-event
+ * excursions recorded so far -- cruise vibration +/-0.09 m/s^2 and stationary
+ * noise +/-0.05:
+ *
+ *   threshold   departure(0.345)   cruise(0.09)   stationary(0.05)
+ *      48           1.5x              0.39x           0.22x
+ *      32           2.2x              0.58x           0.33x     <- here
+ *      24           3.0x              0.78x           0.43x
+ *      16           4.5x              1.17x           0.65x
+ *
+ * 24 and below run into cruise vibration. A threshold that fires mid-ride is
+ * worse than one that misses a departure: it destroys the latched FSM's ability
+ * to tell a departure from hoistway noise, which is the whole point of §3.
+ *
+ * If false fires do appear at 32, raise ANYMOTION_DURATION rather than the
+ * threshold. Vibration spikes are brief; a departure ramp lasts 1-2 s and will
+ * still sustain a longer gate. Raising the threshold instead gives back the
+ * slow-speed sensitivity this change exists to buy.
  *
  * ⬜ UNTESTED AT 18 FPM. The transient depends on the acceleration ramp rather
- * than the top speed, so an 18 fpm departure may be similar to this one or may
- * be half of it. That run is what decides whether any-motion can solve the
- * slow-speed problem in §3.
+ * than the top speed, so an 18 fpm departure may be similar to the 38 fpm one
+ * or may be half of it. If it is half (~0.17 m/s^2) that is 1.1x at this
+ * threshold -- marginal -- and 24 would be the next step, accepting the cruise
+ * risk above. That run is what decides whether any-motion can solve §3.
  *
  * Z AXIS ONLY. The raw a= samples are logged regardless, so
  * parse_falcon_log.py can sweep thresholds after the fact and one run tests
@@ -177,7 +198,7 @@ static volatile bool         accel_avg_primed = false;
  * §7's sustain gating, which found N>=3 consecutive samples eliminated every
  * false fire.
  */
-#define ANYMOTION_THRESHOLD       48
+#define ANYMOTION_THRESHOLD       32
 #define ANYMOTION_DURATION        5
 #define ANYMOTION_INT_LINE        BMA4_INTR1_MAP
 
