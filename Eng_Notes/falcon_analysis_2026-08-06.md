@@ -1112,3 +1112,127 @@ already sensitive.
 ⬜ **Item 7a** — `check_for_battery_alarm()` still drives the piezo without
 setting `buzzer_on`, so a battery alarm blanks nothing and could raise
 any-motion edges that look like a departure.
+
+
+---
+
+## 14. Speed sweep, 2026-08-07 (cartop inspection)
+
+Five consecutive correct runs across 18-123 fpm, both directions, on the
+latched FSM with corroborated arrival detection. No mid-travel releases, no
+failsafes, no double alarms, and zero any-motion edges during cruise on every
+run.
+
+| Speed | Dir | Held | Cruise peak | Arrival delta | Released by |
+|---|---|---|---|---|---|
+| 18 fpm | down | 171.6 s | 0.271 | 0.312 | polled |
+| ~50 fpm | down | 53.4 s | 0.086 | 0.278 | any-motion |
+| 58 fpm | down | 60.7 s | 0.218 | 0.383 | polled |
+| 123 fpm | up | 36.1 s | 0.124 | 0.362 | polled |
+| 123 fpm | down | 34.8 s | 0.103 | 0.362 | any-motion + delta |
+
+All figures from `parse_falcon_log.py`, which now splits each run into cruise
+and arrival windows -- the aggregate numbers it printed before hid exactly the
+distinction that matters.
+
+### 14.1 Both release paths are load-bearing
+
+Neither detector covers the range alone, and today produced a case where each
+rescued a run the other would have missed:
+
+- The **~50 fpm descent** released on clustering at delta 0.278. The polled
+  threshold is 0.30, so polling alone would have missed it.
+- The **18 fpm descent** released on polling at 0.312 with a single arrival
+  edge. Clustering alone would have missed it.
+
+Section 12's sensitivity comparison would have justified deleting the polled
+path. That would have been wrong.
+
+### 14.2 Direction is symmetric
+
+123 fpm up and down gave near-identical arrival deltas (0.362 both) and
+comparable cruise peaks (0.124 / 0.103). The only false release of the day --
+12 s into a 54 s ride at 58 fpm up -- was the uncorroborated clustering rule,
+and it does not recur once the polled average has to agree.
+
+### 14.3 Cruise peak scales with run DURATION, not speed
+
+| Held | Cruise peak |
+|---|---|
+| 34.8 s | 0.103 |
+| 36.1 s | 0.124 |
+| 53.4 s | 0.086 |
+| 60.7 s | 0.218 |
+| **171.6 s** | **0.271** |
+
+The fastest runs gave the *lowest* cruise peaks and the slowest gave the
+highest. Sorted by duration it is near-monotonic; sorted by speed it is noise.
+
+That is what a maximum does: a 171 s run takes ~500 samples and a 35 s run
+~110, so the long run has more chances to throw an outlier. **Sample count is
+the driver, not speed.**
+
+This makes `ARRIVAL_CLUSTER_DELTA = 0.20` wrong in principle even though it
+works here. Cruise peak will keep creeping up on longer runs; in a taller
+building at 18 fpm a 300 s run would plausibly exceed 0.20 while also having
+more opportunity to cluster, and the corroboration gate would stop rejecting.
+
+- [ ] The fix is not a larger constant. Either compare the arrival against
+  *recent* cruise rather than a running maximum, or use a percentile so one
+  outlier in 500 samples does not set the bar. Both are real changes and
+  deserve more than the seven runs behind them.
+
+### 14.4 Failure modes are NOT symmetric -- this is a life-safety tool
+
+Context from Dave, 2026-08-07: this is a mechanic's device, placed in the
+hoistway -- initially on the counterweight -- to warn of unintended movement
+while working. "The silent killer." Used case by case, occasionally a full day
+for construction crews on running platforms.
+
+That inverts how these parameters should be biased:
+
+| Failure | Consequence |
+|---|---|
+| Missed departure | The mechanic is not warned. **Catastrophic.** |
+| Released mid-travel | Alarm stops while the counterweight is still moving, the exact moment it is needed. **Catastrophic.** |
+| Fails to release / alarms too long | Nuisance. The mechanic is present and knows the state. |
+| False alarm while parked | Nuisance, but erodes trust -- alarm fatigue is its own hazard. |
+
+**The safe direction is always "alarm longer."** Much of 2026-08-07 was spent
+treating a stuck alarm as comparably serious to a mid-travel release, including
+shortening `LATCH_FAILSAFE_MS` to 60 s on that basis. That was backwards.
+
+Consequences for tuning:
+
+- **Departure sensitivity is the safety-critical parameter.**
+  `ANYMOTION_THRESHOLD = 32` caught an 18 fpm departure at 1.5x margin -- the
+  thinnest safety-relevant number in the system.
+- **Arrival gates should be biased toward NOT releasing**, not centred between
+  their failure cases. Failing long is free; failing short is not.
+- Battery concern downgrades: 2236 -> 2209 counts over two hours of heavy use
+  is comfortable for a shift, and continuous full-day use is not the norm.
+
+### 14.5 Every number here is from the CARTOP; the device deploys on a COUNTERWEIGHT
+
+Different rails, guide shoes and mass, travelling opposite to the car -- and
+confirmed by Dave to be a rougher ride than the cartop.
+
+A rougher ride pushes **both** release paths toward firing during travel:
+cruise peak rises toward the 0.30 polled threshold, and more cruise edges make
+clustering pair up while the higher cruise delta also clears the 0.20
+corroboration gate. Both land on mid-travel release -- the dangerous failure.
+
+**The release thresholds are fitted to the smoothest data available and the
+deployment environment is the roughest.** Do not assume they transfer.
+
+- [ ] Before trusting any release threshold on a counterweight: set the arrival
+  gates unreachable (e.g. 5.0) so nothing can release early, run slow and fast,
+  and let every run hold to the failsafe. That yields counterweight cruise peak,
+  edge rate and a real arrival signature at no risk of an early release. Then
+  set the gates from that data, biased upward.
+
+- [ ] Worth asking Biju whether automatic release should exist at all. A
+  mechanic standing next to the device can silence it; the device deciding from
+  a 3 Hz accelerometer that the counterweight has stopped is a judgement with no
+  ground truth. Section 3 introduced the latch to stop the alarm cutting out
+  mid-run -- "runs until silenced" solves that too, and cannot fail dangerously.
