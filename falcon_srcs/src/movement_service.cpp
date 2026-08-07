@@ -33,6 +33,9 @@ MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, flo
     arrival_seen       = false;
     stop_confirm_timer = 0;
     monitor_entered_ms = 0;
+    arrival_edge_count = 0;
+    arrival_edge_first = 0;
+    still_since_ms     = 0;
 #endif
 }
 
@@ -40,10 +43,12 @@ MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, flo
 /*
  * Record that the BMA456 any-motion interrupt fired.
  *
- * Only STATE_MONITORING acts on it. That matters: the buzzer triggers
- * any-motion continuously while it sounds (Eng_Notes §11), so once the alarm is
- * running these arrive constantly. Latching only from MONITORING makes those
- * harmless -- there is nothing for them to do.
+ * Two states use it, for opposite purposes:
+ *
+ *   STATE_MONITORING  a departure -- latch the alarm
+ *   STATE_MOVING      an arrival  -- release it, once clustered
+ *
+ * Every other state ignores it.
  *
  * Called from loop(), not from the ISR. The ISR does nothing but count.
  *
@@ -66,6 +71,30 @@ MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, flo
  */
 void MovementService::notify_any_motion(uint32_t edge_ms)
 {
+#if LATCHED_FSM
+    /*
+     * While MOVING, any-motion is the PRIMARY arrival detector -- it caught 3
+     * of 3 arrivals against polling's 2 of 3, and the one polling missed left
+     * the unit alarming at rest.
+     *
+     * A single edge is not enough: cruise produced isolated singles (1 in 97 s).
+     * Requiring ARRIVAL_EDGE_COUNT inside ARRIVAL_EDGE_WINDOW_MS means the
+     * condition survived more than one status poll, i.e. sustained motion.
+     * Both observed arrivals gave 3 edges inside 1.8 s.
+     */
+    if (state == MotionStates::STATE_MOVING) {
+        if (arrival_edge_count == 0 ||
+            (uint32_t)(edge_ms - arrival_edge_first) > ARRIVAL_EDGE_WINDOW_MS) {
+            /* First edge, or the previous window has expired -- start again. */
+            arrival_edge_first = edge_ms;
+            arrival_edge_count = 1;
+        } else if (arrival_edge_count < 0xFF) {
+            arrival_edge_count++;
+        }
+        return;
+    }
+#endif
+
     if (state != MotionStates::STATE_MONITORING) {
         return;
     }
@@ -213,7 +242,10 @@ void MovementService::fsm_run()
         if ((millis() - start_timer) > MOVEMENT_DETECTION_TIMEOUT_MS) {
             movement_start_timer = millis();
 #if LATCHED_FSM
-            arrival_seen = false;
+            arrival_seen       = false;
+            arrival_edge_count = 0;
+            arrival_edge_first = 0;
+            still_since_ms     = millis();
 #endif
             enable_alarm();
             enable_chase_leds();
@@ -266,20 +298,71 @@ void MovementService::fsm_run()
             delta_accel = zero_calib_value - present_accel;
 
         /*
-         * MIN_TRAVEL_MS keeps the departure transient itself from satisfying the
-         * arrival test and releasing the latch immediately after setting it.
+         * MIN_TRAVEL_MS keeps the departure transient itself from satisfying any
+         * of the tests below and releasing the latch straight after setting it.
          */
-        if (!arrival_seen &&
-            (current_time - movement_start_timer) > MIN_TRAVEL_MS &&
-            delta_accel > ARRIVAL_THRESHOLD_VALUE) {
+        if (!arrival_seen && (current_time - movement_start_timer) > MIN_TRAVEL_MS) {
 
-            arrival_seen = true;
-            Serial.print(F("FSM: Arrival transient, delta "));
-            Serial.print(delta_accel, 6);
-            Serial.print(F("\r\n"));
-            start_timer = millis();
-            set_state(STATE_DECELERATING);
-            break;
+            /*
+             * 1. PRIMARY -- clustered any-motion. See notify_any_motion().
+             */
+            if (arrival_edge_count >= ARRIVAL_EDGE_COUNT &&
+                (uint32_t)(current_time - arrival_edge_first) <= ARRIVAL_EDGE_WINDOW_MS) {
+
+                arrival_seen = true;
+                Serial.print(F("FSM: Arrival (any-motion), edges "));
+                Serial.print(arrival_edge_count);
+                Serial.print(F("\r\n"));
+                start_timer = millis();
+                set_state(STATE_DECELERATING);
+                break;
+            }
+
+            /*
+             * 2. SECONDARY -- polled transient on the average. Independent of
+             * the interrupt, so it still works if that path fails. Only reaches
+             * violent stops now that the threshold is 0.30; that is deliberate.
+             */
+            if (delta_accel > ARRIVAL_THRESHOLD_VALUE) {
+                arrival_seen = true;
+                Serial.print(F("FSM: Arrival (polled), delta "));
+                Serial.print(delta_accel, 6);
+                Serial.print(F("\r\n"));
+                start_timer = millis();
+                set_state(STATE_DECELERATING);
+                break;
+            }
+
+            /*
+             * 3. BACKSTOP -- sustained stillness.
+             *
+             * Without this, a latch set while the car is stationary can never
+             * clear: the release conditions above both need motion, and no
+             * motion is coming. The failsafe would be the only way out, which
+             * means minutes of alarming at rest.
+             *
+             * A moving car in rails does not stay this quiet -- cruise breaks a
+             * 0.08 band within about 3 s -- so this should only be reachable
+             * when genuinely stopped.
+             */
+            if (delta_accel > STILL_BAND_VALUE || arrival_edge_count > 0) {
+                still_since_ms = current_time;      /* not still; restart */
+            } else if ((current_time - still_since_ms) > STILL_RELEASE_MS) {
+                arrival_seen = true;
+                Serial.print(F("FSM: Released on stillness, no arrival seen \r\n"));
+                start_timer = millis();
+                set_state(STATE_DECELERATING);
+                break;
+            }
+        }
+
+        /*
+         * Expire a stale cluster so isolated edges spread over a long ride
+         * cannot accumulate into a false arrival.
+         */
+        if (arrival_edge_count > 0 &&
+            (uint32_t)(current_time - arrival_edge_first) > ARRIVAL_EDGE_WINDOW_MS) {
+            arrival_edge_count = 0;
         }
 
         /*

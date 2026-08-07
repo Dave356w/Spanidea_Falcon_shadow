@@ -32,22 +32,73 @@
 #define LATCHED_FSM                    1
 
 /*
- * Arrival detection threshold, m/s^2, on the rolling average.
+ * ARRIVAL DETECTION -- two independent paths, plus a stillness backstop.
  *
- * NOT the same as DEFAULT_THRESHOLD_VALUE (0.400), which is applied while
- * stationary. This one runs while the car is moving and the buzzer is sounding,
- * so it sees a noisier signal built from ~45% sample coverage.
+ * Measured on 2026-08-07, three arrivals:
  *
- * Measured arrival deltas ON THE AVERAGE: 0.755, 0.334, 0.32. Note the last two
- * are below 0.400 -- which is exactly why the old code sometimes failed to
- * notice an arrival at all. Cruise noise on the average is roughly +/-0.10
- * (raw +/-0.19 through a 4-sample window).
+ *                       polled averaged delta      clustered any-motion
+ *   run 1, harsh stop        0.441   detected       3 edges in 1.0 s  detected
+ *   run 2, gentle stop       0.136   MISSED         3 edges in 1.8 s  detected
+ *   earlier 18 fpm run       detected               3 edges           detected
  *
- * 0.20 sits above cruise and below the weakest arrival observed, but the margin
- * either side is under 2x. This is the least well-evidenced number in the
- * change and the first thing to revisit with more hoistway data.
+ * Cruise, for comparison: the averaged signal reaches 0.18, while any-motion
+ * gave 1 isolated edge in 97 s and 0 in 86 s.
+ *
+ * The interrupt wins on both counts. The sensor applies threshold-and-duration
+ * to its own 100 Hz waveform; the polled path sees a 4-sample average at
+ * 3.13 Hz that flattens the transient. On run 2 the arrival was SMALLER after
+ * averaging (0.136) than cruise noise (0.18) -- no threshold can separate those,
+ * which is why that run alarmed at rest until the failsafe.
+ *
+ * So any-motion is primary. Polling is kept as a genuinely independent second
+ * opinion: if the interrupt path fails -- sensor fault, config that did not
+ * take, or the buzzer coupling described in Eng_Notes §11 turning out to be
+ * mounting-dependent -- the alarm still releases.
  */
-#define ARRIVAL_THRESHOLD_VALUE        (0.20)
+
+/*
+ * Polled arrival threshold, m/s^2 on the rolling average.
+ *
+ * Raised from 0.20 to 0.30. Demoted to a backup for violent stops, it no longer
+ * needs to reach for gentle arrivals, so it can have real margin over the 0.18
+ * cruise noise instead of the 1.1x it had at 0.20. Run 1's 0.441 still clears it.
+ */
+#define ARRIVAL_THRESHOLD_VALUE        (0.30)
+
+/*
+ * Clustered any-motion: edges required, and the window they must fall inside.
+ *
+ * ACC-STAT polls and clears the sensor status every ACC_INT_POLL_MS (1 s), so
+ * two edges inside this window means the any-motion condition survived more
+ * than one poll -- sustained motion, not an isolated spike. Both observed
+ * arrivals produced 3 edges inside 1.8 s; cruise produced isolated singles.
+ */
+#define ARRIVAL_EDGE_COUNT             2
+#define ARRIVAL_EDGE_WINDOW_MS         2500
+
+/*
+ * Stillness backstop.
+ *
+ * A latch whose only release is a motion event can never clear if it was set
+ * while the car was stationary -- there is no future movement to end it, and
+ * the failsafe becomes the only way out. Three minutes of alarming at rest is
+ * not acceptable, so stillness releases it too.
+ *
+ * Measured while alarming, so both figures are at the ~45% sample coverage that
+ * item 7 leaves during a buzzer cycle:
+ *
+ *   at rest    delta <= 0.082, mostly <= 0.04
+ *   cruising   regular excursions to 0.10 - 0.18, quiet stretches ~3 s at most
+ *
+ * 0.08 for 15 s continuous therefore holds at rest and is broken by cruise.
+ *
+ * ⚠️ This is the parameter most likely to misbehave in a shaft smoother than
+ * the one measured. If a car ever cruises inside 0.08 for 15 unbroken seconds
+ * the alarm will cut out mid-ride. Worth stressing on a third run before it is
+ * trusted; the symptom is a "released on stillness" line with no arrival.
+ */
+#define STILL_BAND_VALUE               (0.08)
+#define STILL_RELEASE_MS               15000
 
 /*
  * Minimum time in STATE_MOVING before arrival detection is armed.
@@ -176,6 +227,9 @@ class MovementService {
     bool     arrival_seen;         /* arrival transient seen while MOVING */
     uint32_t stop_confirm_timer;   /* start of the settled-at-1g window   */
     uint32_t monitor_entered_ms;   /* when STATE_MONITORING was entered   */
+    uint8_t  arrival_edge_count;   /* any-motion edges inside the window  */
+    uint32_t arrival_edge_first;   /* timestamp of the first of them      */
+    uint32_t still_since_ms;       /* start of the current stillness run  */
 #endif
 
     void reset_counters();
