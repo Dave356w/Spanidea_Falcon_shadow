@@ -32,13 +32,34 @@ OLD_SCALE_FIX = 16.384          # old logs: multiply to reach true m/s^2
 
 new_re = re.compile(
     r"t=(\d+)\s+a=(-?\d+\.?\d*)\s+avg=(-?\d+\.?\d*)\s+st=(\d+)"
-    r"(?:\s+rd=(\d+))?(?:\s+ov=(\d+))?"
+    r"(?:\s+rd=(\d+))?(?:\s+ov=(\d+))?(?:\s+im=(\d+))?"
+)
+
+# Sensor fault line: "t=... a=ERR er=N st=... rd=... ov=... tk=... im=..."
+err_re = re.compile(r"t=(\d+)\s+a=ERR\s+er=(\d+)\s+st=(\d+)")
+
+# Any-motion interrupt edge, and the status poll that clears it.
+accint_re  = re.compile(r"ACC-INT\s+n=(\d+)\s+t=(\d+)\s+st=(\d+)\s+bz=(\d+)(?:\s+pin=(\d+))?")
+accstat_re = re.compile(r"ACC-STAT\s+s=0x([0-9A-Fa-f]+)\s+pin=(\d+)\s+n=(\d+)")
+
+# Latched-FSM lifecycle lines (roadmap item 8).
+LATCH_RE = (
+    ("departure", re.compile(r"FSM:\s*Departure latched")),
+    ("arr_int",   re.compile(r"FSM:\s*Arrival \(any-motion\), edges (\d+)")),
+    ("arr_poll",  re.compile(r"FSM:\s*Arrival \(polled\), delta (-?\d+\.?\d*)")),
+    ("stillness", re.compile(r"FSM:\s*Released on stillness")),
+    ("failsafe",  re.compile(r"FSM:\s*FAILSAFE")),
+    ("blanked",   re.compile(r"FSM:\s*any-motion ignored")),
+    ("stopped",   re.compile(r"FSM:\s*Transitioned to STATE_MONITORING")),
 )
 old_re = re.compile(r"Data\s*:\s*(-?\d+\.?\d*)\s+G value\s*:\s*(-?\d+\.?\d*)")
 old_gonly_re = re.compile(r"G value\s*:\s*(-?\d+\.?\d*)")
 delta_re = re.compile(r"Delta\s*:\s*(-?\d+\.?\d*)")
 
-CORRUPT_HINTS = ("STA ", "ST TE", "MONIT ", "STAT ", "E_MONITORING", "�")
+CORRUPT_HINTS = ("STA ", "ST TE", "MONIT ", "E_MONITORING", "�")
+
+# Lines that look like state names but are healthy output, not contention.
+NOT_CORRUPT = ("ACC-INT", "ACC-STAT", "FSM:", "STATE_")
 
 
 class Capture(object):
@@ -53,6 +74,10 @@ class Capture(object):
         self.overrun = []
         self.marks = []          # (sample_index, kind, text)
         self.fw_delta = []       # firmware's own "still moving?" variable
+        self.im = []             # cumulative any-motion count per sample
+        self.edges = []          # (t_ms, state, bz) per ACC-INT
+        self.latch = []          # (t_ms, kind, detail) FSM lifecycle
+        self.errs = []           # (t_ms, consecutive) sensor read failures
         self._parse()
 
     def _parse(self):
@@ -73,6 +98,7 @@ class Capture(object):
                 self.state.append(int(m.group(4)))
                 self.read_us.append(int(m.group(5)) if m.group(5) else None)
                 self.overrun.append(int(m.group(6)) if m.group(6) else None)
+                self.im.append(int(m.group(7)) if m.group(7) else None)
                 continue
 
             m = old_re.search(s) or old_gonly_re.search(s)
@@ -86,6 +112,38 @@ class Capture(object):
                 self.state.append(None)
                 self.read_us.append(None)
                 self.overrun.append(None)
+                self.im.append(None)
+                continue
+
+            # --- new-format lines the old parser mistook for corruption -----
+            m = accint_re.search(s)
+            if m:
+                self.edges.append((int(m.group(2)), int(m.group(3)),
+                                   int(m.group(4))))
+                continue
+
+            if accstat_re.search(s):
+                continue          # status poll: healthy, carries no new data
+
+            m = err_re.search(s)
+            if m:
+                self.errs.append((int(m.group(1)), int(m.group(2))))
+                continue
+
+            hit = None
+            for kind, rx in LATCH_RE:
+                mm = rx.search(s)
+                if mm:
+                    hit = (kind, mm.group(1) if mm.groups() else None)
+                    break
+            if hit:
+                # FSM lines carry no timestamp of their own. Anchor to the
+                # sample INDEX and resolve later against the NEXT sample -- the
+                # previous one precedes the edge that triggered the transition,
+                # so anchoring backwards drops the deciding edge out of the run
+                # window and makes a legitimate cluster look impossible.
+                self.latch.append((len(self.accel), hit[0], hit[1]))
+                self.marks.append((len(self.accel), "event", s))
                 continue
 
             if "Voltage" in s or "Battery" in s:
@@ -96,7 +154,10 @@ class Capture(object):
                 scale = OLD_SCALE_FIX if self.fmt == "old" else 1.0
                 self.fw_delta.append(float(d.group(1)) * scale)
 
-            kind = "corrupt" if any(h in s for h in CORRUPT_HINTS) else "event"
+            kind = "event"
+            if (any(h in s for h in CORRUPT_HINTS)
+                    and not any(g in s for g in NOT_CORRUPT)):
+                kind = "corrupt"
             if "FSM" in s or "STATE" in s or kind == "corrupt":
                 self.marks.append((len(self.accel), kind, s))
 
@@ -189,6 +250,8 @@ class Capture(object):
         for i, _, s in corrupt:
             print("      sample %d: %s" % (i, s[:60]))
 
+        report_runs(self)
+
         print("  events:")
         for i, kind, s in self.marks:
             if kind == "event":
@@ -199,6 +262,110 @@ class Capture(object):
                     t = " t~%.1fs" % (i / rate)
                 print("    [%5d]%s %s" % (i, t, s))
         print("")
+
+
+def report_runs(cap):
+    """Per-run summary of the latched FSM (roadmap item 8).
+
+    One line per trip: how long the alarm held, which path released it, and
+    the two numbers that decide an arrival -- quiet-window any-motion edges,
+    and the peak polled delta. Cruise edge rate is printed alongside because
+    that is what differs between speeds and what the 2-edge clustering rule
+    is sensitive to.
+    """
+    if not any(k == "departure" for _, k, _ in cap.latch):
+        return          # pre-item-8 log, or no trip captured
+
+    calib = None
+    for _, kind, txt in cap.marks:
+        m = re.search(r"Zero-Calib-Value\s*:\s*(-?\d+\.?\d*)", txt)
+        if m:
+            calib = float(m.group(1))
+    if calib is None and cap.avg:
+        vals = [v for v in cap.avg if v is not None]
+        calib = st.median(vals) if vals else 0.0
+
+    def at(idx):
+        if not cap.t_ms:
+            return None
+        return cap.t_ms[min(idx, len(cap.t_ms) - 1)]
+
+    open_run = None
+    runs = []
+    for idx, kind, detail in cap.latch:
+        t = at(idx)
+        if kind == "departure":
+            open_run = {"start": t, "release": None, "detail": None}
+        elif kind in ("arr_int", "arr_poll", "stillness", "failsafe") and open_run:
+            open_run["release"] = t
+            open_run["detail"] = (kind, detail)
+            runs.append(open_run)
+            open_run = None
+    if open_run:
+        open_run["release"] = None
+        runs.append(open_run)
+
+    LABEL = {"arr_int": "any-motion", "arr_poll": "polled",
+             "stillness": "STILLNESS", "failsafe": "FAILSAFE"}
+
+    print("  latched-FSM runs:")
+
+    for i, r in enumerate(runs, 1):
+        t0 = r["start"]
+        t1 = r["release"]
+        held = "(open)" if (t1 is None or t0 is None) else "%.1f s" % ((t1 - t0) / 1000.0)
+        kind, detail = r["detail"] if r["detail"] else ("none", None)
+        how = LABEL.get(kind, kind)
+        if detail:
+            how += " %s" % detail
+
+        # Any-motion edges inside the run, split by buzzer state.
+        #
+        # Only st=4 (STATE_MOVING) counts: notify_any_motion() ignores edges in
+        # every other state, so edges raised during MOVEMENT_DETECTED or
+        # DECELERATING must not be included or the clustering analysis will not
+        # match what the firmware actually saw.
+        span = [e for e in cap.edges
+                if t0 is not None and e[0] >= t0 and (t1 is None or e[0] <= t1)
+                and e[1] == 4]
+        quiet = [e for e in span if e[2] == 0]
+        loud = len(span) - len(quiet)
+
+        # closest quiet-edge pair -- what the clustering rule actually sees
+        gap = None
+        for a, b in zip(quiet, quiet[1:]):
+            d = b[0] - a[0]
+            gap = d if gap is None or d < gap else gap
+
+        # peak polled delta during the run
+        peak = 0.0
+        for t, av in zip(cap.t_ms, cap.avg):
+            if t is None or av is None or t0 is None:
+                continue
+            if t >= t0 and (t1 is None or t <= t1):
+                peak = max(peak, abs(av - calib))
+
+        print("    run %d  held %-8s  released by %-18s" % (i, held, how))
+        print("           edges %d quiet / %d buzzer   closest quiet pair %s"
+              % (len(quiet), loud,
+                 ("%d ms" % gap) if gap is not None else "n/a"))
+        print("           peak polled delta %.3f  (arrival threshold 0.30)" % peak)
+
+    # cruise edge rate: quiet edges while alarming, per minute
+    tot_quiet = sum(1 for e in cap.edges if e[2] == 0 and e[1] == 4)
+    tot_loud = sum(1 for e in cap.edges if e[2] == 1 and e[1] == 4)
+    span_ms = 0
+    for r in runs:
+        if r["start"] is not None and r["release"] is not None:
+            span_ms += r["release"] - r["start"]
+    if span_ms:
+        print("  while alarming: %.1f quiet edges/min, %.1f buzzer edges/min"
+              % (tot_quiet * 60000.0 / span_ms, tot_loud * 60000.0 / span_ms))
+        print("    ^ quiet-edge rate is what the 2-in-2500ms rule risks")
+
+    if cap.errs:
+        print("  sensor read failures: %d (max consecutive %d)"
+              % (len(cap.errs), max(e[1] for e in cap.errs)))
 
 
 def plot(cap):
