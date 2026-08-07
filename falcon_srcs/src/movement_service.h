@@ -58,14 +58,24 @@
 #define MIN_TRAVEL_MS                  3000
 
 /*
- * Failsafe. §3 argues for no timeout, and a genuine express run should alarm
- * for its whole duration -- but with no upper bound at all, a missed arrival
- * means the unit alarms until the battery is flat. Five minutes is far longer
- * than any plausible single run and still bounds the worst case.
+ * Failsafe. §3 argues for no timeout, and a genuine run should alarm for its
+ * whole duration -- but with no upper bound at all, a missed arrival means the
+ * unit alarms until the battery is flat. Reaching this is a fault, not a normal
+ * release, and it says so in the log.
  *
- * Reaching this is a fault, not normal operation, and it says so in the log.
+ * ⚠️ 1 minute bounds the run length, and at slow speeds that bound is short:
+ *
+ *     18 fpm  = 0.091 m/s  ->  5.5 m in 60 s  ~= 1.6 floors
+ *     38 fpm  = 0.193 m/s  -> 11.6 m in 60 s  ~= 3.5 floors
+ *    350 fpm  = 1.78 m/s   ->  107 m in 60 s  ~=  30 floors
+ *
+ * The 18 fpm run measured on 2026-08-07 took about 23 s door to door, so it
+ * fits -- but a slow run of more than roughly two floors will hit this and
+ * release the alarm early, which is the original complaint reappearing in a
+ * different form. If slow multi-floor runs are expected in service, this needs
+ * to be longer.
  */
-#define LATCH_FAILSAFE_MS              300000
+#define LATCH_FAILSAFE_MS              60000
 
 /*
  * How long the average must stay inside ARRIVAL_THRESHOLD_VALUE of the zero
