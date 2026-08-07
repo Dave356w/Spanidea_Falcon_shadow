@@ -349,11 +349,30 @@ beep as well, where it previously went blind for the final second.
 something listening while the alarm sounds, which §3 identified as "the hard
 part" and §11 confirmed any-motion cannot provide.
 
-⬜ **Not addressed:** `check_for_battery_alarm()` drives `PIN_PIEZO` directly and
-never touches `buzzer_on`, so during a battery alarm the piezo sounds for 1.8 s
-at a stretch with the accelerometer entirely unblanked. The FSM would read that
-vibration as motion and could raise a spurious movement alarm on top of the
-battery one. Different alarm path, different timing — worth its own fix.
+✅ **Fixed 2026-08-07 (item 7a) — and the claim below was wrong.**
+
+This originally read "`check_for_battery_alarm()` drives `PIN_PIEZO` directly
+and never touches `buzzer_on`". It does touch it. That claim came from a source
+read that stopped two lines above the assignment, and it propagated into the
+roadmap and two commit messages before being caught.
+
+The two real defects were worse than the one described:
+
+1. **No ringdown blanking.** It cleared `buzzer_on` the instant the pin went
+   low, so the piezo's mechanical ringing was sampled unblanked — and counted
+   as a trustworthy any-motion edge for arrival clustering.
+2. **It spoke for the movement alarm.** `loop()` calls
+   `check_for_active_alarm()` and then `check_for_battery_alarm()`, so the
+   battery path writes `buzzer_on` last and wins. Its 1800/1800 ms pattern
+   against the movement pattern's 200/300 cleared the flag for over a second at
+   a time *while the movement buzzer was still beeping*.
+
+Both fixed: ringdown blanking on the falling edge, and the flag is only cleared
+when `alarm_status_g` is 0.
+
+⬜ Still open: both paths write `PIN_PIEZO` directly and the last writer wins,
+so with both alarms active the audible pattern is whichever ran most recently.
+That is undefined behaviour rather than a chosen design.
 
 ---
 
@@ -460,6 +479,11 @@ requirement, after which you can *lower* it and gain slow-speed sensitivity.
 ⚠️ Caveat: ~6 minutes of aggregate stationary data. Encouraging, not proof, for
 a unit that sits in a hoistway for months. Needs a soak test.
 
+✅ **Soak done 2026-08-07 (§14.6): 17.6 minutes parked, zero false departures,
+zero any-motion edges, polled margin ~4×.** Retires this caveat for the cartop
+case. The counterweight remains unmeasured (§14.5), and 17.6 minutes is still
+short against a full-day construction deployment.
+
 ⚠️ These N values are at **3 Hz**. They must be recomputed after the timer fix —
 N=3 at 100 Hz is 30 ms, not 1 s.
 
@@ -497,13 +521,16 @@ on a sensor that silently reports zero is still a dead unit.
 | 3 | **Check the `bma4_read_accel_xyz()` return code; fault instead of reporting 0.0** | ✅ PR #2 | §10.2. `a=ERR` path not yet exercised on hardware |
 | 3a | Fix `ov=` so decimation is actually detected | 🔧 PR #2 | §6a. Symptom gone; `tk=` added, cause unproven |
 | 4 | **Call `disable_battery_alarm()` when voltage recovers; average before latching** | ✅ PR #2 | §10.3. Confirmed on the bench |
-| 7a | Blank the sensor during the battery alarm too — `check_for_battery_alarm()` never sets `buzzer_on` | ⬜ | §5. 1.8 s of unblanked piezo could raise a spurious movement alarm |
+| 7a | Blank the sensor during the battery alarm too | ✅ 2026-08-07 | §5. Ringdown added; no longer overrides the movement alarm's blanking |
 | 4a | Decide what the unit should *do* when the sensor is dead | ⬜ | It no longer lies, but raises no user-visible fault. Product decision — ask Biju |
-| 5 | **Fix Timer1: CTC mode (`WGM12`), prescaler 64 → 100 Hz** | ⬜ | **the** detection fix; everything below assumes it |
+| 5 | **Fix Timer1: CTC mode (`WGM12`), prescaler 64 → 100 Hz** | ⬜ | Was "**the** detection fix". §12 and §14 largely retire that: departure and arrival are both carried by the sensor's own 100 Hz engine, so the firmware rate is no longer the blocker. Still worth doing; no longer urgent |
 | 6 | Delete the dead pressure path | ⬜ | §4 |
 | 7 | Restore `buzzer_on = false` on beep-off phase | ✅ PR #4 | §5. ~45% coverage, samples clean. Unblocks item 8 |
-| 8 | Departure-latch / decel-release FSM, no timeout | ⬜ | §3. **Now unblocked** by item 7 |
-| 9 | Sustain-gated threshold, recomputed at 100 Hz | ⬜ | §7 |
+| 8 | Departure-latch / decel-release FSM, no timeout | ✅ PR #5 | §13, §14. Validated 18–123 fpm, both directions |
+| 8a | Arrival release: replace the duration-fragile `ARRIVAL_CLUSTER_DELTA` with a statistic that does not degrade as runs get longer | ⬜ | §14.3. Works today, wrong in principle |
+| 8b | Counterweight characterisation — and logging is not possible safely there | ⬜ | §14.5. Largest remaining risk. Needs on-device recording, see 11 |
+| 9 | Sustain-gated threshold, recomputed at 100 Hz | ⬜ | §7. Superseded in practice by the sensor-side threshold+duration gate |
+| 11 | On-device black box: record per-run stats to EEPROM, dump over serial afterwards | ⬜ | The only way to characterise the counterweight without a cable in a live hoistway |
 | 10 | Cleanups: `#if 0` block, `movement_service.cpp.original`, `current_time` member, missing EOF newline, untrack `.pio/` + `compile_commands.json`, stray `falcon_srcs.code-workspace` in `src/` | ⬜ | |
 
 **Sequencing note:** re-run the EFT after 5–7 and before 8–9. At 100 Hz with a
@@ -1099,19 +1126,25 @@ arrival logic in particular was rewritten three times today, each revision
 prompted by the previous run's failure, and it now rests on five observed
 arrivals total. Departure detection is on much firmer ground.
 
-⬜ **No long stationary soak.** Still the oldest open item. At threshold 32 with
-a latch that holds indefinitely, a single false departure while parked means an
-alarm until the 180 s failsafe. Hours of parked logging would be worth more than
-another run.
+✅ **Stationary soak done (§14.6).** 17.6 minutes parked: zero false departures,
+zero any-motion edges, polled margin ~4× with a p99 of 0.032. Cartop only.
 
-⬜ **Battery.** Runs B and C sounded the buzzer continuously for 80+ seconds.
-`Voltage value` fell from 2287 to 2200 across this session. Nobody has costed
-what the latched design does to battery life, and §10.3 showed this pack is
-already sensitive.
+🔧 **Battery — downgraded.** Runs B and C sounded the buzzer continuously for
+80+ seconds. Across the whole 2026-08-07 session, including many such runs, the
+reading fell 2236 → 2209 counts and held steady through the soak. Comfortable
+for a shift, and §14.4 establishes the device is used case by case rather than
+continuously, so this is no longer a headline concern.
 
-⬜ **Item 7a** — `check_for_battery_alarm()` still drives the piezo without
-setting `buzzer_on`, so a battery alarm blanks nothing and could raise
-any-motion edges that look like a departure.
+✅ **Item 7a done (§5)** — though the description here was wrong.
+`check_for_battery_alarm()` *does* set `buzzer_on`. The real defects were the
+missing ringdown blanking and the fact that it overrode the movement alarm's
+blanking for over a second at a time.
+
+⬜ **The counterweight (§14.5).** The largest remaining risk. Every release
+threshold is fitted to cartop data, the device deploys on a counterweight, that
+ride is rougher, and **logging there is not possible safely** — so the
+measure-then-tune method used all day is unavailable exactly where it matters
+most.
 
 
 ---
@@ -1236,3 +1269,44 @@ deployment environment is the roughest.** Do not assume they transfer.
   a 3 Hz accelerometer that the counterweight has stopped is a judgement with no
   ground truth. Section 3 introduced the latch to stop the alarm cutting out
   mid-run -- "runs until silenced" solves that too, and cannot fail dangerously.
+
+### 14.6 Stationary soak -- zero events in 17.6 minutes
+
+The oldest open item in this document. Section 7 warned that ~6 minutes of
+aggregate stationary data was "encouraging, not proof, for a unit that sits in
+a hoistway for months", and the latched FSM sharpened it: a single false
+departure while parked now holds the alarm until LATCH_FAILSAFE_MS.
+
+Measured 2026-08-07, cartop, device parked and undisturbed:
+
+| | Result |
+|---|---|
+| Duration | 17.6 min, 3314 samples, entirely in STATE_MONITORING |
+| **False departures** | **0** |
+| **Any-motion edges** | **0** -- none at all |
+| Polled max delta | 0.103 against the 0.400 departure trigger |
+| Polled p99 | 0.032 |
+| Raw max | 0.367 |
+| Sensor read errors | 0 |
+| Battery | 2193 -> 2212, no drift |
+
+**Zero any-motion interrupts across the whole window** is the figure that
+matters. A departure latches on a single edge, so the entire exposure is how
+often a stationary device raises one, and here the rate is zero rather than
+small. The polled path had ~4x margin with a p99 of 0.032.
+
+This retires section 7's caveat for the cartop case. It does **not** transfer
+to the counterweight (14.5): zero edges on a cartop in a quiet shaft shows the
+firmware does not invent departures on its own, not that a live building will
+not supply real ones. 17.6 minutes is also short against a full-day
+construction deployment.
+
+Method note. The first pass at this analysis reported 13 false departures.
+That was wrong -- the capture spans three reflashes, millis() restarts at each,
+and the script mixed boot sections while anchoring FSM lines to samples from
+the wrong one. It was counting the day's real runs. Any analysis of these
+captures must restrict itself to a single boot section; parse_falcon_log.py has
+the same limitation and does not detect reboots.
+
+- [ ] Teach parse_falcon_log.py to split on "Device Booted" and analyse the
+  last section by default, or refuse to run across a reboot.
