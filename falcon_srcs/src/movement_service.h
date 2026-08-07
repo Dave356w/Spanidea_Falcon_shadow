@@ -63,19 +63,26 @@
  * unit alarms until the battery is flat. Reaching this is a fault, not a normal
  * release, and it says so in the log.
  *
- * ⚠️ 1 minute bounds the run length, and at slow speeds that bound is short:
+ * This bounds how long a legitimate run can be, and at slow speeds the bound
+ * bites hardest -- which is exactly where this product is weakest:
  *
- *     18 fpm  = 0.091 m/s  ->  5.5 m in 60 s  ~= 1.6 floors
- *     38 fpm  = 0.193 m/s  -> 11.6 m in 60 s  ~= 3.5 floors
- *    350 fpm  = 1.78 m/s   ->  107 m in 60 s  ~=  30 floors
+ *              distance in 60 s / 180 s      floors at ~3.3 m
+ *     18 fpm      5.5 m  /  16.5 m             1.6  /   5
+ *     38 fpm     11.6 m  /  34.7 m             3.5  /  10
+ *    350 fpm      107 m  /   320 m              30  /  97
  *
- * The 18 fpm run measured on 2026-08-07 took about 23 s door to door, so it
- * fits -- but a slow run of more than roughly two floors will hit this and
- * release the alarm early, which is the original complaint reappearing in a
- * different form. If slow multi-floor runs are expected in service, this needs
- * to be longer.
+ * Set to 60 s initially. That was too short: on the 2026-08-07 18 fpm run it
+ * fired at 60,064 ms while the car was still moving, dropped the alarm, and
+ * returned the FSM to MONITORING 16 s before the real arrival -- so the arrival
+ * transient looked like a fresh departure and the unit alarmed twice for one
+ * trip. The run was about two floors.
+ *
+ * 180 s covers roughly five floors at 18 fpm while still bounding a genuinely
+ * stuck alarm to three minutes. Raise it further if slower or longer runs turn
+ * up in service; the symptom to watch for is a FAILSAFE line followed shortly
+ * by a second departure latch.
  */
-#define LATCH_FAILSAFE_MS              60000
+#define LATCH_FAILSAFE_MS              180000
 
 /*
  * How long the average must stay inside ARRIVAL_THRESHOLD_VALUE of the zero
