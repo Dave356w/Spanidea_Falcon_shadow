@@ -77,28 +77,28 @@
 #define ARRIVAL_EDGE_WINDOW_MS         2500
 
 /*
- * Stillness backstop.
+ * ⛔ NO STILLNESS BACKSTOP -- do not reintroduce one.
  *
- * A latch whose only release is a motion event can never clear if it was set
- * while the car was stationary -- there is no future movement to end it, and
- * the failsafe becomes the only way out. Three minutes of alarming at rest is
- * not acceptable, so stillness releases it too.
+ * A "release the latch if the signal has been quiet for N seconds" path was
+ * added on 2026-08-07 and removed the same day. It fired mid-ride on both test
+ * runs, before either arrival, and released the alarm while the car was moving.
  *
- * Measured while alarming, so both figures are at the ~45% sample coverage that
- * item 7 leaves during a buzzer cycle:
+ * The reasoning behind it was wrong in a way §3 already covers. It assumed
+ * cruise is measurably noisier than rest, from one ride where cruise excursions
+ * reached 0.18 while rest stayed inside 0.082. Two later rides in the same shaft
+ * cruised inside 0.081 and 0.04 respectively -- quieter at cruise than the first
+ * ride was at rest.
  *
- *   at rest    delta <= 0.082, mostly <= 0.04
- *   cruising   regular excursions to 0.10 - 0.18, quiet stretches ~3 s at most
+ * That is not a tuning error. At constant velocity the accelerometer reads 1 g,
+ * exactly as it does parked; there is no signal to threshold. No band and no
+ * duration separates them, and smoother or slower cars make it worse. The same
+ * argument rules out the sensor's no-motion feature.
  *
- * 0.08 for 15 s continuous therefore holds at rest and is broken by cruise.
- *
- * ⚠️ This is the parameter most likely to misbehave in a shaft smoother than
- * the one measured. If a car ever cruises inside 0.08 for 15 unbroken seconds
- * the alarm will cut out mid-ride. Worth stressing on a third run before it is
- * trusted; the symptom is a "released on stillness" line with no arrival.
+ * The problem a backstop was meant to solve -- an alarm that never clears
+ * because the latch was set with no motion coming to end it -- has to be solved
+ * by making ARRIVAL detection reliable, not by inventing a rest detector that
+ * cannot exist. LATCH_FAILSAFE_MS remains the only time-based escape.
  */
-#define STILL_BAND_VALUE               (0.08)
-#define STILL_RELEASE_MS               15000
 
 /*
  * Minimum time in STATE_MOVING before arrival detection is armed.
@@ -229,7 +229,6 @@ class MovementService {
     uint32_t monitor_entered_ms;   /* when STATE_MONITORING was entered   */
     uint8_t  arrival_edge_count;   /* any-motion edges inside the window  */
     uint32_t arrival_edge_first;   /* timestamp of the first of them      */
-    uint32_t still_since_ms;       /* start of the current stillness run  */
 #endif
 
     void reset_counters();
