@@ -141,30 +141,43 @@ static volatile bool         accel_avg_primed = false;
  *      so any-motion is expected to see the buzzer too. Measuring how badly is
  *      the point.
  *
- * THRESHOLD ARITHMETIC -- treat as a starting point, not a tuned value.
+ * THRESHOLD -- set from the 2026-08-07 38 fpm down run, not from arithmetic.
  *
- * The field is 11 bits (BMA456_ANY_NO_MOTION_THRES_MSK = 0x07FF) spanning
- * roughly 1 g at the configured RANGE_2G, giving ~0.488 mg per count. That LSB
- * is derived from the mask width, NOT read off the datasheet -- confirm against
- * Datasheet/ before trusting any number computed from it.
+ * The first value, 96, was derived from an assumed ~0.488 mg per count (the
+ * 11-bit BMA456_ANY_NO_MOTION_THRES_MSK spanning roughly 1 g at RANGE_2G). That
+ * LSB has still NOT been confirmed against Datasheet/, so everything below is
+ * expressed as a RATIO to the threshold actually used, which stays valid even
+ * if the mg-per-count figure is wrong.
  *
- * Against the July captures:
- *   arrival transient  +1.35 m/s^2 = 138 mg  ~= 282 counts
- *   stationary noise   +/-0.16 m/s^2 = 16 mg ~=  33 counts
+ * Measured on the 38 fpm down run at threshold 96:
  *
- * 96 counts (~47 mg) sits comfortably above the noise floor and well below the
- * arrival transient. The 18 fpm departure was below the noise floor in July and
- * may not trigger at any threshold -- that is one of the things being tested.
+ *   departure   -0.317 m/s^2   0.67x threshold   MISSED
+ *   cruise      +/-0.09 m/s^2  0.19x threshold   silent (correct)
+ *   arrival     +0.646 m/s^2   1.37x threshold   DETECTED
+ *   stationary  +/-0.02 m/s^2  0.04x threshold   silent (correct)
  *
- * Z AXIS ONLY as of the hoistway run. The raw a= samples are logged regardless,
- * so parse_falcon_log.py can sweep thresholds after the fact and one run tests
- * many values; ACC-INT tells you what the sensor actually did at 96.
+ * The stationary noise floor turned out to be +/-0.02 m/s^2, eight times quieter
+ * than the +/-0.16 measured in July, so there is far more room to drop the
+ * threshold than the original analysis assumed.
+ *
+ * Halving it to 48 puts the departure at 1.35x -- detectable -- while cruise
+ * vibration sits at 0.38x and stationary noise at 0.08x. The 100 ms duration
+ * gate below gives further protection against isolated vibration spikes.
+ *
+ * ⬜ UNTESTED AT 18 FPM. The transient depends on the acceleration ramp rather
+ * than the top speed, so an 18 fpm departure may be similar to this one or may
+ * be half of it. That run is what decides whether any-motion can solve the
+ * slow-speed problem in §3.
+ *
+ * Z AXIS ONLY. The raw a= samples are logged regardless, so
+ * parse_falcon_log.py can sweep thresholds after the fact and one run tests
+ * many values; ACC-INT records what the sensor actually did at this setting.
  *
  * Duration is in 50 Hz samples: 5 = 100 ms. This is the hardware equivalent of
  * §7's sustain gating, which found N>=3 consecutive samples eliminated every
  * false fire.
  */
-#define ANYMOTION_THRESHOLD       96
+#define ANYMOTION_THRESHOLD       48
 #define ANYMOTION_DURATION        5
 #define ANYMOTION_INT_LINE        BMA4_INTR1_MAP
 
