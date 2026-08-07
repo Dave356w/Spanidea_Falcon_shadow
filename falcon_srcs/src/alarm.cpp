@@ -96,10 +96,18 @@ void check_for_active_alarm()
 
 void check_for_buzzer_alert()
 {
+    static bool     ringdown_active = false;
+    static uint32_t ringdown_start  = 0;
+
     /*
      * Check if the alarm flag is enabled. If not, then bail out
      */
     if (alarm_status_g == 0) {
+        /*
+         * Clear the ringdown state so a stale timestamp from the previous alarm
+         * cannot make the next one skip its blanking window.
+         */
+        ringdown_active = false;
         return ;
     }
 
@@ -117,16 +125,45 @@ void check_for_buzzer_alert()
 
     }
 
+    /*
+     * buzzer_on gates the accelerometer read in the timer ISR. Setting it true
+     * in BOTH branches -- as 59e945f did -- blanked the sensor for the entire
+     * alarm, not just while the pin was driven, which is why the device could
+     * not tell whether the car was still moving while it was alarming.
+     *
+     * Measured 2026-08-07: 10,224 ms of alarm produced ONE accelerometer sample.
+     * Coverage during an alarm was not the 33% estimated from source reading,
+     * it was effectively zero.
+     *
+     * The buzzer must still be blanked while the piezo is driven, and for a
+     * short ringdown afterwards -- that part of b795dd2 was correct. But the
+     * rest of the off-phase is usable, and §3's latched FSM depends on it: the
+     * decel transient that releases the alarm happens *while the alarm is
+     * sounding*, so something has to be listening then.
+     *
+     * Any-motion cannot substitute here. The 2026-08-07 bench run showed the
+     * sensor's own engine triggers continuously on the buzzer (Eng_Notes §11),
+     * so moving the decision into hardware does not avoid this.
+     */
     if (beep)
     {
         digitalWrite(PIN_PIEZO, HIGH);
         buzzer_on = true;
+        ringdown_active = false;
     }
     else
     {
         digitalWrite(PIN_PIEZO, LOW);
-//        buzzer_on = false;
-        buzzer_on = true;
+
+        if (!ringdown_active) {
+            /* Falling edge: start the ringdown blanking window. */
+            ringdown_active = true;
+            ringdown_start  = millis();
+        }
+
+        if ((millis() - ringdown_start) >= BUZZER_RINGDOWN_MS) {
+            buzzer_on = false;
+        }
     }
 
 }
