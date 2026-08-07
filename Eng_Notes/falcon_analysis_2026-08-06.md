@@ -101,6 +101,51 @@ is measured against `millis()` on a clock confirmed by fuse read, so the
 oscillator no longer cancels out of the comparison. Both bugs are real and the
 32× error is exactly as described.
 
+### ✅ 2a. A third Timer1 defect: the self-calibration ran on one sample
+
+Found on the bench 2026-08-07, fixed the same day. Independent of the two bugs
+above, and arguably worse in the field.
+
+```c
+TCCR1B = 0;
+TCCR1B |= ((1 << CS12) | (1 << CS10));   // clock started FIRST
+TIMSK1 |= (1 << OCIE1A);
+TCCR1B |= (1 << WGM13);
+OCR1A = 156;                             // written LAST
+```
+
+Two hazards in the ordering:
+
+1. **`TCNT1` is never cleared.** In mode 9 the counter cannot reach a TOP below
+   its current value, so a stale `TCNT1` must run all the way to `0xFFFF` and
+   wrap before the first compare match. At `F_CPU/1024` = 976 Hz that is **up to
+   67 seconds**.
+2. **`OCR1A` is double-buffered in mode 9.** Written after the mode bits, it does
+   not take effect until the counter reaches the *previous* TOP — so the first
+   period is governed by whatever `OCR1A` happened to hold, not by 156.
+
+Measured: one sensor read at `t=5275`, the next at `t=72335`, then perfectly
+regular 3.13 Hz. The 10-second self-calibration fell entirely inside that gap:
+
+```
+Zero-Calib-Value : 9.652528     <- byte-identical to the single t=5275 sample
+```
+
+**Every unit in the field has been deriving its zero reference from one
+reading**, with no averaging and no noise rejection, and the value depends on
+whatever the accelerometer happened to report at one arbitrary instant during
+boot. This is not a bench artifact.
+
+**Fix:** write `TCNT1 = 0` and `OCR1A` while `TCCR1B` is still 0 (normal mode,
+unbuffered), and start the clock last. The prescaler and waveform mode are
+deliberately left alone — those are the two bugs above and roadmap item 5.
+
+After the fix, calibration averages ~28 samples and `Zero-Calib-Value` came out
+as `9.691297`, matching no individual reading.
+
+⚠️ **Item 5 must preserve this.** CTC mode 4 is not double-buffered, so hazard 2
+disappears on its own, but `TCNT1 = 0` is still required.
+
 ### Why this breaks slow-speed detection
 
 `RollingAvg<float> acceleration_avg_g(4)` at 3.13 Hz spans **1.28 seconds**.
@@ -282,28 +327,36 @@ The timestamps and `rd=` both earned their keep immediately — §2's rate is no
 confirmed to three digits and `rd=` turned out to be a usable sensor-health
 signal (§10.2). But the overrun counter does not work.
 
-### ✅ 6a. `ov=` did not detect the decimation it exists to detect — symptom resolved
+### ✅ 6a. RESOLVED — and `ov=` was correct all along
 
-**Update, same day, after the reliability fixes.** The gaps are gone. `tk=` (a
-free-running count of read attempts, added to tell the two candidate causes
-apart) advances **1:1 with printed lines across 95 consecutive ticks with no
-holes**, and timestamp deltas hold a steady 311/328 ms throughout. `ov=5` is now
-legitimate: five overruns during init and none since, because `loop()` keeps up.
+**Final, 2026-08-07.** This section previously accused `ov=` of failing to count
+decimation it should have caught. That accusation was wrong, and so was the
+follow-up guess that the `F()`/RAM change had fixed it. Both are corrected here.
 
-**Which change fixed it is not established.** The leading candidate is moving
-eleven `Serial.print` string literals to flash with `F()`, which took RAM from
-1676 to 1515 bytes — `RollingAvg` heap-allocates, so at 81.8% the heap and stack
-were 372 bytes apart, and a stack collision would explain erratic ISR behaviour
-that no counter could have diagnosed. But the return-code change touched the same
-function, and the two were not tested in isolation. Reverting only the `F()`
-wraps would settle it, at the cost of the RAM headroom.
+**`ov=5` is right.** `initialization()` drives the piezo high and then runs a
+**1.6-second blocking loop of `delay(100)`** before printing "Device initialized
+completely". The timer is already running by then, so the ISR publishes about
+five samples that `loop()` never gets to print and dutifully counts as overruns.
+Five overruns, one blocking init loop, exactly — and none afterwards, because
+`loop()` keeps up at 3.13 Hz. `ov` was recording a real event, not missing one.
 
-Treat the original diagnosis below as unresolved-but-latent rather than fixed. If
-the gaps return, `tk=` is now in place to distinguish the two causes on sight.
+**The "half the samples vanish" symptom was §2a**, the timer-start defect: the
+first compare match was delayed by up to 67 seconds while `TCNT1` wrapped, and
+`OCR1A`'s double-buffering made the early periods arbitrary. Nothing was being
+decimated; the timer genuinely was not ticking. `ov` had nothing to count
+because the ISR had not run.
 
-The historical description follows.
+With §2a fixed, `tk=` advances 1:1 with printed lines from the first tick, and
+timestamp deltas hold a steady 311/328 ms throughout.
 
-### 🔴 6a (original) — `ov=` does not detect the decimation it exists to detect
+**`tk=` earned its place anyway.** It is what distinguished "the ISR never ran"
+from "the ISR ran and the print path dropped it", which is precisely the question
+`ov` cannot answer, and it later gave the first direct measurement of §5's
+blanking. Worth keeping.
+
+The original — and incorrect — diagnosis follows, for the record.
+
+### 🔴 6a (original, superseded) — `ov=` does not detect the decimation it exists to detect
 
 Printed samples arrive in bursts of ~6 followed by a gap of 1917 or 2229 ms.
 1917 ms is exactly 6 × 319.5 ms — six missing samples, so **roughly half of all
@@ -531,10 +584,38 @@ well-formed telemetry, correct timestamps, FSM in `STATE_MONITORING`, and
 | Good batteries | 6080–6272 | 9.74 |
 | No batteries, cable only | **4736** | 0.0000 |
 
-4736 µs to the microsecond in both failure cases — the transaction aborting at
-the same point every time because the sensor never acknowledges. A working read
-costs ~6144 µs. `rd=` is a usable health signal, but the correct fix is checking
-the return code and raising a fault (roadmap item 3).
+4736 µs to the microsecond in both failure cases, against ~6144 µs for a working
+read. `rd=` is a usable health signal.
+
+⚠️ **Correction, 2026-08-07.** This section originally read the 4736 µs as "the
+transaction aborting because the sensor never acknowledges". That was wrong, and
+so was the first fix built on it.
+
+The bus completes normally. The failure is that **the transport reported success
+no matter what**:
+
+```c
+static uint16_t bma_i2c_read(uint8_t addr, uint8_t reg, uint8_t* data, uint16_t len) {
+    ...
+    Wire1.requestFrom((int16_t)addr, len);
+    while (Wire1.available()) { data[i++] = Wire1.read(); }
+    return 0;                      /* always */
+}
+```
+
+`endTransmission()`'s result was discarded and the byte count never checked. When
+the sensor did not answer, the loop body simply never ran and the caller was told
+everything was fine — so checking `bma4_read_accel_xyz()`'s return code, which
+roadmap item 3 originally did, had **no effect whatever**. The shorter `rd=`
+reflects a read that returned early with no data, not an aborted transaction.
+
+A sensor can also acknowledge and return zeros while browning out, which passes
+every bus-level check. Both are now handled: the wrappers return `BMA4_E_FAIL` on
+a NACK or short read, and `getAcceleration()` rejects all three axes reading
+exactly zero.
+
+⬜ **Still not exercised on hardware.** No read failure has occurred since the
+fix, so the `a=ERR` path remains unproven in practice.
 
 At rest a healthy unit reads **9.74 m/s²** against 9.81 nominal, ~0.7% low, which
 is unremarkable for an uncalibrated part.
@@ -594,3 +675,82 @@ Not committed — the bench runs were monitor sessions rather than PuTTY capture
 so no log files exist for `parse_falcon_log.py`. Everything above is quoted
 inline. **Capture to file next session**; the parser already reads this format
 and the gap analysis in §6a would be far easier against a real log.
+
+### Bench results, 2026-08-07 — the interrupt path works, and it does not escape §5
+
+The any-motion engine was armed at threshold 96 / duration 5, mapped to
+INT1_ACC → INT0/PD2, running alongside the polled detector and changing no FSM
+behaviour. Three questions were posed; all three are now answered.
+
+#### ✅ 1. The hardware path works
+
+`INT1_ACC → PD2` is live. Twenty interrupts in one session, each `ACC-INT` line
+showing `pin=1` at the edge and `pin=0` after the status read.
+
+**`BMA4_NON_LATCH_MODE` alone is not sufficient.** Setting it returned `BMA4_OK`
+and the pin still latched: one edge at `t=35471` and nothing for the following
+150 seconds, across three handling events the polled detector caught easily. An
+explicit read of the status register (`bma456_read_int_status`, returning
+`s=0x40` = `BMA456_ANY_NO_MOTION_INT`) is what drops the pin and re-arms it.
+Whether the mode bit is being overwritten by the feature-config write or simply
+does not behave as the datasheet implies has not been established — but any
+design here must poll the status register, not rely on non-latch.
+
+#### 🔴 2. The buzzer triggers any-motion continuously
+
+```
+ACC-INT n=4  t=20103 st=4 bz=1 pin=1
+ACC-INT n=5  t=21118 st=4 bz=1 pin=1
+ACC-INT n=10 t=63668 st=4 bz=1 pin=1
+ACC-INT n=11 t=64684 st=4 bz=1 pin=1
+ACC-INT n=12 t=65863 st=4 bz=1 pin=1
+```
+
+Those intervals are ~1015 ms — **exactly the status-poll period**. The condition
+is not firing once; it re-asserts the instant it is cleared. While the buzzer
+runs, any-motion is permanently triggered at this threshold.
+
+This confirms by measurement what §11 predicted from the physics: the sensor's
+engine sits behind the same mechanical coupling as the rolling average, and it
+hears the piezo.
+
+**Consequence for the §3 latched FSM — this is the important one.** The design
+needs a decel transient detected *while the alarm is sounding*. Neither feature
+can do it:
+
+| Release mechanism | Why it fails during the alarm |
+|---|---|
+| any-motion | permanently asserted by the buzzer — no usable edge |
+| no-motion | the buzzer prevents stillness, so it never asserts |
+
+**Moving detection into the sensor does not rescue §5.** Roadmap item 7
+(`buzzer_on = false` on the beep-off phase) is required whichever architecture
+wins. That was the main hope for the interrupt approach and it is now closed.
+
+#### ✅ 3. Any-motion is more sensitive than the polled detector
+
+Events `n=13` through `n=19` fired during `STATE_MONITORING` on handling the FSM
+**never flagged** — readings in the 9.2–10.5 m/s² range that `RollingAvg(4)` at
+3.13 Hz smooths away before any threshold sees them.
+
+This is the first evidence that anything on this hardware can detect events the
+current design misses, and it bears directly on §3's 18 fpm departure problem,
+where the transient sat below the polled noise floor. It does **not** prove an
+18 fpm departure would be caught — that needs a hoistway — but it is the most
+promising result of the two bench days.
+
+⚠️ All three axes were enabled so a hand-wave would register. Elevator motion is
+Z-only; narrow to `BMA456_Z_AXIS_EN` before drawing conclusions about real
+detection performance, since X/Y pick up handling a mounted unit never sees.
+
+#### Where this leaves the architecture
+
+The interrupt path is viable, more sensitive than polling, and needs no board
+change. But it inherits §5 rather than solving it, so it is not a shortcut around
+the existing roadmap — it is an alternative detector that still requires item 7,
+and still cannot observe constant velocity (§3 is a physical constraint, not an
+implementation one).
+
+⬜ **Open:** does any-motion catch an 18 fpm departure? Only a hoistway run can
+answer it, and it is the question that decides whether this approach is worth
+pursuing over fixing the polled path.
