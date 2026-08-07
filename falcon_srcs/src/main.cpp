@@ -681,6 +681,19 @@ void emit_acc_int_log()
     }
     last_reported = count;
 
+#if LATCHED_FSM
+    /*
+     * Hand the departure to the FSM. It only acts on this in STATE_MONITORING,
+     * so the constant stream of interrupts the buzzer raises while alarming
+     * (Eng_Notes §11) is harmless.
+     *
+     * Done here rather than in the ISR so the FSM is only ever touched from
+     * loop() -- §6 is what happens when this codebase does work in interrupt
+     * context.
+     */
+    ms.notify_any_motion();
+#endif
+
     Serial.print(F("ACC-INT n="));
     Serial.print(count);
     Serial.print(F(" t="));
