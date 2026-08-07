@@ -88,6 +88,27 @@ class BMA456 {
     void stepCounterEnable(MA456_PLATFORM_CONF conf = WRIST_CONFIG, bool cmd = true);
 
     /*
+     * Configure the any-motion / no-motion engine and route it to an interrupt
+     * pin. Returns BMA4_OK on success.
+     *
+     * threshold    5.11g format, 11-bit. See ANYMOTION_THRESHOLD in main.cpp
+     *              for the arithmetic behind the value used.
+     * duration     in 50 Hz samples, i.e. units of 20 ms.
+     * nomotion_sel BMA4_DISABLE selects any-motion, BMA4_ENABLE selects
+     *              no-motion. They are MUTUALLY EXCLUSIVE in this driver
+     *              variant -- one feature and one shared interrupt
+     *              (BMA456_ANY_NO_MOTION_INT), not two independent ones.
+     *              To do latch-on-departure / release-on-arrival, reconfigure
+     *              at the state transition rather than running both.
+     * int_line     BMA4_INTR1_MAP (-> INT1_ACC / PD2) or BMA4_INTR2_MAP.
+     */
+    uint16_t configureAnyMotion(uint16_t threshold, uint16_t duration,
+                                uint8_t nomotion_sel, uint8_t int_line);
+
+    /* Reads and clears the sensor's interrupt status word. */
+    uint16_t readInterruptStatus(uint16_t *int_status);
+
+    /*
      * Returns BMA4_OK on success. On failure the outputs are left untouched,
      * so the caller must check the result rather than trusting the values it
      * passed in. A non-responding sensor previously produced a valid-looking

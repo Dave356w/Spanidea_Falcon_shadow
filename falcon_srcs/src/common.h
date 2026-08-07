@@ -48,6 +48,20 @@
     #define BAT_ADC_ENABLE                      PIN_PB0
     #define BAT_ADC_CHANNEL                     PIN_PC2
 
+    /*
+     * BMA456 interrupt outputs.
+     *
+     * Confirmed against RTC1273R2 PAGE04:uC on 2026-08-06: net INT1_ACC lands
+     * on INT0/PD2 and INT2_ACC on INT1/PD3. Both are true external interrupt
+     * pins, so no pin-change-interrupt workaround is needed.
+     *
+     * NOTE: PIN_PSI_INT above is also PD3. That name predates the DPS310 being
+     * depopulated -- the pin is the accelerometer's second interrupt, not a
+     * pressure-sensor line. Nothing reads PIN_PSI_INT today. See Eng_Notes §11.
+     */
+    #define PIN_ACC_INT1                        PIN_PD2
+    #define PIN_ACC_INT2                        PIN_PD3
+
 #endif
 
 typedef struct _eeprom_db_
