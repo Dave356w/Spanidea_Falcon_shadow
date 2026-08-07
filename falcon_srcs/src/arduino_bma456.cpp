@@ -35,15 +35,30 @@ uint8_t config_file[8] = { 0 };
 
 #endif
 
+/*
+ * These two are the Bosch driver's entire view of the bus. Both used to
+ * `return 0` unconditionally, which meant BMA4_OK propagated all the way up
+ * even when the sensor was not answering at all: bma4_read_accel_xyz() reported
+ * success, the caller's buffer kept whatever it already held, and a dead sensor
+ * surfaced as a perfectly valid reading of 0.0 -- which the FSM reads as
+ * "perfectly still". See Eng_Notes §10.2.
+ *
+ * Checking the return code further up the stack (as the first attempt did) has
+ * no effect while the transport hardcodes success. The check has to be here.
+ */
 static uint16_t bma_i2c_write(uint8_t addr, uint8_t reg, uint8_t* data, uint16_t len) {
     Wire1.beginTransmission(addr);
     Wire1.write(reg);
     for (uint16_t i = 0; i < len; i++) {
         Wire1.write(data[i]);
     }
-    Wire1.endTransmission();
 
-    return 0;
+    /* 0 = success; 2 = NACK on address, 3 = NACK on data, 4 = other. */
+    if (Wire1.endTransmission() != 0) {
+        return (BMA4_E_FAIL);
+    }
+
+    return (BMA4_OK);
 }
 
 static uint16_t bma_i2c_read(uint8_t addr, uint8_t reg, uint8_t* data, uint16_t len) {
@@ -51,14 +66,24 @@ static uint16_t bma_i2c_read(uint8_t addr, uint8_t reg, uint8_t* data, uint16_t 
 
     Wire1.beginTransmission(addr);
     Wire1.write(reg);
-    Wire1.endTransmission();
+    if (Wire1.endTransmission() != 0) {
+        return (BMA4_E_FAIL);
+    }
 
     Wire1.requestFrom((int16_t)addr, len);
     while (Wire1.available()) {
         data[i++] = Wire1.read();
     }
 
-    return 0;
+    /*
+     * A short read is a failure. Previously the while loop simply did not
+     * execute and the caller was told everything was fine.
+     */
+    if (i != len) {
+        return (BMA4_E_FAIL);
+    }
+
+    return (BMA4_OK);
 }
 
 static void bma_delay_ms(uint32_t ms) {
@@ -135,6 +160,83 @@ void BMA456::initialize(MA456_RANGE range, MBA456_ODR odr, MA456_BW bw, MA456_PE
     Serial.print("BMA456 : Completed configuration \r\n");
 }
 
+uint16_t BMA456::configureAnyMotion(uint16_t threshold, uint16_t duration,
+                                    uint8_t nomotion_sel, uint8_t int_line) {
+    struct bma456_anymotion_config any_cfg;
+    struct bma4_int_pin_config     pin_cfg;
+    uint16_t                       rslt;
+
+    any_cfg.threshold    = threshold;
+    any_cfg.duration     = duration;
+    any_cfg.nomotion_sel = nomotion_sel;
+
+    rslt = bma456_set_any_motion_config(&any_cfg, &accel);
+    if (rslt != BMA4_OK) {
+        return (rslt);
+    }
+
+    /*
+     * Elevator motion is along Z. X and Y are enabled as well for this first
+     * test so that a hand-wave registers -- it makes the interrupt easy to
+     * exercise on the bench without a hoistway. Narrow to BMA456_Z_AXIS_EN
+     * before drawing any conclusion about real detection performance.
+     */
+    rslt = bma456_anymotion_enable_axis(BMA456_ALL_AXIS_EN, &accel);
+    if (rslt != BMA4_OK) {
+        return (rslt);
+    }
+
+    /*
+     * Electrical behaviour of the INT pin.
+     *
+     * Edge-triggered active-high suits this test, which never sleeps.
+     * SLEEP_MODE_PWR_DOWN stops the I/O clock and can only be woken by a
+     * LEVEL-triggered INT0/INT1, so anyone combining this with the sleep work
+     * must switch to BMA4_ACTIVE_LOW + BMA4_LEVEL_TRIGGER and attach the
+     * handler as LOW. The Anymotion branch's commented-out RISING would never
+     * have woken the part. See Eng_Notes §11.
+     */
+    pin_cfg.edge_ctrl  = BMA4_EDGE_TRIGGER;
+    pin_cfg.lvl        = BMA4_ACTIVE_HIGH;
+    pin_cfg.od         = BMA4_PUSH_PULL;
+    pin_cfg.output_en  = BMA4_OUTPUT_ENABLE;
+    pin_cfg.input_en   = BMA4_INPUT_DISABLE;
+
+    rslt = bma4_set_int_pin_config(&pin_cfg, int_line, &accel);
+    if (rslt != BMA4_OK) {
+        return (rslt);
+    }
+
+    /*
+     * Non-latched, and this is not optional.
+     *
+     * In latched mode the pin goes high and STAYS high until the status
+     * register is read, so an edge-triggered handler sees exactly one edge and
+     * then nothing ever again. That is what the first bench run showed: n=1 at
+     * t=61521 and im=1 for the rest of the session. Non-latch lets the sensor
+     * clear the pin itself once the condition passes, so every motion event
+     * produces a fresh edge with no I2C traffic needed to re-arm.
+     */
+    rslt = bma4_set_interrupt_mode(BMA4_NON_LATCH_MODE, &accel);
+    if (rslt != BMA4_OK) {
+        return (rslt);
+    }
+
+    rslt = bma456_feature_enable(nomotion_sel ? BMA456_NO_MOTION
+                                              : BMA456_ANY_MOTION,
+                                 BMA4_ENABLE, &accel);
+    if (rslt != BMA4_OK) {
+        return (rslt);
+    }
+
+    return (bma456_map_interrupt(int_line, BMA456_ANY_NO_MOTION_INT,
+                                 BMA4_ENABLE, &accel));
+}
+
+uint16_t BMA456::readInterruptStatus(uint16_t *int_status) {
+    return (bma456_read_int_status(int_status, &accel));
+}
+
 void BMA456::stepCounterEnable(MA456_PLATFORM_CONF conf, bool cmd) {
     bma456_reset_step_counter(&accel);
     bma456_select_platform(conf, &accel);
@@ -153,6 +255,20 @@ uint16_t BMA456::getAcceleration(float* x, float* y, float* z) {
          * sensor indistinguishable from a stationary one.
          */
         return (rslt);
+    }
+
+    /*
+     * Plausibility check: all three axes reading exactly zero.
+     *
+     * The transport now reports bus failures, but a sensor that acknowledges
+     * and returns zeros -- unconfigured, held in reset, or browning out -- still
+     * passes every error check above. That is what was observed on the bench:
+     * rd=4800 with a successful read and a=0.0000. Physically, all three axes
+     * at exactly zero means sustained free fall in every direction at once,
+     * which is not a state an elevator alarm needs to support.
+     */
+    if (sens_data.x == 0 && sens_data.y == 0 && sens_data.z == 0) {
+        return (BMA4_E_FAIL);
     }
 
     *x = (float)sens_data.x * devRange / 32768;
