@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "alarm.h"
 #include "RollingAvg.h"
+#include "velocity.h"
 
 #define TEMP_WAIT                      100
 #define VEL_MAX_LIMIT                  (2.0)
@@ -295,6 +296,17 @@ class MovementService {
     uint32_t monitor_entered_ms;   /* when STATE_MONITORING was entered   */
     uint8_t  arrival_edge_count;   /* any-motion edges inside the window  */
     uint32_t arrival_edge_first;   /* timestamp of the first of them      */
+
+    /*
+     * Signed velocity integral measured across the departure, m/s. The arrival
+     * conservation test is scaled from it -- see velocity.h. Zero means no
+     * usable departure measurement was taken, which disables the velocity
+     * arrival path for that run rather than falling back to a fitted constant.
+     */
+    float    vel_departure;
+
+    /* Edge-detect on the departure gate so the log gets one line, not many. */
+    bool     vel_reported;
 #endif
 
     void reset_counters();

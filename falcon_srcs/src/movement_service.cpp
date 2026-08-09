@@ -35,6 +35,8 @@ MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, flo
     monitor_entered_ms = 0;
     arrival_edge_count = 0;
     arrival_edge_first = 0;
+    vel_departure      = 0.0f;
+    vel_reported       = false;
 #endif
 }
 
@@ -213,6 +215,17 @@ void MovementService::fsm_run()
              */
             monitor_entered_ms = millis();
             any_motion_pending = false;
+
+            /*
+             * Clear the window for the same reason MONITOR_REARM_MS exists:
+             * the arrival that just ended is still inside it, and left there it
+             * would re-latch as a fresh departure and alarm twice for one trip.
+             * vel_departure is cleared so a stale value cannot scale the next
+             * run's conservation test.
+             */
+            vel_window.reset(millis());
+            vel_departure = 0.0f;
+            vel_reported  = false;
 #endif
         }
 
@@ -249,8 +262,61 @@ void MovementService::fsm_run()
         if (any_motion_pending) {
             any_motion_pending = false;
             Serial.print(F("FSM: Departure latched (any-motion) \r\n"));
+            vel_departure = vel_window.valid() ? vel_window.w() : 0.0f;
             start_timer = millis();
             set_state(STATE_MOVEMENT_DETECTED);
+            break;
+        }
+
+        /*
+         * Departure via the windowed velocity integral. OR'd with the two
+         * paths above, never AND'd: §14.4 makes a missed departure the only
+         * catastrophic failure, so an extra detector may only ever make the
+         * unit alarm sooner.
+         *
+         * This is the path that reaches a departure the others physically
+         * cannot. A car ramping to 20 fpm over 4 s averages 0.025 m/s^2 --
+         * six times under ANYMOTION_THRESHOLD -- and its 4-sample average at
+         * 3.13 Hz never approaches DEFAULT_THRESHOLD_VALUE either. The integral
+         * sees 0.1 m/s of velocity change regardless of how the ramp is shaped.
+         *
+         * At the CURRENT sample rate VEL_DEPART_THRESHOLD works out at 22.6 fpm
+         * (5 sigma of measured parked noise), so this does not yet meet the
+         * 20 fpm requirement on its own -- any-motion above still carries the
+         * slow cases it has been catching all along. velocity.h has the sample
+         * rate table and the reason the threshold cannot simply be lowered.
+         */
+        if (vel_window.valid() && fabs(vel_window.w()) > VEL_DEPART_THRESHOLD) {
+
+            /*
+             * Report on the RISING crossing only. Unarmed, the condition can
+             * persist for several seconds and one line per sample would drown
+             * the capture.
+             */
+            if (!vel_reported) {
+                vel_reported = true;
+                vel_departure = vel_window.w();
+
+                Serial.print(F("VEL: departure w="));
+                Serial.print(vel_departure, 3);
+                Serial.print(F(" cov="));
+                Serial.print(vel_window.coverage_ms());
+#if VEL_ARMED
+                Serial.print(F(" LATCH\r\n"));
+                start_timer = millis();
+                set_state(STATE_MOVEMENT_DETECTED);
+#else
+                /*
+                 * Not armed -- see velocity.h. The window is characterised in
+                 * the log and the FSM is left alone, exactly as §11 introduced
+                 * any-motion before §12 promoted it.
+                 */
+                Serial.print(F(" obs\r\n"));
+                vel_departure = 0.0f;
+#endif
+            }
+        } else {
+            vel_reported = false;
         }
 #endif
         break;
@@ -261,12 +327,37 @@ void MovementService::fsm_run()
             last_state = MotionStates::STATE_MOVEMENT_DETECTED;
         }
 
+#if LATCHED_FSM
+        /*
+         * The departure ramp is still running through this state, so keep the
+         * largest |w| seen rather than only the value that tripped the latch.
+         * That peak is what the arrival conservation test is scaled against,
+         * and a latch driven by any-motion may have fired well before the
+         * integral had accumulated the full velocity step.
+         */
+        if (vel_window.valid() && fabs(vel_window.w()) > fabs(vel_departure)) {
+            vel_departure = vel_window.w();
+        }
+#endif
+
         if ((millis() - start_timer) > MOVEMENT_DETECTION_TIMEOUT_MS) {
             movement_start_timer = millis();
 #if LATCHED_FSM
             arrival_seen       = false;
             arrival_edge_count = 0;
             arrival_edge_first = 0;
+
+            /*
+             * Clear the window before cruise so the departure transient cannot
+             * still be sitting in it when arrival detection arms. MIN_TRAVEL_MS
+             * (3 s) and VEL_MIN_COVERAGE_MS together mean the window has
+             * refilled from cruise data before anything is read from it.
+             */
+            vel_window.reset(millis());
+
+            Serial.print(F("FSM: departure velocity w="));
+            Serial.print(vel_departure, 3);
+            Serial.print(F("\r\n"));
 #endif
             enable_alarm();
             enable_chase_leds();
@@ -350,6 +441,75 @@ void MovementService::fsm_run()
                 set_state(STATE_DECELERATING);
                 break;
             }
+
+#if VEL_ARRIVAL_ENABLE
+            /*
+             * 1b. CONSERVATION -- the arrival integral must cancel the
+             *     departure integral.
+             *
+             * The car that left at 20 fpm has to shed exactly 20 fpm to stop.
+             * So the arrival is the same size as the departure with the
+             * opposite sign, however softly the machine sets down -- which is
+             * the property §14.7 needed and could not get from amplitude. That
+             * run's arrival measured 0.058 m/s^2, below the 0.103 a PARKED
+             * device produces, yet it still had to integrate to -0.0914 m/s.
+             *
+             * Unlike ARRIVAL_CLUSTER_DELTA this calibrates itself from the
+             * departure measured on this run, so §14.3's problem -- a constant
+             * fitted to twelve cartop runs, degrading as runs get longer --
+             * does not arise. The gate is a fraction of a measurement, not a
+             * number from a table.
+             *
+             * THREE CONDITIONS, all required:
+             *
+             *   a) a usable departure was measured. Without one there is
+             *      nothing to conserve against, and rather than inventing a
+             *      threshold the path stays out of the way for that run.
+             *   b) opposite sign. Vibration does not respect the sign of a
+             *      departure that happened a minute ago; a genuine stop must.
+             *   c) magnitude over max(fraction * departure, VEL_ARRIVE_MIN).
+             *      The floor is what stops a weak departure measurement from
+             *      setting an arrival gate inside the noise and releasing the
+             *      alarm mid-ride -- the one failure §14.4 calls catastrophic.
+             *
+             * Like every other release path this only reaches
+             * STATE_DECELERATING, which still requires STOP_CONFIRM_MS of
+             * continuous quiet before anything is silenced.
+             */
+            if (fabs(vel_departure) >= VEL_ARRIVE_MIN && vel_window.valid()) {
+                float w_now = vel_window.w();
+                float gate  = fabs(vel_departure) * VEL_ARRIVE_FRACTION;
+
+                if (gate < VEL_ARRIVE_MIN) {
+                    gate = VEL_ARRIVE_MIN;
+                }
+
+                if (((w_now > 0.0f) != (vel_departure > 0.0f)) &&
+                    fabs(w_now) > gate) {
+
+                    Serial.print(F("VEL: arrival w="));
+                    Serial.print(w_now, 3);
+                    Serial.print(F(" dep="));
+                    Serial.print(vel_departure, 3);
+                    Serial.print(F(" cov="));
+                    Serial.print(vel_window.coverage_ms());
+#if VEL_ARMED
+                    Serial.print(F(" RELEASE\r\n"));
+                    arrival_seen = true;
+                    start_timer = millis();
+                    set_state(STATE_DECELERATING);
+                    break;
+#else
+                    Serial.print(F(" obs\r\n"));
+                    /*
+                     * Unarmed: zero the reference so this reports once per run
+                     * rather than on every pass for the rest of the ride.
+                     */
+                    vel_departure = 0.0f;
+#endif
+                }
+            }
+#endif
 
             /*
              * 2. SECONDARY -- polled transient on the average. Independent of

@@ -8,6 +8,7 @@
 #include "main.h"
 #include "arduino_bma456.h"
 #include "common.h"
+#include "velocity.h"
 #include <EEPROM.h>
 
 uint16_t x_axis_1, x_axis_2, y_axis_1, y_axis_2, z_axis_1, z_axis_2;
@@ -50,6 +51,29 @@ typedef struct {
     uint32_t t_ms;          /* millis() at time of sample                   */
     float    accel;         /* z acceleration, m/s^2                        */
     float    avg;           /* rolling average after this sample was added  */
+    /*
+     * Lateral axes, m/s^2. Logged but not yet used by the FSM.
+     *
+     * X and Y carry NO gravity component, so unlike z they have no 1 g
+     * pedestal for cruise and rest to hide behind -- what they measure is
+     * lateral acceleration, i.e. guide-shoe and rail excitation while
+     * travelling and nothing at all while parked. §3's "constant velocity is
+     * unobservable" argument is about the gravity axis and does not apply to
+     * these; neither do the numbers in movement_service.h's stillness-backstop
+     * block, every one of which is z.
+     *
+     * getAcceleration() has always read all three axes and discarded these
+     * two, so logging them costs no extra I2C -- only the serial characters.
+     * The open question they answer is the contrast between parked and
+     * travelling, which has never been measured on this device.
+     *
+     * Note aliasing hurts an ENERGY measure far less than it hurts transient
+     * detection: sub-sampling scrambles a waveform's shape but preserves its
+     * total power, so sample variance of x/y is a usable vibration estimate
+     * even at 3.13 Hz.
+     */
+    float    ax;            /* x acceleration, m/s^2                        */
+    float    ay;            /* y acceleration, m/s^2                        */
     uint16_t read_us;       /* duration of the bma456 I2C read, microseconds */
     uint8_t  fsm_state;     /* MovementService state at time of sample      */
     uint8_t  err_run;       /* consecutive failed sensor reads, 0 = healthy */
@@ -205,6 +229,16 @@ static volatile bool         accel_avg_primed = false;
 /* How often to read/clear the sensor interrupt status, milliseconds. */
 #define ACC_INT_POLL_MS           1000
 
+/*
+ * Consecutive ACC_INT_POLL_MS polls with any-motion still asserted, while the
+ * FSM is monitoring, before the feature is re-armed. See poll_acc_int_status().
+ *
+ * 8 s at the current poll rate. Long enough that a real departure -- which
+ * moves the FSM out of STATE_MONITORING within MOVEMENT_DETECTION_TIMEOUT_MS
+ * and so stops the count -- can never reach it.
+ */
+#define ACC_INT_STUCK_POLLS       8
+
 static volatile uint16_t     acc_int_count = 0;
 static volatile uint32_t     acc_int_last_ms = 0;
 
@@ -340,6 +374,24 @@ void loop()
         break;
 
     case SystemStates::SYSTEM_STATE_NOMINAL:
+        /*
+         * Age the velocity window on wall clock before the FSM reads it.
+         * Without this it would only decay when a sample arrives, so w() would
+         * hold a stale value right through a buzzer blank -- which is exactly
+         * when STATE_MOVING is asking about arrival.
+         *
+         * Baseline tracking is allowed only while monitoring. Anywhere else the
+         * tracker would absorb the very transient it exists to expose; a slow
+         * departure is precisely the case where that guarantees a miss. Samples
+         * taken while the piezo sounds never reach the window at all -- the
+         * timer ISR drops them (§5, §11) -- so buzzer coupling is handled a
+         * layer down and does not need gating here.
+         */
+        vel_window.tick(millis());
+        vel_window.set_baseline_tracking(
+            ms.get_state() == MotionStates::STATE_MONITORING ||
+            ms.get_state() == MotionStates::STATE_CALIBERATION);
+
         ms.fsm_run();
 
         emit_sample_log();
@@ -455,6 +507,8 @@ float read_acceleration_mss()
     isr_sample.t_ms      = millis();
     isr_sample.accel     = accel_value;
     isr_sample.avg       = acceleration_avg_g.avg();
+    isr_sample.ax        = x / 1000.0 * 9.81;
+    isr_sample.ay        = y / 1000.0 * 9.81;
     isr_sample.read_us   = (uint16_t)(micros() - read_start);
     isr_sample.fsm_state = (uint8_t)ms.get_state();
     isr_sample.err_run   = 0;
@@ -490,6 +544,25 @@ void emit_sample_log()
     sample_pending = false;
     interrupts();
 
+    /*
+     * Feed the velocity window.
+     *
+     * Deliberately here and not in read_acceleration_mss(). That runs in the
+     * timer ISR, and the FSM reads w()/valid() from loop() -- float and
+     * multi-byte state shared across that boundary would tear, with no
+     * atomicity on AVR. Consuming the published snapshot keeps every access to
+     * the window in loop() context, which is the same reason §6 moved printing
+     * out of the ISR.
+     *
+     * BEFORE the decimation return: LOG_DECIMATE_N thins the log, and must
+     * never thin the detector. Samples lost to snapshot overrun are simply not
+     * credited -- the window's coverage accounting reports the shortfall rather
+     * than interpolating across it.
+     */
+    if (!s.err_run) {
+        vel_window.add(s.accel, s.t_ms);
+    }
+
     if (++decimate < LOG_DECIMATE_N) {
         return;
     }
@@ -523,6 +596,29 @@ void emit_sample_log()
     Serial.print(ticks);
     Serial.print(F(" im="));
     Serial.print(acc_int_count);
+
+    /*
+     * Velocity window: signed integral and how much of it was actually
+     * observed. cv= well under VEL_WINDOW_MS means the buzzer or a fault is
+     * eating samples and w= is built on less data than it looks like -- the
+     * one thing a capture must not hide. Costs ~14 characters a line, about
+     * 5% more of the 9600 baud budget.
+     */
+    Serial.print(F(" w="));
+    Serial.print(vel_window.w(), 3);
+    Serial.print(F(" cv="));
+    Serial.print(vel_window.coverage_ms());
+
+    /*
+     * Lateral axes. Exploration only -- nothing reads these yet. The question
+     * they exist to answer is whether |x|,|y| separate a travelling unit from a
+     * parked one, which would give a cruise-confirm and 3 s false-alarm veto
+     * that z physically cannot (see the sample_log_t comment).
+     */
+    Serial.print(F(" x="));
+    Serial.print(s.ax, 3);
+    Serial.print(F(" y="));
+    Serial.print(s.ay, 3);
 
     if (err_total) {
         Serial.print(F(" et="));
@@ -730,6 +826,7 @@ void emit_acc_int_log()
 void poll_acc_int_status()
 {
     static uint32_t last_poll = 0;
+    static uint8_t  stuck_polls = 0;
     uint16_t        status = 0;
     uint16_t        rslt;
 
@@ -749,6 +846,62 @@ void poll_acc_int_status()
         return;
     }
 
+    /*
+     * Stuck any-motion reference -- see the datasheet review, finding 3.
+     *
+     * BST-BMA456-AN002 p.7: any-motion tests |Acc - Reference|, and "reference
+     * acceleration sample is updated only when an any-motion interrupt is
+     * triggered". If the reference is left stale at a level the device no
+     * longer sits at, the slope never falls back under the threshold, the
+     * output never de-asserts, and an attachInterrupt(RISING) handler sees ONE
+     * edge and then silence for the rest of the deployment. Departure detection
+     * would be dead with nothing in the log to say so -- the catastrophic
+     * direction (§14.4), and the half §14.9 calls the one that works.
+     *
+     * Non-latch mode does not protect against this: it clears the pin when the
+     * CONDITION passes, and with a stale reference the condition does not pass.
+     *
+     * The measured data says we are not currently in that state -- §13.1 and
+     * §14 show zero any-motion edges through cruise and working arrival
+     * clusters afterwards, neither possible with a pin stuck high -- so the
+     * sensor evidently re-references more often than AN002 rev 0.1 describes.
+     * This is here because the cost is one counter and the failure is silent.
+     *
+     * Only counted in STATE_MONITORING: while MOVING the output is SUPPOSED to
+     * be asserted, and re-arming there would destroy the arrival cluster.
+     */
+    if ((status & BMA456_ANY_NO_MOTION_INT) &&
+        ms.get_state() == MotionStates::STATE_MONITORING) {
+        if (stuck_polls < 0xFF) {
+            stuck_polls++;
+        }
+    } else {
+        stuck_polls = 0;
+    }
+
+    if (stuck_polls >= ACC_INT_STUCK_POLLS) {
+        /*
+         * Disable and re-enable the feature. That forces the sensor to take a
+         * fresh reference at the level the device actually sits at now.
+         */
+        Serial.print(F("ACC-STAT STUCK "));
+        Serial.print(stuck_polls);
+        Serial.print(F(" polls, re-arming any-motion\r\n"));
+
+        stuck_polls = 0;
+
+        rslt = bma456.configureAnyMotion(ANYMOTION_THRESHOLD,
+                                         ANYMOTION_DURATION,
+                                         BMA4_DISABLE,
+                                         ANYMOTION_INT_LINE);
+        if (rslt != BMA4_OK) {
+            Serial.print(F("ACC-STAT re-arm FAILED : "));
+            Serial.print(rslt);
+            Serial.print(F("\r\n"));
+        }
+        return;
+    }
+
     if (status != 0 || digitalRead(PIN_ACC_INT1) != 0) {
         Serial.print(F("ACC-STAT s=0x"));
         Serial.print(status, HEX);
@@ -756,6 +909,8 @@ void poll_acc_int_status()
         Serial.print(digitalRead(PIN_ACC_INT1));
         Serial.print(F(" n="));
         Serial.print(acc_int_count);
+        Serial.print(F(" sk="));
+        Serial.print(stuck_polls);
         Serial.print(F("\r\n"));
     }
 }
