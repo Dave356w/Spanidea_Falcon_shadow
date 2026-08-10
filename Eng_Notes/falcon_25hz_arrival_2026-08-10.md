@@ -162,3 +162,27 @@ oscillates 0.07–0.23 and repeatedly falls back, then decays
   automatic stops. §14.7's case was gentle *because the machine set down
   softly*, and whether the brake still bounces on the softest possible stop is
   the assumption the whole result rests on.
+
+## NOTES from Dave's testing 8/10/26 @ 2:30 pm
+Device is stable at all speeds on cartop and counterweight, on cartop inspection
+brake pick and set is pronounced enough to give clear signal to set and release 
+latched alarm. The jog issue remains, a 1-2 second pulse to run intermittently results 
+in an active alarm state requiring an additional jog to reset. Successfull runs have 
+been with a clear start-cruise-stop transition from 5-120 seconds. An eight floor run
+at 18FPM expired on failsafe timeout. Performance though has been great so far activating
+on cartop at low speed which was previously an issue.
+When tested on normal operation inside the cab (350 FPM) with smooth slowdowns and approach speeds
+the unit activated but failed to reset upon arrival due to no noticeable brake set. 
+On normal operation the elevator drive performs a gradual slow down and stop before
+setting the brake. This is technically outside of the initial use case (counterweight testing succssesful
+due to abrupt inspection operation) but successful normal operation
+alarm-cruise-arrival would complete testing.  
+
+## OPEN ITEMS
+Z axis performs well to latch alarm but misses smooth transition to stop.
+x/y shows running not running deltas, can x/y be used as a release mechanism in conjunction with Z?
+On normal operation/leveling approach Z must show some deviation from cruise, can we trigger x/y as
+a possible measure for release when z deviation is measured? 
+Jogging 1-2 runs can't separate a start/stop signal when produced back to back, 
+could x/y settle over 5 sec activate release? 
+A stable Z and stable x/y = no motion
