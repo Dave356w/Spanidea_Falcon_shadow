@@ -38,7 +38,26 @@
  * release the car did not deserve, and it is the same discipline velocity.h
  * applies to itself.
  */
-#define XY_RELEASE_ARMED          1
+/*
+ * ⛔ NOT ARMED for the first hoistway session (2026-08-10, Phase 1a).
+ *
+ * The bench closed risk 1 -- the buzzer does not block the release. It cannot
+ * say anything about risk 2, a smooth machine letting the metric fall below
+ * XY_STILL mid-cruise and dropping the beacon while the car is still moving.
+ * That is the dangerous direction, and it is the exact failure that got the
+ * stillness backstop banned on 2026-08-07 after it released mid-ride twice.
+ *
+ * So: log what this WOULD have done, replay it against the capture, and only
+ * then arm. Unarmed, the FSM releases on the existing z paths and behaviour
+ * is identical to the previous build, while m= and q= are logged throughout.
+ * This is the sequence §11 used to introduce any-motion before §12 promoted
+ * it, and it is why that path works.
+ *
+ * WHAT UNBLOCKS IT: one measurement -- the lateral level during the slowest
+ * cruise the machine can produce, against the parked floor in the same shaft.
+ * If the quietest travel clears the noisiest parked with margin, set this to 1.
+ */
+#define XY_RELEASE_ARMED          0
 
 /*
  * THE METRIC: |dx| + |dy| between consecutive unblanked samples, m/s^2.
