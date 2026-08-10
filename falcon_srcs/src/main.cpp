@@ -166,28 +166,52 @@ static volatile uint8_t      sensor_err_run   = 0;
 #define ARRIVAL_QUIET_MSS      (0.15f)   /* above cruise raw max 0.0875      */
 #define ARRIVAL_ARM_SAMPLES    5         /* 200 ms of quiet at 25 Hz         */
 
-static volatile float   arr_zero    = 0.0f;  /* baseline, published by FSM   */
-static volatile float   arr_peak    = 0.0f;  /* max |a - zero| while armed   */
-static volatile uint8_t arr_quiet   = 0;
-static volatile bool    arr_armed   = false;
+/*
+ * ⚠️ THE PEAK MUST BE WINDOWED, NOT CUMULATIVE. Fixed 2026-08-10 after the
+ * high-speed run exposed it.
+ *
+ * The first implementation held a running max for the whole run. A max only
+ * ever grows, so cruise vibration ratchets it upward indefinitely: the
+ * high-speed run climbed 0.09 -> 0.13 -> 0.17 -> 0.19 -> 0.23 in fifteen
+ * seconds of cruise, against a threshold of 0.30. This morning's 25 fpm run
+ * lasted 197 seconds. A cumulative max would have crossed any threshold
+ * eventually and released the beacon mid-travel -- the catastrophic direction,
+ * reached not by a bad threshold but by a detector that cannot forget.
+ *
+ * An arrival is a BRIEF event, so the honest question is "what was the peak in
+ * the last second", not "since the run began". Two alternating buckets, with
+ * the reported value being the max of the current and previous one, give a
+ * 1-2 s sliding window using two floats and no array.
+ */
+#define ARRIVAL_PEAK_WINDOW_MS 1000
+
+static volatile float    arr_zero      = 0.0f; /* baseline, published by FSM */
+static volatile float    arr_peak_cur  = 0.0f; /* max in the open bucket     */
+static volatile float    arr_peak_prev = 0.0f; /* max in the one before it   */
+static volatile uint32_t arr_bucket_ms = 0;
+static volatile uint8_t  arr_quiet     = 0;
+static volatile bool     arr_armed     = false;
 
 /* Called from the FSM on entering STATE_MOVING. */
 void arrival_peak_reset()
 {
     noInterrupts();
-    arr_peak  = 0.0f;
-    arr_quiet = 0;
-    arr_armed = false;
+    arr_peak_cur  = 0.0f;
+    arr_peak_prev = 0.0f;
+    arr_bucket_ms = millis();
+    arr_quiet     = 0;
+    arr_armed     = false;
     interrupts();
 }
 
 float arrival_peak_get()
 {
-    float v;
+    float a, b;
     noInterrupts();
-    v = arr_peak;
+    a = arr_peak_cur;
+    b = arr_peak_prev;
     interrupts();
-    return v;
+    return (a > b) ? a : b;
 }
 
 void arrival_zero_set(float z)
@@ -605,12 +629,24 @@ float read_acceleration_mss()
             if (dev < ARRIVAL_QUIET_MSS) {
                 if (++arr_quiet >= ARRIVAL_ARM_SAMPLES) {
                     arr_armed = true;
+                    arr_bucket_ms = isr_sample.t_ms;
                 }
             } else {
                 arr_quiet = 0;
             }
-        } else if (dev > arr_peak) {
-            arr_peak = dev;
+        } else {
+            uint32_t now = millis();
+
+            /* Roll the window: the open bucket becomes the previous one. */
+            if ((uint32_t)(now - arr_bucket_ms) >= ARRIVAL_PEAK_WINDOW_MS) {
+                arr_peak_prev = arr_peak_cur;
+                arr_peak_cur  = 0.0f;
+                arr_bucket_ms = now;
+            }
+
+            if (dev > arr_peak_cur) {
+                arr_peak_cur = dev;
+            }
         }
     }
 

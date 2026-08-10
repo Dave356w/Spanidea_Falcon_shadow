@@ -701,7 +701,7 @@ void MovementService::fsm_run()
              * the interrupt, so it still works if that path fails. Only reaches
              * violent stops now that the threshold is 0.30; that is deliberate.
              */
-            if (arrival_peak_get() > ARRIVAL_THRESHOLD_VALUE) {
+            if (arrival_peak_get() > ARRIVAL_PEAK_VALUE) {
                 arrival_seen = true;
                 Serial.print(F("FSM: Arrival (polled), peak "));
                 Serial.print(arrival_peak_get(), 3);

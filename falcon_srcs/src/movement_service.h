@@ -194,13 +194,23 @@
  *                                  8:1 so the true population max is higher)
  *   brake-set bounce     0.938    = 10.7x
  *
- * 0.40 sits ~4.5x above the observed cruise peak and ~2.3x below the observed
- * arrival. Every other arrival discriminator this project has measured had a
- * margin between 1.07x and 1.4x, so this is the first one with real room --
- * but it rests on ONE run, and the cruise figure is from a decimated log.
- * Re-derive both from a full-rate capture before trusting the number.
+ * RAISED 0.40 -> 0.70 the same afternoon, on the high-speed run. 0.40 came
+ * from a decimated log that understated the population peak; a true running
+ * max showed cruise reaching 0.23 at speed, leaving only 1.3x. Measured across
+ * both speeds now:
+ *
+ *   cruise ceiling, high speed   0.23     (windowed, see main.cpp)
+ *   arrival, 18 fpm              2.03
+ *   arrival, high speed          3.42
+ *
+ * 0.70 sits 3.0x above the worst cruise observed and 2.9x below the SMALLER of
+ * the two arrivals. Both margins are real, which no arrival discriminator on
+ * this device has previously managed in either direction.
+ *
+ * Still only two runs. The cruise figure is what moves with equipment, so it
+ * is the one to re-measure on a different machine.
  */
-#define ARRIVAL_PEAK_VALUE             (0.40)
+#define ARRIVAL_PEAK_VALUE             (0.70)
 
 /*
  * ⛔ NO STILLNESS BACKSTOP -- do not reintroduce one.
