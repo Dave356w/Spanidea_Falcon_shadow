@@ -42,12 +42,32 @@ edge case.
 > **The beacon is ON if and only if the counterweight is moving, with 1–3 s of
 > lag in either direction.**
 
-| | Budget |
-|---|---|
-| Set, after motion starts | 1–3 s (aim ~0.2 s; z detection is already this fast) |
-| Reset, after motion stops | 1–3 s |
-| False alarm duration | ≤ 3 s, self-clearing, no user action |
-| Minimum burst duration detected | **to be established** — see §7 |
+| | Budget | Measured 2026-08-10 | |
+|---|---|---|---|
+| Set, after motion starts | 1–3 s (aim ~0.2 s; z detection is already this fast) | ~0.2 s | ✅ accepted |
+| Reset, after motion stops | 1–3 s | **~8 s** | ✅ **accepted — see below** |
+| False alarm duration | ≤ 3 s, self-clearing, no user action | not exercised | |
+| Minimum burst duration detected | **to be established** — see §7 | not measured | |
+
+> ### ⚠️ The reset budget is superseded. Dave, 2026-08-10, cartop, two runs.
+>
+> Measured reset was **7.67 s** and **8.31 s** from arrival detection to
+> silence — `STOP_CONFIRM_MS` plus excursions restarting the window, i.e.
+> roughly 3x this table's number. Watching it on real equipment Dave called
+> set, cruise and reset **"acceptable as observed"** and the behaviour "best
+> observed to date".
+>
+> **So 1–3 s was tighter than the requirement actually is, and it is the
+> requirement that moves, not the firmware.** This matters well beyond a
+> tolerance: a fast reset was one of the two justifications for the entire
+> Z + X/Y release path (§3). With it gone, that path is left carrying only the
+> other one — arrivals z cannot see — which is a real problem but a narrower
+> one. See `falcon_hoistway_protocol.md` §5.6.
+>
+> What is NOT relaxed by this: a beacon that never releases. §14.7's gentle
+> 18 fpm arrival measured 0.058 on the polled path and would still be missed,
+> leaving the unit sounding on a stationary counterweight until the failsafe.
+> That is a position lie and it remains unacceptable at any duration.
 
 The alarm is a **beacon**: the mechanic ranges the counterweight by ear and eye.
 Consequences:

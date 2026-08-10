@@ -192,7 +192,104 @@ evidence that would justify arming.
 - Risk 2 is no longer a risk. It is a measured failure.
 - The z + x/y architecture is not dead; it is blocked on roadmap item 5.
 
-### 5.6 Still unmeasured
+### 5.6 ✅ The reset budget was wrong, and that reshapes the roadmap
+
+Unprompted, after both runs, Dave: *"both speeds alarmed held through travel
+and promptly reset upon arrival, behavior is best observed to date"*, and then
+*"set, cruise and reset was acceptable as observed"*.
+
+Measured, arrival detection to silence:
+
+| run | arrival delta | reset |
+|---|---|---|
+| 25 fpm down | 0.412 | **7.67 s** |
+| 122 fpm up | 0.320 | **8.31 s** |
+
+That is `STOP_CONFIRM_MS` plus a couple of excursions restarting the window —
+about **3x the spec's 1-3 s reset budget** — and the person who set the
+requirement, watching the device on real equipment, called it prompt.
+
+**The requirement moves, not the firmware.** Spec §2 is amended.
+
+The consequence is larger than a tolerance. A 1-3 s reset was one of the two
+justifications for the whole Z + X/Y release path. With it withdrawn, that path
+carries only the other one — arrivals z physically cannot see — so it drops
+from *necessary* to *an optimisation for a narrower case*, and item 5 loses one
+of its two claims on priority.
+
+**What this does NOT relax.** §14.7's gentle 18 fpm arrival measured 0.058 on
+the polled path against a 0.30 threshold, and would still be missed entirely,
+leaving the unit sounding on a stationary counterweight until
+`LATCH_FAILSAFE_MS`. A beacon that never releases is a position lie and stays
+unacceptable at any duration. That failure is the one still worth engineering
+against.
+
+**Do not over-read the two runs.** n=2 and both were firm stops — the case the
+whole arrival investigation started from was not exercised. The 122 fpm margin
+was 0.320 against a 0.30 threshold, 7%: it fired, but that is not margin.
+
+**Method note.** Dave's qualitative read and the log agreed here, which is
+worth recording because the standing rule is the opposite — when they disagree,
+he is usually right, since the log is a 3 Hz keyhole and he is watching the
+actual car. An acceptance judgement is a measurement this project cannot take
+any other way.
+
+### 5.7 Parked soak, 11.8 min — and an unexpected result for `velocity.h`
+
+Cartop, live building, car parked, untouched. 2218 samples at 3.13 Hz, `st=2`
+throughout.
+
+**Zero any-motion edges, zero FSM events, zero false departures.** Matches the
+§14.6 soak and is the strongest evidence to date that `ANYMOTION_THRESHOLD 32`
+/ `ANYMOTION_DURATION 5` is correctly placed. Averaged z delta peaked at 0.0257
+against the 0.40 departure threshold, a 15x margin.
+
+**The lateral verdict, now conclusive.**
+
+| parked | median | p95 | p99 | peak |
+|---|---|---|---|---|
+| `m` | 0.0150 | 0.0320 | 0.0420 | **0.0640** |
+
+25 fpm cruise median (0.0190) sits between the parked median and p95. 122 fpm
+cruise median (0.0465) sits **below the parked peak**. Both cruise speeds fall
+inside the parked distribution. The earlier parked max of 0.104 came from
+windows contaminated by movement on the cartop; the clean figure is 0.064 and
+it still swallows both runs. §5.2's conclusion is now measured rather than
+inferred.
+
+**🟢 The unexpected part.**
+
+| | prior soak (§14.6) | this soak |
+|---|---|---|
+| \|w\| median | 0.0176 | **0.0080** |
+| \|w\| p99 | 0.0757 | **0.0300** |
+| \|w\| **peak** | 0.1274 | **0.0400** |
+| crossings of the 0.255 gate | 2 | **0 of 2218** |
+
+3.2x quieter at the peak, on noisier equipment. `velocity.h` derives its gate
+as 2x the measured peak — 0.255 m/s, about 50 fpm, and hence its conclusion
+that at 3.13 Hz no threshold is both safe and useful. On these numbers the same
+rule gives **0.080 m/s, about 16 fpm, under the 20 fpm requirement.**
+
+Hypothesis: 0.1274 predates the two bugs fixed in `540399f` — the baseline
+seeded from a single sample, and the `|w|` freeze deadlock. Both inflate parked
+`|w|`, and that commit already recorded the bench falling to 0.013 median
+afterwards. If so, **the velocity path may be armable at the current sample
+rate**, with no dependency on item 5.
+
+That matters because the velocity **conservation test is a candidate solution
+to the one failure still worth engineering against** — §14.7's gentle arrival,
+missed by z, leaving the beacon sounding on a stationary counterweight until
+the failsafe. It scales itself from each run's own departure rather than a
+fitted constant, which is the property that case needs.
+
+⬜ **Not a conclusion.** n=1, 11.8 minutes, and the parked distribution is
+heavy-tailed — a shift has roughly 40x more opportunity to throw an outlier
+than this soak saw. **Test: a one-hour-plus parked soak replayed through
+`graph/velocity_replay.py`.** It needs a bench, not a hoistway, and it can run
+overnight. Do that before touching `VEL_ARMED`.
+
+### 5.8 Still unmeasured
 
 - Phase 0's duration axis. Never run.
 - Phase 2 entirely. Given §5.1 there is nothing to confirm yet.
