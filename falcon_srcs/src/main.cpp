@@ -9,6 +9,7 @@
 #include "arduino_bma456.h"
 #include "common.h"
 #include "velocity.h"
+#include "lateral.h"
 #include <EEPROM.h>
 
 uint16_t x_axis_1, x_axis_2, y_axis_1, y_axis_2, z_axis_1, z_axis_2;
@@ -561,6 +562,15 @@ void emit_sample_log()
      */
     if (!s.err_run) {
         vel_window.add(s.accel, s.t_ms);
+
+        /*
+         * Same placement, same reasons: the FSM reads the quiet run from
+         * loop(), and the snapshot has already had the buzzer blanking and
+         * the failed-read guard applied to it. Also before the decimation
+         * return -- LOG_DECIMATE_N thins the log and must never thin a
+         * detector, least of all one that RELEASES the beacon.
+         */
+        lat_monitor.add(s.ax, s.ay, s.t_ms);
     }
 
     if (++decimate < LOG_DECIMATE_N) {
@@ -619,6 +629,20 @@ void emit_sample_log()
     Serial.print(s.ax, 3);
     Serial.print(F(" y="));
     Serial.print(s.ay, 3);
+
+    /*
+     * The lateral metric the release path actually decides on, and the quiet
+     * run it has accumulated. x= and y= alone are not a substitute: the
+     * metric is a difference between CONSECUTIVE UNBLANKED samples, and the
+     * log does not show which samples the ISR dropped, so it cannot be
+     * reconstructed offline. q= is what makes a release explicable after the
+     * fact -- and, during the buzzer bench test, what shows whether the
+     * metric ever gets under the threshold at all.
+     */
+    Serial.print(F(" m="));
+    Serial.print(lat_monitor.m(), 3);
+    Serial.print(F(" q="));
+    Serial.print(lat_monitor.quiet_run());
 
     if (err_total) {
         Serial.print(F(" et="));

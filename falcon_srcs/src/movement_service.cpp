@@ -37,6 +37,9 @@ MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, flo
     arrival_edge_first = 0;
     vel_departure      = 0.0f;
     vel_reported       = false;
+    rearm_ms           = MONITOR_REARM_MS;
+    calib_moved        = false;
+    calib_attempts     = 0;
 #endif
 }
 
@@ -117,13 +120,24 @@ void MovementService::notify_any_motion(uint32_t edge_ms)
         }
         return;
     }
+
+    /*
+     * An any-motion edge during calibration means the counterweight moved
+     * while its own noise floor was being measured. That is the one input
+     * that pushes the learned threshold in the dangerous direction, so the
+     * window is thrown away rather than trusted -- see CALIB_RETRIES.
+     */
+    if (state == MotionStates::STATE_CALIBERATION) {
+        calib_moved = true;
+        return;
+    }
 #endif
 
     if (state != MotionStates::STATE_MONITORING) {
         return;
     }
 
-    if ((int32_t)(edge_ms - monitor_entered_ms) < (int32_t)MONITOR_REARM_MS) {
+    if ((int32_t)(edge_ms - monitor_entered_ms) < (int32_t)rearm_ms) {
         Serial.print(F("FSM: any-motion ignored, re-arm blanking \r\n"));
         return;
     }
@@ -182,7 +196,106 @@ void MovementService::fsm_run()
         if (last_state != MotionStates::STATE_CALIBERATION) {
             Serial.print(F("FSM: Performing Self Calibration \r\n"));
             last_state = MotionStates::STATE_CALIBERATION;
+#if LATCHED_FSM
+            /*
+             * Learn the lateral noise floor over the same window that
+             * measures the z zero. The deployment sequence guarantees this
+             * runs at rest, on the counterweight, in the building -- see
+             * lateral.h.
+             */
+            lat_monitor.calib_begin(millis());
+            calib_moved = false;
+#endif
         }
+
+#if LATCHED_FSM
+        if ((millis() - start_timer) > CALIB_TIMEOUT_MS) {
+            bool ok;
+
+            ok = lat_monitor.calib_finish();
+
+            Serial.print(F("XY: calib b="));
+            Serial.print(lat_monitor.buckets());
+            Serial.print(F(" peak="));
+            Serial.print(lat_monitor.calib_peak(), 4);
+            Serial.print(F(" mv="));
+            Serial.print(calib_moved ? 1 : 0);
+            Serial.print(F("\r\n"));
+
+            /*
+             * Retry rather than trust a window that saw movement or came back
+             * short of samples. The z zero is recomputed with it -- a window
+             * that cannot be trusted for x/y cannot be trusted for z either.
+             */
+            if ((!ok || calib_moved) && calib_attempts < CALIB_RETRIES) {
+                calib_attempts++;
+                Serial.print(F("FSM: NOT READY - recalibrating, attempt "));
+                Serial.print(calib_attempts + 1);
+                Serial.print(F("\r\n"));
+                start_timer = millis();
+                lat_monitor.calib_begin(millis());
+                calib_moved = false;
+                break;
+            }
+
+            if (!ok || calib_moved) {
+                lat_monitor.arm_fallback();
+                Serial.print(F("FSM: READY (fallback) - site not measurable, "
+                               "expect a twitchy device \r\n"));
+            } else if (lat_monitor.noisy()) {
+                Serial.print(F("FSM: READY (noisy) - lateral floor at the "
+                               "clamp \r\n"));
+            } else {
+                Serial.print(F("FSM: READY \r\n"));
+            }
+
+            /*
+             * CAPTURE THE ZERO BEFORE MAKING ANY NOISE.
+             *
+             * ready_signal() drives the piezo directly and does NOT set
+             * alarm_status_g, so the timer ISR keeps sampling right through
+             * it -- unlike enable_alarm(), which the old code used here and
+             * which blanks the sensor as a side effect. A 4-sample average at
+             * 3.13 Hz spans 1.28 s, so reading it after a chirp of up to 1 s
+             * would capture a baseline built mostly out of piezo ringing and
+             * hand it to the FSM as "at rest" for the whole deployment.
+             */
+            zero_calib_value = acceleration_avg_ref->avg();
+            threshold_value = DEFAULT_THRESHOLD_VALUE;
+
+            Serial.print(F("-------------------------------------\r\n"));
+            Serial.print(F("Zero-Calib-Value : "));
+            Serial.print(zero_calib_value, 6);
+            Serial.print(F("\r\n"));
+            Serial.print(F("Threshold-Value  : "));
+            Serial.print(threshold_value, 6);
+            Serial.print(F("\r\n"));
+            Serial.print(F("XY-Still-Value   : "));
+            Serial.print(lat_monitor.still(), 4);
+            Serial.print(F("\r\n"));
+            Serial.print(F("-------------------------------------\r\n"));
+
+            /*
+             * Now make the noise, and re-anchor afterwards so the first
+             * monitored metric is not a difference across the chirp.
+             */
+            ready_signal((!ok || calib_moved || lat_monitor.noisy()) ? 3 : 1);
+            lat_monitor.drop_anchor();
+
+            /*
+             * And flush the z average for the same reason STATE_STOPPED does:
+             * the chirp is still sitting in the window, and a 4-sample
+             * average holding it would clear DEFAULT_THRESHOLD_VALUE the
+             * instant monitoring begins -- the unit would announce a
+             * departure caused by its own ready signal. MONITOR_REARM_MS
+             * covers the any-motion side of the same problem.
+             */
+            acceleration_avg_ref->fill(zero_calib_value);
+
+            set_state(STATE_MONITORING);
+        }
+        break;
+#else
         if ((millis() - start_timer) > (CALIB_TIMEOUT_MS - 1000)) {
             enable_alarm();
         }
@@ -203,6 +316,7 @@ void MovementService::fsm_run()
             disable_alarm();
         }
         break;
+#endif
 
     case MotionStates::STATE_MONITORING:
         if (last_state != MotionStates::STATE_MONITORING) {
@@ -369,6 +483,14 @@ void MovementService::fsm_run()
         if (last_state != MotionStates::STATE_MOVING) {
             Serial.print(F("FSM: Transitioned to STATE_MOVING \r\n"));
             last_state = MotionStates::STATE_MOVING;
+#if LATCHED_FSM
+            /*
+             * Quiet observed before the beacon started says nothing about the
+             * run that has just begun.
+             */
+            lat_monitor.clear_quiet();
+            rearm_ms = MONITOR_REARM_MS;
+#endif
         }
 
         /*
@@ -408,6 +530,55 @@ void MovementService::fsm_run()
             delta_accel = present_accel - zero_calib_value;
         else if (present_accel < zero_calib_value)
             delta_accel = zero_calib_value - present_accel;
+
+        /*
+         * 0. PRIMARY UNDER THE Z + X/Y DESIGN -- lateral stillness.
+         *
+         * Z cannot answer "is it still moving": at constant velocity it reads
+         * 1 g, exactly as it does parked (§3). Every path below is therefore
+         * hunting for an arrival TRANSIENT, and §14.7 measured a real gentle
+         * arrival smaller than the parked noise floor -- there are stops that
+         * produce no transient to find. X/Y is not looking for the stop at
+         * all; it is looking for the absence of travel afterwards, which is a
+         * level and does not care how gently the machine set down.
+         *
+         * This releases straight to STATE_STOPPED rather than through
+         * STATE_DECELERATING. That state exists to hold the beacon through
+         * levelling by demanding STOP_CONFIRM_MS (5 s) of quiet z; x/y
+         * handles levelling structurally, because a levelling counterweight
+         * is genuinely moving and cannot produce quiet lateral metrics. Going
+         * through it would add 5 s to a reset budget of 1-3 s.
+         *
+         * Buzzer coupling -- risk 1, the largest known hole -- is bounded
+         * here by construction rather than by tuning: the timer ISR drops
+         * every sample taken while the piezo is driven, so the metrics that
+         * reach this test come only from the ~250 ms quiet phase of each beep
+         * cycle. Whether that is enough is the bench measurement this build
+         * exists to make. If the piezo holds the metric above the threshold
+         * anyway, the symptom is unmistakable: the beacon never releases and
+         * every run ends on FAILSAFE.
+         */
+#if XY_RELEASE_ARMED
+        if (!arrival_seen && lat_monitor.armed() &&
+            (current_time - movement_start_timer) > XY_MIN_BEACON_MS &&
+            lat_monitor.quiet_run() >= XY_RELEASE_POLLS) {
+
+            arrival_seen = true;
+            Serial.print(F("FSM: Release (x/y still) m="));
+            Serial.print(lat_monitor.m(), 4);
+            Serial.print(F(" xs="));
+            Serial.print(lat_monitor.still(), 4);
+            Serial.print(F(" q="));
+            Serial.print(lat_monitor.quiet_run());
+            Serial.print(F("\r\n"));
+
+            rearm_ms = XY_REARM_MS;
+            disable_alarm();
+            disable_chase_leds();
+            set_state(STATE_STOPPED);
+            break;
+        }
+#endif
 
         /*
          * MIN_TRAVEL_MS keeps the departure transient itself from satisfying any

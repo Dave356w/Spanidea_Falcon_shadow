@@ -38,6 +38,14 @@ new_re = re.compile(
 # Sensor fault line: "t=... a=ERR er=N st=... rd=... ov=... tk=... im=..."
 err_re = re.compile(r"t=(\d+)\s+a=ERR\s+er=(\d+)\s+st=(\d+)")
 
+# Lateral stillness fields, appended to the sample line by the Z + X/Y build.
+# m= is |dx|+|dy| between consecutive UNBLANKED samples and q= the consecutive
+# count under the learned threshold. Searched separately from new_re so that
+# captures from older firmware keep parsing unchanged.
+xym_re = re.compile(r"\sm=(-?\d+\.?\d*)\s+q=(\d+)")
+xycal_re = re.compile(r"XY:\s*calib\s+b=(\d+)\s+peak=(-?\d+\.?\d*)\s+mv=(\d+)")
+xystill_re = re.compile(r"XY-Still-Value\s*:\s*(-?\d+\.?\d*)")
+
 # Any-motion interrupt edge, and the status poll that clears it.
 accint_re  = re.compile(r"ACC-INT\s+n=(\d+)\s+t=(\d+)\s+st=(\d+)\s+bz=(\d+)(?:\s+pin=(\d+))?")
 accstat_re = re.compile(r"ACC-STAT\s+s=0x([0-9A-Fa-f]+)\s+pin=(\d+)\s+n=(\d+)")
@@ -48,6 +56,7 @@ LATCH_RE = (
     ("arr_int",   re.compile(r"FSM:\s*Arrival \(any-motion\), edges (\d+)")),
     ("arr_poll",  re.compile(r"FSM:\s*Arrival \(polled\), delta (-?\d+\.?\d*)")),
     ("stillness", re.compile(r"FSM:\s*Released on stillness")),
+    ("xy_rel",    re.compile(r"FSM:\s*Release \(x/y still\) m=(-?\d+\.?\d*)")),
     ("failsafe",  re.compile(r"FSM:\s*FAILSAFE")),
     ("blanked",   re.compile(r"FSM:\s*any-motion ignored")),
     ("stopped",   re.compile(r"FSM:\s*Transitioned to STATE_MONITORING")),
@@ -78,6 +87,10 @@ class Capture(object):
         self.edges = []          # (t_ms, state, bz) per ACC-INT
         self.latch = []          # (t_ms, kind, detail) FSM lifecycle
         self.errs = []           # (t_ms, consecutive) sensor read failures
+        self.xy_m = []           # lateral metric per sample, None if absent
+        self.xy_q = []           # quiet run per sample
+        self.xy_still = None     # learned threshold, m/s^2
+        self.xy_calib = None     # (buckets, peak, moved)
         self._parse()
 
     def _parse(self):
@@ -99,6 +112,9 @@ class Capture(object):
                 self.read_us.append(int(m.group(5)) if m.group(5) else None)
                 self.overrun.append(int(m.group(6)) if m.group(6) else None)
                 self.im.append(int(m.group(7)) if m.group(7) else None)
+                xy = xym_re.search(s)
+                self.xy_m.append(float(xy.group(1)) if xy else None)
+                self.xy_q.append(int(xy.group(2)) if xy else None)
                 continue
 
             m = old_re.search(s) or old_gonly_re.search(s)
@@ -113,6 +129,8 @@ class Capture(object):
                 self.read_us.append(None)
                 self.overrun.append(None)
                 self.im.append(None)
+                self.xy_m.append(None)
+                self.xy_q.append(None)
                 continue
 
             # --- new-format lines the old parser mistook for corruption -----
@@ -124,6 +142,19 @@ class Capture(object):
 
             if accstat_re.search(s):
                 continue          # status poll: healthy, carries no new data
+
+            m = xycal_re.search(s)
+            if m:
+                self.xy_calib = (int(m.group(1)), float(m.group(2)),
+                                 int(m.group(3)))
+                self.marks.append((len(self.accel), "event", s))
+                continue
+
+            m = xystill_re.search(s)
+            if m:
+                self.xy_still = float(m.group(1))
+                self.marks.append((len(self.accel), "event", s))
+                continue
 
             m = err_re.search(s)
             if m:
@@ -250,6 +281,7 @@ class Capture(object):
         for i, _, s in corrupt:
             print("      sample %d: %s" % (i, s[:60]))
 
+        report_xy(self)
         report_runs(self)
 
         print("  events:")
@@ -262,6 +294,63 @@ class Capture(object):
                     t = " t~%.1fs" % (i / rate)
                 print("    [%5d]%s %s" % (i, t, s))
         print("")
+
+
+def report_xy(cap):
+    """Lateral stillness summary -- the RESET half of the Z + X/Y design.
+
+    The contrast this prints is the whole question. XY_STILL is learned from a
+    parked window, so what decides whether the design works is where the
+    metric sits while the beacon is sounding:
+
+      beacon metric ABOVE the threshold, always  -> never releases, every run
+                                                    ends on FAILSAFE. If the
+                                                    unit was stationary, that
+                                                    is the buzzer holding x/y
+                                                    up -- risk 1
+      beacon metric BELOW it while travelling    -> releases mid-travel, the
+                                                    dangerous direction
+      below while stopped, above while moving    -> the design works
+
+    Split by FSM state rather than by wall clock: st=4 is STATE_MOVING (beacon
+    on), st=2 is STATE_MONITORING (armed and silent).
+    """
+    have = [v for v in cap.xy_m if v is not None]
+    if not have:
+        return
+
+    print("  lateral (x/y):")
+    if cap.xy_calib:
+        b, peak, moved = cap.xy_calib
+        print("    calibration    : %d buckets, peak %.4f, moved=%d%s"
+              % (b, peak, moved, "   <-- REJECTED" if moved else ""))
+    if cap.xy_still is not None:
+        print("    XY_STILL       : %.4f m/s^2" % cap.xy_still)
+
+    def band(states):
+        return [cap.xy_m[k] for k in range(len(cap.xy_m))
+                if cap.xy_m[k] is not None and k < len(cap.state)
+                and cap.state[k] in states]
+
+    for label, states in (("monitoring (silent)", (2,)),
+                          ("beacon (st=4)", (4,)),
+                          ("decelerating", (5,))):
+        vals = band(states)
+        if not vals:
+            continue
+        line = ("    %-15s: n=%-4d min %.4f  median %.4f  max %.4f"
+                % (label, len(vals), min(vals), st.median(vals), max(vals)))
+        if cap.xy_still is not None:
+            under = sum(1 for v in vals if v < cap.xy_still)
+            line += "   %d%% under XY_STILL" % (100 * under / len(vals))
+        print(line)
+
+    if cap.xy_still is not None:
+        beacon = band((4,))
+        if beacon and min(beacon) >= cap.xy_still:
+            print("    ** the metric NEVER got under XY_STILL while sounding."
+                  " If the unit was stationary this is risk 1: the buzzer is"
+                  " holding x/y up and the beacon can never release. **")
 
 
 def report_runs(cap):
@@ -296,7 +385,8 @@ def report_runs(cap):
         t = at(idx)
         if kind == "departure":
             open_run = {"start": t, "release": None, "detail": None}
-        elif kind in ("arr_int", "arr_poll", "stillness", "failsafe") and open_run:
+        elif kind in ("arr_int", "arr_poll", "stillness", "xy_rel",
+                      "failsafe") and open_run:
             open_run["release"] = t
             open_run["detail"] = (kind, detail)
             runs.append(open_run)
@@ -306,7 +396,8 @@ def report_runs(cap):
         runs.append(open_run)
 
     LABEL = {"arr_int": "any-motion", "arr_poll": "polled",
-             "stillness": "STILLNESS", "failsafe": "FAILSAFE"}
+             "stillness": "STILLNESS", "xy_rel": "x/y still m=",
+             "failsafe": "FAILSAFE"}
 
     print("  latched-FSM runs:")
 

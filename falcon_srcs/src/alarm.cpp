@@ -332,6 +332,33 @@ bool get_buzzer_status()
     return (buzzer_on);
 }
 
+/*
+ * Blocking chirp pattern used to report the calibration result.
+ *
+ * "Signals ready to use" is the only rich channel this product has -- the one
+ * moment the mechanic is standing beside the device rather than a hoistway
+ * away from it. One chirp is a clean arm; three say the unit armed but the
+ * site could not be measured and it will be twitchy.
+ *
+ * Blocking is acceptable and nothing else is: this runs at the end of
+ * STATE_CALIBERATION, before the FSM is armed, so there is no beacon to
+ * delay. It is deliberately NOT built out of enable_alarm(), whose duty cycle
+ * is a sensing parameter that must not be repurposed for UX.
+ */
+void ready_signal(uint8_t chirps)
+{
+    while (chirps--) {
+        digitalWrite(PIN_PIEZO, HIGH);
+        digitalWrite(PIN_CHASE_LED, HIGH);
+        delay(READY_CHIRP_MS);
+        digitalWrite(PIN_PIEZO, LOW);
+        digitalWrite(PIN_CHASE_LED, LOW);
+        if (chirps) {
+            delay(READY_CHIRP_MS);
+        }
+    }
+}
+
 uint8_t get_alarm_status()
 {
     uint8_t al_status = alarm_status_g | battery_alarm_status_g;

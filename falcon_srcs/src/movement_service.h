@@ -2,6 +2,7 @@
 #include "alarm.h"
 #include "RollingAvg.h"
 #include "velocity.h"
+#include "lateral.h"
 
 #define TEMP_WAIT                      100
 #define VEL_MAX_LIMIT                  (2.0)
@@ -9,7 +10,65 @@
 #define VEL_THRESHOLD_ADJ              2
 #define MOVING_ACC_THRESHOLD           (0.05)
 #define CALIB_TIMEOUT_MS               10000
-#define MOVEMENT_DETECTION_TIMEOUT_MS  1000
+
+/*
+ * How many times a rejected calibration window is repeated before the device
+ * arms on XY_STILL_FALLBACK anyway.
+ *
+ * ⚠️ DELIBERATE DEVIATION from the spec, which says "refuse to arm if the
+ * calibration window shows movement". Refusing outright leaves a device on a
+ * counterweight that never beacons at all, and a silent device is the one
+ * failure the spec calls unrecoverable -- the mechanic is ranging the
+ * counterweight by ear. So what is refused here is the LEARNED THRESHOLD, not
+ * arming: after the retries the unit arms on the low compile-time floor,
+ * which makes it over-eager rather than deaf, and says so out loud at the one
+ * moment someone is holding it.
+ *
+ * Two retries puts the worst case at 30 s of calibration, which is inside the
+ * 20-30 s the spec already asks about as a UX question.
+ */
+#define CALIB_RETRIES                  2
+
+/*
+ * How long STATE_MOVEMENT_DETECTED dwells before the beacon sounds.
+ *
+ * Lowered 1000 -> 200 on 2026-08-10. The bench measured set latency at 1115
+ * and 1065 ms across two runs, essentially all of it this dwell. That is
+ * inside the 1-3 s budget, so this is not a requirement fix -- it is the
+ * SECOND working-range axis, minimum burst DURATION.
+ *
+ * A sub-second jog still alarms: the latch fires on the any-motion edge and
+ * nothing downstream can cancel it. What the dwell did was start the beacon
+ * AFTER the jog ended -- a 0.25 s inspection jog sounded from 1.1 s to 2.6 s
+ * over an already-stationary counterweight. For a beacon the mechanic ranges
+ * by ear that asserts "moving now" about a thing that has stopped, which is
+ * the same family of position lie the whole design exists to avoid. And
+ * inspection operation is continuous-pressure, so bursts are the normal case.
+ *
+ * The dwell bought nothing on the path that matters. It is a debounce
+ * inherited from the polled threshold test, where a single noisy 4-sample
+ * average could latch. Any-motion is already debounced in hardware --
+ * ANYMOTION_THRESHOLD sustained over ANYMOTION_DURATION at 100 Hz -- so for
+ * the detector that actually catches departures it was redundant.
+ *
+ * NOT ZERO, deliberately. STATE_MOVEMENT_DETECTED is where vel_departure
+ * accumulates its peak across the departure ramp; at zero dwell that collapses
+ * to a single sample. That measurement is instrumentation today (VEL_ARMED 0)
+ * but it is what would arm the velocity path later, and degrading it silently
+ * would be paid for much later. 200 ms still spans a sample at 3.13 Hz.
+ *
+ * COUPLING, since it is not obvious: this moves movement_start_timer 800 ms
+ * earlier, and that is the reference for both MIN_TRAVEL_MS (3000) and
+ * XY_MIN_BEACON_MS (1500). Both still clear the departure transient with
+ * room, but anything that shortens either of those must be checked against
+ * this number rather than against the old 1 s.
+ *
+ * ⬜ THE DURATION AXIS IS STILL UNMEASURED. No deliberate short jog has ever
+ * been recorded on this device. The test is cheap -- taps at roughly 0.25,
+ * 0.5, 1 and 2 s -- and until it is run, "the beacon starts during the
+ * movement" is reasoning, not a measurement.
+ */
+#define MOVEMENT_DETECTION_TIMEOUT_MS  200
 #define STOP_TIMEOUT_MS                15000
 
 /*
@@ -307,6 +366,27 @@ class MovementService {
 
     /* Edge-detect on the departure gate so the log gets one line, not many. */
     bool     vel_reported;
+
+    /*
+     * Re-arm blanking to apply on the NEXT entry to STATE_MONITORING.
+     *
+     * Set per release path rather than fixed, because the two paths have
+     * opposite requirements. A z arrival is followed by ringing that would
+     * re-latch, so it needs MONITOR_REARM_MS. An x/y release has already
+     * observed XY_RELEASE_POLLS quiet metrics, so the ringing is over and
+     * 6 s of deafness would only lose the next inspection jog. See
+     * XY_REARM_MS.
+     */
+    uint32_t rearm_ms;
+
+    /*
+     * Calibration bookkeeping for the learned XY_STILL. calib_moved is set by
+     * an any-motion edge during the window; calib_attempts bounds how many
+     * times a rejected window is retried before the device arms on the
+     * conservative fallback instead.
+     */
+    bool     calib_moved;
+    uint8_t  calib_attempts;
 #endif
 
     void reset_counters();

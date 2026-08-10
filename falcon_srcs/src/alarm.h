@@ -54,6 +54,9 @@
 #define BUZZER_ON_STEPS           2
 #define BATTERY_FLASH_TIME_MS     600
 
+/* Length of one ready-signal chirp, and of the gap between chirps. */
+#define READY_CHIRP_MS            200
+
 /*
  * How long the accelerometer stays blanked after PIN_PIEZO drops, milliseconds.
  *
@@ -84,5 +87,6 @@ void disable_chase_leds();
 void disable_battery_alarm();
 uint8_t get_alarm_status();
 bool get_buzzer_status();
+void ready_signal(uint8_t chirps);
 
 #endif
