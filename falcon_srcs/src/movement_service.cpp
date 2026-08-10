@@ -5,6 +5,11 @@
 
 extern float get_threshold_data();
 
+/* Raw-sample arrival peak, maintained in the sampling ISR. See main.cpp. */
+extern void  arrival_peak_reset();
+extern float arrival_peak_get();
+extern void  arrival_zero_set(float z);
+
 MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, float *adj_acc, float *vel_ms, RollingAvg<float> *pres_avg)
 {
     acc_varience_counter = 0;
@@ -263,6 +268,9 @@ void MovementService::fsm_run()
             zero_calib_value = acceleration_avg_ref->avg();
             threshold_value = DEFAULT_THRESHOLD_VALUE;
 
+            /* The raw peak detector measures against the same baseline. */
+            arrival_zero_set(zero_calib_value);
+
             Serial.print(F("-------------------------------------\r\n"));
             Serial.print(F("Zero-Calib-Value : "));
             Serial.print(zero_calib_value, 6);
@@ -490,6 +498,12 @@ void MovementService::fsm_run()
              */
             lat_monitor.clear_quiet();
             rearm_ms = MONITOR_REARM_MS;
+
+            /*
+             * Start the raw peak detector for this run. It stays disarmed
+             * until the departure transient has died away -- see main.cpp.
+             */
+            arrival_peak_reset();
 #endif
         }
 
@@ -600,13 +614,13 @@ void MovementService::fsm_run()
              */
             if (arrival_edge_count >= ARRIVAL_EDGE_COUNT &&
                 (uint32_t)(current_time - arrival_edge_first) <= ARRIVAL_EDGE_WINDOW_MS &&
-                delta_accel > ARRIVAL_CLUSTER_DELTA) {
+                arrival_peak_get() > ARRIVAL_PEAK_VALUE) {
 
                 arrival_seen = true;
                 Serial.print(F("FSM: Arrival (any-motion), edges "));
                 Serial.print(arrival_edge_count);
-                Serial.print(F(" delta "));
-                Serial.print(delta_accel, 3);
+                Serial.print(F(" peak "));
+                Serial.print(arrival_peak_get(), 3);
                 Serial.print(F("\r\n"));
                 start_timer = millis();
                 set_state(STATE_DECELERATING);
@@ -687,10 +701,10 @@ void MovementService::fsm_run()
              * the interrupt, so it still works if that path fails. Only reaches
              * violent stops now that the threshold is 0.30; that is deliberate.
              */
-            if (delta_accel > ARRIVAL_THRESHOLD_VALUE) {
+            if (arrival_peak_get() > ARRIVAL_THRESHOLD_VALUE) {
                 arrival_seen = true;
-                Serial.print(F("FSM: Arrival (polled), delta "));
-                Serial.print(delta_accel, 6);
+                Serial.print(F("FSM: Arrival (polled), peak "));
+                Serial.print(arrival_peak_get(), 3);
                 Serial.print(F("\r\n"));
                 start_timer = millis();
                 set_state(STATE_DECELERATING);

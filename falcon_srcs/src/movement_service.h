@@ -173,6 +173,36 @@
 #define ARRIVAL_CLUSTER_DELTA          (0.20)
 
 /*
+ * ⬆️ SUPERSEDED at 25 Hz by ARRIVAL_PEAK_VALUE below. Kept for the record and
+ * for anyone reverting the sample rate.
+ *
+ * ARRIVAL_CLUSTER_DELTA and ARRIVAL_THRESHOLD_VALUE both read the rolling
+ * average, and on 2026-08-10 the first 25 Hz run showed why that no longer
+ * works: a stop whose RAW excursion was 0.938 m/s^2 registered 0.0072 on the
+ * 1.28 s average, because one large sample inside a 32-sample window is
+ * divided by 32. The signal did not get smaller -- the averaging got longer.
+ */
+
+/*
+ * Arrival corroboration, on the RAW sample. See main.cpp's ARRIVAL_QUIET_MSS
+ * block for how the peak is collected and why it is armed on quiet rather
+ * than on a timer.
+ *
+ * Measured on the first 25 Hz run, cartop, 5-floor slow descent:
+ *
+ *   cruise raw peak      0.0875   (95 logged samples; the log is decimated
+ *                                  8:1 so the true population max is higher)
+ *   brake-set bounce     0.938    = 10.7x
+ *
+ * 0.40 sits ~4.5x above the observed cruise peak and ~2.3x below the observed
+ * arrival. Every other arrival discriminator this project has measured had a
+ * margin between 1.07x and 1.4x, so this is the first one with real room --
+ * but it rests on ONE run, and the cruise figure is from a decimated log.
+ * Re-derive both from a full-rate capture before trusting the number.
+ */
+#define ARRIVAL_PEAK_VALUE             (0.40)
+
+/*
  * ⛔ NO STILLNESS BACKSTOP -- do not reintroduce one.
  *
  * A "release the latch if the signal has been quiet for N seconds" path was

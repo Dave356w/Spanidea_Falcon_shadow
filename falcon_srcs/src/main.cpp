@@ -23,7 +23,23 @@ float acc_mss_g = 0.0, vel_ms_g = 0.0, adj_acc_g = 0.0;
 SystemStates state = SystemStates::SYSTEM_STATE_INITIALIZING;
 static boolean in_isr = false;
 RollingAvg<float> pressure_avg_g(2);
-RollingAvg<float> acceleration_avg_g(4);
+/*
+ * 4 -> 32 alongside the 3.13 Hz -> 25 Hz timer change (see enable_timer()).
+ *
+ * THE WINDOW LENGTH IN SECONDS IS DELIBERATELY UNCHANGED: 4 samples at 3.13 Hz
+ * and 32 at 25 Hz both span 1.28 s. Every threshold that reads this average --
+ * DEFAULT_THRESHOLD_VALUE, ARRIVAL_THRESHOLD_VALUE, ARRIVAL_CLUSTER_DELTA,
+ * STOP_BAND_VALUE -- therefore keeps exactly the meaning it was tuned to, and
+ * the sample-rate change does not silently retune the FSM.
+ *
+ * What DOES change is what the average is made of: 32 real samples instead of
+ * 4 aliased ones. Averaging 8x more independent samples over the same interval
+ * cuts the noise by about sqrt(8) = 2.8x while leaving a genuine 1 s transient
+ * untouched. That ratio is the entire point of the exercise -- §14.7's gentle
+ * arrival measured 0.058 against a parked noise floor of 0.103, and a 2.8x
+ * quieter floor is what would make it visible.
+ */
+RollingAvg<float> acceleration_avg_g(32);
 //RollingAvg<float> adj_acc_avg_g(16);
 RollingAvg<uint16_t> battery_avg(8);
 float x = 0, y = 0, z = 0;
@@ -117,6 +133,71 @@ static volatile uint16_t     sensor_err_total = 0;
 static volatile uint8_t      sensor_err_run   = 0;
 
 /*
+ * RAW-SAMPLE ARRIVAL PEAK -- roadmap item 5's payoff, 2026-08-10.
+ *
+ * The brake energising at the end of a run produces an abrupt bounce (Dave,
+ * on the cartop: "rollback upon brake energization ... abrupt up and down
+ * bounce"). Measured on the first 25 Hz run it reached 0.938 m/s^2 against a
+ * cruise raw maximum of 0.0875 -- a 10x separation, where every other arrival
+ * signal this project has tried managed 1.07x to 1.4x.
+ *
+ * IT IS INVISIBLE TO THE ROLLING AVERAGE. One large sample inside a 32-sample
+ * window is divided by 32: the same stop reported 0.0072 on avg, against an
+ * ARRIVAL_CLUSTER_DELTA of 0.20. The averaging destroys precisely the signal
+ * that the sample-rate fix just made visible, which is why arrival now reads
+ * the RAW value and the average is left to the departure and stop-band tests
+ * it was tuned for.
+ *
+ * At 3.13 Hz this could not have worked: an ~80 ms bounce falls between
+ * samples taken 320 ms apart most of the time, and a detector that sees a
+ * quarter of the events it is looking for is not a detector.
+ *
+ * Tracked as a RUNNING MAX in the ISR rather than sampled from the published
+ * snapshot, because ~20% of snapshots are currently lost to overrun and the
+ * peak must not be one of them. A max is monotonic, so a lost publish costs
+ * nothing.
+ *
+ * ARMING: the departure produces a bounce of its own, so the peak is not
+ * collected until the signal has been quiet for ARRIVAL_ARM_SAMPLES -- the
+ * detector waits for the departure transient to end rather than for a fixed
+ * time to elapse. That is what makes it a SECOND transient rather than a
+ * timer, and it is the property MIN_TRAVEL_MS was approximating badly.
+ */
+#define ARRIVAL_QUIET_MSS      (0.15f)   /* above cruise raw max 0.0875      */
+#define ARRIVAL_ARM_SAMPLES    5         /* 200 ms of quiet at 25 Hz         */
+
+static volatile float   arr_zero    = 0.0f;  /* baseline, published by FSM   */
+static volatile float   arr_peak    = 0.0f;  /* max |a - zero| while armed   */
+static volatile uint8_t arr_quiet   = 0;
+static volatile bool    arr_armed   = false;
+
+/* Called from the FSM on entering STATE_MOVING. */
+void arrival_peak_reset()
+{
+    noInterrupts();
+    arr_peak  = 0.0f;
+    arr_quiet = 0;
+    arr_armed = false;
+    interrupts();
+}
+
+float arrival_peak_get()
+{
+    float v;
+    noInterrupts();
+    v = arr_peak;
+    interrupts();
+    return v;
+}
+
+void arrival_zero_set(float z)
+{
+    noInterrupts();
+    arr_zero = z;
+    interrupts();
+}
+
+/*
  * Cleared until acceleration_avg_g has been primed from a real sample. See
  * read_acceleration_mss() for why an unprimed window is dangerous.
  */
@@ -127,7 +208,28 @@ static volatile bool         accel_avg_primed = false;
  * line per sample costs about 15% of the 9600 baud budget. Raise this when the
  * timer is fixed to 100 Hz, or serial becomes the new bottleneck.
  */
-#define LOG_DECIMATE_N  1
+/*
+ * 1 -> 8 with the move to 25 Hz, to hold the serial load where it already was.
+ *
+ * A sample line is ~145 characters, which at 9600 baud takes ~151 ms to send.
+ * One line per sample was 47% of the budget at 3.13 Hz; at 25 Hz it would be
+ * 3.8x more than the link can carry. 8 gives 3.1 lines/s -- the same 47%.
+ *
+ * ⚠️ Serial.print() BLOCKS once the 64-byte TX buffer fills, for roughly 85 ms
+ * of each line. The ISR keeps running through that (it is an interrupt), but
+ * loop() does not, so a snapshot can be overwritten before it is consumed --
+ * which is what ov= counts. At 3.13 Hz a 151 ms line fitted inside a 320 ms
+ * period with room to spare; at 25 Hz it spans two 40 ms periods.
+ *
+ * EXPECT ov= TO GROW, and read it as sample loss in the detectors, not just in
+ * the log -- vel_window and lat_monitor are fed from the same snapshot. Rough
+ * estimate is 2 samples lost per printed line, so ~25%. That is tolerable for
+ * characterising the new rate and NOT tolerable for shipping. The proper fix is
+ * a small ring buffer of samples in place of the single snapshot, so loop() can
+ * drain several after a blocking print; do that before trusting any threshold
+ * derived at this rate.
+ */
+#define LOG_DECIMATE_N  8
 
 /*
  * Battery thresholds, in raw ADC counts.
@@ -493,6 +595,26 @@ float read_acceleration_mss()
     }
 
     /*
+     * Raw arrival peak. Arm once the departure transient has died away, then
+     * hold the largest excursion seen. See the ARRIVAL_QUIET_MSS block.
+     */
+    {
+        float dev = fabs(accel_value - arr_zero);
+
+        if (!arr_armed) {
+            if (dev < ARRIVAL_QUIET_MSS) {
+                if (++arr_quiet >= ARRIVAL_ARM_SAMPLES) {
+                    arr_armed = true;
+                }
+            } else {
+                arr_quiet = 0;
+            }
+        } else if (dev > arr_peak) {
+            arr_peak = dev;
+        }
+    }
+
+    /*
      * Publish a snapshot for loop() to print. No serial I/O in here.
      */
     if (sample_pending) {
@@ -644,6 +766,15 @@ void emit_sample_log()
     Serial.print(F(" q="));
     Serial.print(lat_monitor.quiet_run());
 
+    /*
+     * Raw arrival peak. The log is decimated, so this is the ONLY way the
+     * capture shows what the detector actually saw -- the individual sample
+     * carrying the brake bounce is very unlikely to be one of the printed
+     * ones.
+     */
+    Serial.print(F(" pk="));
+    Serial.print(arrival_peak_get(), 2);
+
     if (err_total) {
         Serial.print(F(" et="));
         Serial.print(err_total);
@@ -683,15 +814,60 @@ void enable_timer()
      * document. This change is only about the timer STARTING predictably, so
      * the rate stays at 3.13 Hz and detection behaviour is unchanged.
      */
-    TCNT1 = 0;
-    OCR1A = 156;
+    /*
+     * ROADMAP ITEM 5, 2026-08-10. 3.13 Hz -> 25 Hz.
+     *
+     * The old configuration was phase-and-frequency-correct PWM (mode 9, TOP =
+     * OCR1A) with a 1024 prescaler and OCR1A = 156. That mode counts UP to TOP
+     * and back DOWN, so the period is doubled:
+     *
+     *     2 * 156 * 1024 / 1000000 = 319.5 ms  ->  3.13 Hz
+     *
+     * which is exactly the rate measured in every capture. Nothing wanted a PWM
+     * waveform here -- the timer exists only to raise an interrupt -- so CTC
+     * (mode 4) is both correct and half the period for the same numbers:
+     *
+     *     (624 + 1) * 64 / 1000000 = 40.000 ms  ->  25.000 Hz
+     *
+     * WHY 25 AND NOT 100. The I2C read of the accelerometer measures 7.5 ms
+     * (rd= in every log line), which is a hard floor on the sample period. At
+     * 25 Hz that is 19% of the budget. 100 Hz would be 75% and leaves nothing
+     * for the rest of the ISR; 50 Hz at 37% is probably reachable and should be
+     * earned by measurement, not assumed. Raising F_CPU off the 1 MHz fuse is
+     * what actually unlocks the sensor's full 100 Hz output rate.
+     *
+     * TCCR1A MUST BE CLEARED. Arduino's init() leaves WGM10 set, which combined
+     * with WGM13 is what selected mode 9 in the first place. CTC needs WGM12
+     * alone, so the low bits cannot be left to whatever ran before.
+     *
+     * ⚠️ THIS INVALIDATES SAMPLE-RATE-DEPENDENT TUNING. The rolling average is
+     * widened 4 -> 32 in step, so every threshold expressed against it keeps
+     * its 1.28 s time constant and its existing meaning. velocity.h's constants
+     * are NOT rescaled -- that module is unarmed, so w= changes meaning in the
+     * log but nothing acts on it. lateral.h needs no change: XY_STILL is
+     * learned at calibration and adapts to the new sample spacing by itself.
+     */
+    /*
+     * ORDER IS LOAD-BEARING, and getting it wrong cost a flash cycle on
+     * 2026-08-10. OCR1A is DOUBLE BUFFERED in every PWM waveform mode: the
+     * write lands in a shadow register and is only copied to OCR1A when the
+     * counter reaches TOP. Arduino's init() leaves WGM10 set in TCCR1A, so
+     * until TCCR1A is cleared the timer is in a PWM mode and any OCR1A write
+     * is buffered rather than applied.
+     *
+     * So: clear BOTH control registers first, which selects normal mode where
+     * OCR1A is written directly; then load TOP; then select CTC; then start
+     * the clock. Each step is only ever entered from a known state.
+     */
+    TCCR1A = 0;                 /* normal mode -- OCR1A writes go straight in */
+    TCNT1  = 0;
+    OCR1A  = 624;               /* TOP: (624+1) * 64 / 1e6 = 40.000 ms        */
 
-    // enable overflow interrupt
-    TIMSK1 |= (1 << OCIE1A);
-    TCCR1B |= (1 << WGM13);
+    TCCR1B = (1 << WGM12);      /* CTC, TOP = OCR1A                            */
+    TIMSK1 |= (1 << OCIE1A);    /* compare-match A interrupt                   */
 
-    // enable the internal clock with 1024 prescale -- start it last
-    TCCR1B |= ((1 << CS12) | (1 <<CS10));
+    /* clk/64 -- start the clock last, once everything else is settled */
+    TCCR1B |= ((1 << CS11) | (1 << CS10));
     sei();
 }
 #endif
