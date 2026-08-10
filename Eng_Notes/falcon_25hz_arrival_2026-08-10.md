@@ -185,4 +185,4 @@ On normal operation/leveling approach Z must show some deviation from cruise, ca
 a possible measure for release when z deviation is measured? 
 Jogging 1-2 runs can't separate a start/stop signal when produced back to back, 
 could x/y settle over 5 sec activate release? 
-A stable Z and stable x/y = no motion
+A stable Z and baseline stable x/y = no motion
