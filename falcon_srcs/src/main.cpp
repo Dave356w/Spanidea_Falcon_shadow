@@ -285,6 +285,45 @@ static volatile bool     arr_hit       = false;
 #define BURST_POST_DEP  60  /* departure: 20 pre / 60 post                   */
 #define BURST_POST_ARR  60  /* arrival:   20 pre / 60 post -- see burst_trigger */
 
+/*
+ * JOG VERDICT -- log-only classifier, NOT a release path (2026-08-11).
+ *
+ * A jog latches the alarm until the failsafe because its stop lands inside
+ * MIN_TRAVEL_MS and is discarded unseen. Three fixes are measured dead
+ * (velocity magnitude, lateral level, arm-on-quiet -- see
+ * falcon_signature_2026-08-11.md §5.1); every stillness/quiet approach dies
+ * on the same measured fact, that parked is NOISIER than cruise (0.064 vs
+ * 0.019/0.047).
+ *
+ * What survives is the impulse PAIR. A jog is a hand-jerk one way and a
+ * brake-jerk the other, net velocity ~0, inside ~1 s. A real departure is an
+ * impulse with no compensating partner -- the car keeps going. The 2026-08-11
+ * bursts put real 350 fpm departures at opposite/primary impulse ratios of
+ * 0.00-0.06; a jog's compensating brake shock demonstrably delivers its
+ * impulse (it integrated to 128% of true speed on the one measured stop), so
+ * the pair should land near 1.0. The earlier velocity-integral fix failed by
+ * comparing MAGNITUDES (a jog out-integrates a gentle 25 fpm ramp); this
+ * compares the two signs against each other and never references a speed.
+ *
+ * Runs once, when the departure burst freezes -- 3.2 s after the latch, so
+ * the whole jog (event, stop, aftermath) is inside the window. Armed, the
+ * verdict would release ~4 s in; unarmed it prints JOGV and does nothing.
+ *
+ * THE DEADBAND IS THE UNMEASURED PART. Cruise vibration is symmetric, so on
+ * a slow real departure (small one-signed impulse + 2.5 s of cruise) noise
+ * feeds both sides equally and inflates the ratio toward 1 -- the exact
+ * false-JOG that would silence the beacon on a moving car. 150 mm/s^2 sits
+ * above the cartop cruise peaks seen so far (70-280 windowed, raw samples
+ * mostly lower) but NO jog and NO slow-departure burst has been captured
+ * yet. DO NOT ARM until both populations exist and do not touch -- protocol
+ * §3.1, and the two structurally-dead fixes both looked right from a
+ * hoistway too.
+ */
+#define JOG_VERDICT_ARMED   0    /* log-only; release wiring not written    */
+#define JOG_DEADBAND_MMSS   150  /* samples below this feed neither impulse */
+#define JOG_OPP_RATIO_PCT   50   /* opposite/primary >= this -> jog...      */
+#define JOG_OPP_PEAK_MMSS   450  /* ...AND opposite-side peak >= this       */
+
 static volatile int16_t  burst[BURST_N];
 static volatile uint8_t  burst_head  = 0;
 static volatile uint8_t  burst_post  = 0xFF;   /* 0xFF = not triggered       */
@@ -932,6 +971,47 @@ void emit_burst_log()
         Serial.print(' ');
     }
     Serial.print(F("\r\n"));
+
+    /*
+     * Jog verdict, departure bursts only -- see the block above JOG_VERDICT_ARMED.
+     * Integer throughout: impulses in mm/s^2-samples (int32 headroom 80*32767),
+     * ratio in percent. Everything the verdict used is printed so thresholds
+     * can be re-derived from any log without reflashing.
+     */
+    if (burst_kind == 0) {
+        int32_t  pos = 0, neg = 0;      /* deadbanded impulse, each sign     */
+        int16_t  ppk = 0, npk = 0;      /* raw signed peaks, either sign     */
+        int16_t  sv;
+        uint8_t  ratio_pct;
+        int32_t  pri, opp;
+
+        for (i = 0; i < BURST_N; i++) {
+            sv = burst[(uint8_t)((head + i) % BURST_N)];
+            if (sv > ppk) ppk = sv;
+            if (sv < npk) npk = sv;
+            if (sv >  JOG_DEADBAND_MMSS) pos += sv;
+            if (sv < -JOG_DEADBAND_MMSS) neg -= sv;   /* neg accumulates positive */
+        }
+
+        pri = (pos >= neg) ? pos : neg;
+        opp = (pos >= neg) ? neg : pos;
+        /* opposite-side raw peak: the sign that contributed the smaller impulse */
+        sv  = (pos >= neg) ? (int16_t)-npk : ppk;
+
+        ratio_pct = (pri > 0) ? (uint8_t)((opp * 100) / pri) : 0;
+
+        Serial.print(F("JOGV pos="));  Serial.print(pos);
+        Serial.print(F(" neg="));      Serial.print(neg);
+        Serial.print(F(" ratio="));    Serial.print(ratio_pct);
+        Serial.print(F(" opk="));      Serial.print(sv);
+        Serial.print(F(" verdict="));
+        if (ratio_pct >= JOG_OPP_RATIO_PCT && sv >= JOG_OPP_PEAK_MMSS) {
+            Serial.print(F("JOG"));
+        } else {
+            Serial.print(F("RUN"));
+        }
+        Serial.print(F(" (unarmed)\r\n"));
+    }
 
     noInterrupts();
     burst_ready = false;
