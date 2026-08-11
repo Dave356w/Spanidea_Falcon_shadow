@@ -472,6 +472,18 @@ class MovementService {
      * (Eng_Notes §11) cannot do anything.
      */
     void notify_any_motion(uint32_t edge_ms);
+
+    /*
+     * Called from loop() when the departure-burst jog verdict reads JOG
+     * (main.cpp, JOG_VERDICT_ARMED). Requests a release: accepted only if
+     * the FSM is still in STATE_MOVING, consumed on the next fsm_run()
+     * pass through the same exit the failsafe uses (STATE_DECELERATING),
+     * so arming adds a trigger, not a new transition. Ignored in every
+     * other state -- if a real arrival beat the verdict to it, there is
+     * nothing left to release and no flag is left behind to leak into the
+     * next run (belt-and-braces: MOVING entry clears it too).
+     */
+    void jog_release(void);
 #endif
 
   private:
@@ -485,6 +497,7 @@ class MovementService {
 #if LATCHED_FSM
     bool     any_motion_pending;   /* departure seen, not yet acted on   */
     bool     arrival_seen;         /* arrival transient seen while MOVING */
+    bool     jog_release_pending = false;  /* jog verdict release request */
     uint32_t stop_confirm_timer;   /* start of the settled-at-1g window   */
     uint32_t monitor_entered_ms;   /* when STATE_MONITORING was entered   */
     uint8_t  arrival_edge_count;   /* any-motion edges inside the window  */

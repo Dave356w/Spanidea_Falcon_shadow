@@ -66,9 +66,17 @@ failure this product exists to prevent. Plan, per protocol §3.1:
    peak gate (rollback content grows slightly with speed: 396 → 440), and
    released normally (arrival peak 0.933). One more passive session of
    ordinary use remains the arming bar.
-3. ⬜ If nothing crosses, write the release wiring: verdict JOG →
-   silence + return to MONITORING, ~4 s after the latch. The jog defect
-   then costs one short chirp instead of a 240 s alarm.
+3. ⬛ **ARMED 2026-08-11, same day, on Dave's decision.** The
+   recommendation was one further passive session; the concern (n=4 jogs,
+   one car, one day) was raised, reaffirmed, and overruled — recorded
+   here and in the code comment. Release wiring: verdict JOG →
+   `MovementService::jog_release()` → accepted only in STATE_MOVING,
+   consumed next `fsm_run()` pass through the failsafe's own exit
+   (STATE_DECELERATING), flag cleared on every MOVING entry so no stale
+   verdict can leak into a later run. A jog now costs a ~4 s chirp
+   instead of a 240 s alarm. JOGV lines print `(armed)`. Flashed and
+   verified, 31658 bytes. **If a false JOG ever silences a moving car:
+   `JOG_VERDICT_ARMED` back to 0 first, diagnose from JOGV lines after.**
 
 ## 5. Session notes
 

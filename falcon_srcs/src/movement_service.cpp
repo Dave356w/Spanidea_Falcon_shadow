@@ -503,6 +503,7 @@ void MovementService::fsm_run()
              */
             lat_monitor.clear_quiet();
             rearm_ms = MONITOR_REARM_MS;
+            jog_release_pending = false;   /* no verdict from a past run   */
 
             /*
              * Start the raw peak detector for this run. It stays disarmed
@@ -577,6 +578,24 @@ void MovementService::fsm_run()
          * anyway, the symptom is unmistakable: the beacon never releases and
          * every run ends on FAILSAFE.
          */
+        /*
+         * Jog verdict release (main.cpp, JOG_VERDICT_ARMED). Checked before
+         * the arrival tests: the verdict arrives 3.2 s after the latch, when
+         * MIN_TRAVEL_MS still has the tests below blind -- that blindness IS
+         * the jog defect. Fires through the failsafe's own exit. Measured
+         * basis: 15/15 verdicts, populations opk <=440 (real) vs >=1914
+         * (jog), falcon_jog_verdict_2026-08-11.md. Armed on Dave's decision
+         * 2026-08-11 with n=4 jogs from one car and one day -- if a false
+         * JOG ever silences a moving car, disarm first, diagnose second.
+         */
+        if (jog_release_pending) {
+            jog_release_pending = false;
+            Serial.print(F("FSM: Release (jog verdict) \r\n"));
+            start_timer = millis();
+            set_state(STATE_DECELERATING);
+            break;
+        }
+
 #if XY_RELEASE_ARMED
         if (!arrival_seen && lat_monitor.armed() &&
             (current_time - movement_start_timer) > XY_MIN_BEACON_MS &&
@@ -1023,6 +1042,14 @@ void MovementService::setErrorResetState()
 void MovementService::set_state(int arg_state)
 {
     state = arg_state;
+}
+
+/* See the declaration comment in movement_service.h. */
+void MovementService::jog_release(void)
+{
+    if (state == MotionStates::STATE_MOVING) {
+        jog_release_pending = true;
+    }
 }
 
 int MovementService::get_state()

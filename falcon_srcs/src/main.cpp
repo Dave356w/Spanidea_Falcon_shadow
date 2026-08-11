@@ -339,7 +339,14 @@ static volatile bool     arr_hit       = false;
  * gates were 50/450; the rollback content of real slow departures (opk up
  * to 396) is what pushed the peak gate up, not the jogs.
  */
-#define JOG_VERDICT_ARMED   0    /* log-only; release wiring not written    */
+/*
+ * ARMED 2026-08-11, Dave's decision after the concern was raised and
+ * reaffirmed: evidence base is 15/15 but one day, one car, one mounting
+ * deep. A JOG verdict now silences the alarm ~4 s after the latch via
+ * MovementService::jog_release(). If a false JOG ever releases a moving
+ * car, set this back to 0 first and diagnose from the JOGV lines after.
+ */
+#define JOG_VERDICT_ARMED   1    /* verdict JOG -> release the latch        */
 #define JOG_DEADBAND_MMSS   150  /* samples below this feed neither impulse */
 #define JOG_OPP_RATIO_PCT   33   /* opposite/primary >= this -> jog...      */
 #define JOG_OPP_PEAK_MMSS   900  /* ...AND opposite-side peak >= this       */
@@ -1027,10 +1034,17 @@ void emit_burst_log()
         Serial.print(F(" verdict="));
         if (ratio_pct >= JOG_OPP_RATIO_PCT && sv >= JOG_OPP_PEAK_MMSS) {
             Serial.print(F("JOG"));
+#if JOG_VERDICT_ARMED
+            ms.jog_release();
+#endif
         } else {
             Serial.print(F("RUN"));
         }
+#if JOG_VERDICT_ARMED
+        Serial.print(F(" (armed)\r\n"));
+#else
         Serial.print(F(" (unarmed)\r\n"));
+#endif
     }
 
     noInterrupts();
