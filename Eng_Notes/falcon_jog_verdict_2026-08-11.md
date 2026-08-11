@@ -18,6 +18,7 @@ captured from the cartop with programmer and serial attached.** Log:
 | 6 | slow departure, down | 1145 | 8867 | 12 | 396 | RUN | ✔ |
 | 7 | slow departure, up | 6189 | 1276 | 20 | 338 | RUN | ✔ |
 | 8 | shortest blip jog | 8914 | 8529 | 95 | 1914 | JOG | ✔ |
+| 9 | 100 fpm departure, down (gap probe, after retune) | 1154 | 9558 | 12 | 440 | RUN | ✔ |
 
 The three slow runs all released normally on the peak detector (arrival
 peaks 2.575, 2.182, 1.012 — brake-set stops, the case that works).
@@ -26,7 +27,7 @@ peaks 2.575, 2.182, 1.012 — brake-set stops, the case that works).
 
 |  | ratio % | opk (mm/s²) |
 |---|---|---|
-| real departures, n=8 (this table's 3 slow + the 5× 350 fpm from the afternoon) | **0–20** | **27–396** |
+| real departures, n=9 (3 slow + 100 fpm + 5× 350 fpm) | **0–20** | **27–440** |
 | jogs, n=4 (blip to ~1 s, both directions) | **46–95** | **1914–3194** |
 
 **No overlap on either axis.** Ratio gap 2.3× (20 vs 46); opk gap **4.8×**
@@ -60,9 +61,11 @@ and the false-JOG failure (beacon silenced on a moving car) is the one
 failure this product exists to prevent. Plan, per protocol §3.1:
 
 1. ⬛ Retuned gates flashed, log-only (this commit).
-2. ⬜ One more cartop session of passive JOGV lines — jogs, slow runs, and
-   ideally a mid-speed (~100 fpm) departure, the untested gap between the
-   slow runs and 350 fpm.
+2. ⬛ Mid-speed gap probed same session: 100 fpm down departure read
+   RUN at ratio 12 / opk 440 against the retuned gates — 2.0× under the
+   peak gate (rollback content grows slightly with speed: 396 → 440), and
+   released normally (arrival peak 0.933). One more passive session of
+   ordinary use remains the arming bar.
 3. ⬜ If nothing crosses, write the release wiring: verdict JOG →
    silence + return to MONITORING, ~4 s after the latch. The jog defect
    then costs one short chirp instead of a 240 s alarm.
