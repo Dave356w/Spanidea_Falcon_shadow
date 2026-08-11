@@ -283,7 +283,7 @@ static volatile bool     arr_hit       = false;
  */
 #define BURST_N     80      /* 3.2 s at 25 Hz, 160 bytes                     */
 #define BURST_POST_DEP  60  /* departure: 20 pre / 60 post                   */
-#define BURST_POST_ARR  20  /* arrival:   60 pre / 20 post -- see burst_trigger */
+#define BURST_POST_ARR  60  /* arrival:   20 pre / 60 post -- see burst_trigger */
 
 static volatile int16_t  burst[BURST_N];
 static volatile uint8_t  burst_head  = 0;
@@ -304,12 +304,27 @@ static volatile uint8_t  burst_kind = 0;       /* 0 = departure, 1 = arrival */
  *     / 60 post, the pre-roll only there to catch the bounce that precedes the
  *     FSM knowing anything happened.
  *
- *   ARRIVAL fires at the END. The peak has to cross ARRIVAL_PEAK_VALUE before
- *     the FSM decides anything, so by the time this is called the stop is
- *     already underway or over. 60 pre / 20 post gives 2.4 s of history --
- *     enough to hold a smooth drive-controlled deceleration ramp, which is the
- *     whole reason this trigger exists. A fixed 20-sample pre-roll would have
- *     captured the tail and missed the ramp.
+ *   ARRIVAL fires wherever the peak first crosses ARRIVAL_PEAK_VALUE, and
+ *     WHERE THAT LANDS DEPENDS ON THE STOP:
+ *
+ *       slow brake stop -- the deceleration is too gentle to cross, so the FSM
+ *         waits and fires on the brake set, AFTER the ramp. Wants pre-heavy.
+ *       fast drive stop -- the ramp itself crosses, early in the deceleration.
+ *         Wants post-heavy.
+ *
+ *     These are irreconcilable in one split, and 20 pre / 60 post picks the
+ *     fast case, measured 2026-08-11: two 350 fpm automatic runs in a cab both
+ *     closed the window still at +/-0.61 m/s^2, having captured only 35-40% of
+ *     the speed change, so the full stop was never seen. A 350 fpm stop needs
+ *     ~2.9 s at the drive's ~0.6 m/s^2 and the ramp is already ~0.4 s old at
+ *     the trigger, so 60 post (2.4 s) covers nearly all of it and 20 pre (0.8 s)
+ *     comfortably holds the ramp's start.
+ *
+ *     THE COST IS THE SLOW-STOP DIAGNOSTIC: a 48 fpm ramp already fell outside
+ *     even a 2.4 s pre-roll (the trigger is downstream of the event), so that
+ *     case was not being captured either way -- but if it is ever chased, this
+ *     constant goes back to 20 and the fix is a separate lower trigger, not a
+ *     bigger window.
  *
  * Ignored if a burst is already armed or waiting to be dumped. On a short run
  * the departure burst may still be in flight when the arrival fires; the
