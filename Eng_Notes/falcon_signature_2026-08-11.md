@@ -187,6 +187,66 @@ there is now no reason to assume contrast is high there.
 
 ---
 
+## 4b. Thresholds re-measured at full sample rate
+
+The sample ring recovered the ~20% of samples the single slot was dropping, so
+every figure in §1.1 and in the 08-10 note was computed from 80% of the data.
+Re-measured on the full stream:
+
+| | full rate | previous (80%) |
+|---|---|---|
+| rest, max | **0.070** | 0.040 |
+| cruise ceiling, 64 fpm (14 s) | **0.200** | — |
+| cruise ceiling, 125 fpm (9.8 s) | **0.080** | 0.070 |
+| arrivals | **1.690, 1.217** | 0.713–4.58 |
+
+Parked noise rose ~50%, as expected — a denser stream has more chances to catch
+a peak. **`ARRIVAL_PEAK_VALUE` 0.45 survives: 2.25× above the worst cruise and
+2.7× below the weakest arrival of the day.**
+
+⬜ **But only for SHORT runs.** Both were 14 s and 9.8 s, giving 16 and 8 cruise
+points. A ceiling is a tail statistic and a max over 10 seconds systematically
+underestimates the max over 200 — yesterday's 25 s cruise gave 0.23 where
+today's 10 s gave 0.08, which is mostly run *length*, not speed. The long-run
+ceiling is the number that matters now that `LATCH_FAILSAFE_MS` permits ten
+minutes, and it is **still unmeasured**.
+
+And the weakest arrival ever recorded is 0.713, not today's 1.217. Against that
+figure 0.45 has only 1.6×.
+
+## 4c. 🔋 The battery question answered itself
+
+The 8-floor 21 fpm run — the one measurement that would have closed both §4b
+and the 600 s failsafe — was aborted when **the board lost power at the moment
+of departure.**
+
+```
+ADC_VOLTAGE_THRESHOLD   2000      (low-battery trip)
+
+10:58   2172
+11:02   2169
+11:20   2166
+11:31   2169
+11:35   2124   <- last reading, board died here
+```
+
+Flat all morning, then a 45-count drop in four minutes, quitting 6% above the
+trip point. That is cells collapsing under load, not a connector fault.
+
+The cause is the day's usage: many alarms, several of them stuck jogs running
+the full 300 s failsafe to completion. **This is the endurance question flagged
+when `LATCH_FAILSAFE_MS` was raised to 600 s, answering itself the hard way** —
+and it makes that change look considerably less affordable than it did. A
+single stuck jog now sounds for ten minutes.
+
+**It also re-prices the jog defect.** Until now the cost was a false beacon and
+lost trust; it is now also pack life, on a device that must survive an entire
+job unattended on a counterweight.
+
+⬜ Still unmeasured: alarm current against pack capacity. That is a bench
+measurement, it needs no hoistway, and it should happen before anyone relies on
+the 600 s failsafe in the field.
+
 ## 5. Open problems
 
 | # | Problem | Status |
