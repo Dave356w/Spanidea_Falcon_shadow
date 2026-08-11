@@ -150,3 +150,36 @@ rests on a fixed mechanism (brake set from leveling speed), not headroom:
   reflash, so `…144408.log` spans two boots — the standing trap.
 - Pack ended at avg 2227 with one raw print at 2212. Replace before next
   session.
+
+## 7. Armed verification — five jogs, five releases, zero failsafes
+
+Same evening, immediately after arming (`de4844c`), cartop tether. Log
+`device-monitor-260811-154018.log`. Every jog produced the full sequence
+*latch → beacon ~4 s → JOGV (armed) → `FSM: Release (jog verdict)` →
+DECELERATING → STOPPED → MONITORING*, confirmed audible-correct by Dave:
+
+| jog | ratio % | opk | released |
+|---|---|---|---|
+| 1 | 88 | **1366** | ✔ |
+| 2 | 82 | 3508 | ✔ |
+| 3 | 65 | 4154 | ✔ |
+| 4 | **44** | 1811 | ✔ |
+| 5 | 97 | 4154 | ✔ |
+
+Lifetime: **20/20 verdicts, 5/5 armed releases.** Updated populations
+(jogs n=10, real departures n=9):
+
+- **Jog opk floor moved on the first armed test: 1914 → 1366** (1.52× over
+  the 900 gate). Real ceiling 440 (2.05× under). The gate still splits the
+  gap, but the floor drifted on day one — exactly what the passive-session
+  recommendation existed to watch for. A jog under 900 fails SAFE (RUN →
+  failsafe runoff, the old behaviour), so the cost of drift is a missed
+  chirp, not a silenced moving car.
+- **The ratio axis is finished: jogs now reach down to 44 vs real
+  departures' 39.** Five points. It survives only as the AND guard, and
+  the asymmetry is what matters: crossing it downward makes a jog fail
+  safe, while the opk gate alone protects the dangerous direction.
+
+Watch items for the next sessions, in the armed regime: any JOGV on a real
+departure with opk approaching 900 from below (the 27 fpm rollback shape,
+worst seen 440), and any jog under 900 (worst seen 1366).
