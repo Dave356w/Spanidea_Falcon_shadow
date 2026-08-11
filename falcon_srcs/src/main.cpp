@@ -319,10 +319,30 @@ static volatile bool     arr_hit       = false;
  * §3.1, and the two structurally-dead fixes both looked right from a
  * hoistway too.
  */
+/*
+ * Thresholds re-derived 2026-08-11 evening from the first real populations,
+ * captured on the cartop with the tether (falcon_jog_verdict_2026-08-11.md):
+ *
+ *   real departures  n=8  (5x 350 fpm + 3x slow 25-50 fpm, both directions)
+ *                         ratio 0-20   opk 27-396
+ *   jogs             n=4  (blip to ~1 s, both directions)
+ *                         ratio 46-95  opk 1914-3194
+ *
+ * No overlap on either axis, and the roles reversed from the design guess:
+ * OPK IS THE PRIMARY AXIS (the uncontrolled brake set hammers 1.9-3.2 into
+ * the structure; no real departure exceeded 0.4 -- Dave's mechanism: drive
+ * energizes, brake releases, possible rollback, then brake sets with no
+ * field control). Ratio is the supporting check; it alone would have missed
+ * the first 1 s jog at 46 against the original 50 gate. Gates sit at the
+ * geometric mean of the populations: real departures pass 2.3-2.7x below,
+ * jogs 1.4-2.2x above, on both axes simultaneously. Original design-guess
+ * gates were 50/450; the rollback content of real slow departures (opk up
+ * to 396) is what pushed the peak gate up, not the jogs.
+ */
 #define JOG_VERDICT_ARMED   0    /* log-only; release wiring not written    */
 #define JOG_DEADBAND_MMSS   150  /* samples below this feed neither impulse */
-#define JOG_OPP_RATIO_PCT   50   /* opposite/primary >= this -> jog...      */
-#define JOG_OPP_PEAK_MMSS   450  /* ...AND opposite-side peak >= this       */
+#define JOG_OPP_RATIO_PCT   33   /* opposite/primary >= this -> jog...      */
+#define JOG_OPP_PEAK_MMSS   900  /* ...AND opposite-side peak >= this       */
 
 static volatile int16_t  burst[BURST_N];
 static volatile uint8_t  burst_head  = 0;
