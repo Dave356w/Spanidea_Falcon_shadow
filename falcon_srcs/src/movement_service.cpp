@@ -8,7 +8,9 @@ extern float get_threshold_data();
 /* Raw-sample arrival peak, maintained in the sampling ISR. See main.cpp. */
 extern void  arrival_peak_reset();
 extern float arrival_peak_get();
+extern bool  arrival_peak_hit();
 extern void  arrival_zero_set(float z);
+extern void  burst_trigger();
 
 MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, float *adj_acc, float *vel_ms, RollingAvg<float> *pres_avg)
 {
@@ -384,6 +386,7 @@ void MovementService::fsm_run()
         if (any_motion_pending) {
             any_motion_pending = false;
             Serial.print(F("FSM: Departure latched (any-motion) \r\n"));
+            burst_trigger();
             vel_departure = vel_window.valid() ? vel_window.w() : 0.0f;
             start_timer = millis();
             set_state(STATE_MOVEMENT_DETECTED);
@@ -614,7 +617,7 @@ void MovementService::fsm_run()
              */
             if (arrival_edge_count >= ARRIVAL_EDGE_COUNT &&
                 (uint32_t)(current_time - arrival_edge_first) <= ARRIVAL_EDGE_WINDOW_MS &&
-                arrival_peak_get() > ARRIVAL_PEAK_VALUE) {
+                arrival_peak_hit()) {
 
                 arrival_seen = true;
                 Serial.print(F("FSM: Arrival (any-motion), edges "));
@@ -701,7 +704,7 @@ void MovementService::fsm_run()
              * the interrupt, so it still works if that path fails. Only reaches
              * violent stops now that the threshold is 0.30; that is deliberate.
              */
-            if (arrival_peak_get() > ARRIVAL_PEAK_VALUE) {
+            if (arrival_peak_hit()) {
                 arrival_seen = true;
                 Serial.print(F("FSM: Arrival (polled), peak "));
                 Serial.print(arrival_peak_get(), 3);

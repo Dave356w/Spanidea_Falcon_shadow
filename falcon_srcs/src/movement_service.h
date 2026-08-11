@@ -194,23 +194,37 @@
  *                                  8:1 so the true population max is higher)
  *   brake-set bounce     0.938    = 10.7x
  *
- * RAISED 0.40 -> 0.70 the same afternoon, on the high-speed run. 0.40 came
- * from a decimated log that understated the population peak; a true running
- * max showed cruise reaching 0.23 at speed, leaving only 1.3x. Measured across
- * both speeds now:
+ * 0.40 -> 0.70 -> 0.45. The middle value was set on three runs and was wrong;
+ * two more runs the same afternoon corrected BOTH ends of its margin.
  *
- *   cruise ceiling, high speed   0.23     (windowed, see main.cpp)
- *   arrival, 18 fpm              2.03
- *   arrival, high speed          3.42
+ *   run                      cruise ceiling   arrival
+ *   18 fpm down                   0.09         2.03
+ *   high speed up                 0.23         3.42
+ *   120 fpm down, 4 floors        0.23         4.58
+ *   22 s run                      0.18       * 0.713
+ *   27 s run                    * 0.28         1.413
  *
- * 0.70 sits 3.0x above the worst cruise observed and 2.9x below the SMALLER of
- * the two arrivals. Both margins are real, which no arrival discriminator on
- * this device has previously managed in either direction.
+ * ⚠️ THE 0.713 ARRIVAL CLEARED A 0.70 THRESHOLD BY 1.9%. It fired essentially
+ * by luck; a marginally softer stop would have run to the failsafe. And the
+ * worst cruise rose to 0.28. So the honest separation between the two
+ * populations is 0.28 -> 0.713, about **2.55x**, not the 20x the first run
+ * suggested -- that run was an unusually clean case and the headline drawn
+ * from it did not survive contact with two more.
  *
- * Still only two runs. The cruise figure is what moves with equipment, so it
- * is the one to re-measure on a different machine.
+ * 0.45 sits near the geometric middle: 1.6x above the worst cruise, 1.6x below
+ * the weakest arrival. Balanced rather than comfortable.
+ *
+ * This is still far and away the best arrival discriminator measured on this
+ * device -- every previous one managed between 1.07x and 1.4x, and several
+ * were on the wrong side. But 2.55x is a working margin, not a solved problem.
+ *
+ * WHAT WOULD SETTLE IT: more arrivals, and specifically the SOFTEST stops the
+ * machine can produce. The weakest arrival is the number this whole approach
+ * rests on and five runs have already moved it by a factor of three. The
+ * cruise ceiling is the half that moves with equipment; measure it first on
+ * any new machine.
  */
-#define ARRIVAL_PEAK_VALUE             (0.70)
+#define ARRIVAL_PEAK_VALUE             (0.45)
 
 /*
  * ⛔ NO STILLNESS BACKSTOP -- do not reintroduce one.

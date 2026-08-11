@@ -192,6 +192,80 @@ static volatile uint32_t arr_bucket_ms = 0;
 static volatile uint8_t  arr_quiet     = 0;
 static volatile bool     arr_armed     = false;
 
+/*
+ * Sticky record that the windowed peak crossed ARRIVAL_PEAK_VALUE at some
+ * point during this run. Added 2026-08-10 after a 1 s jog latched the alarm
+ * for a minute with the car provably still.
+ *
+ * Windowing the peak fixed a detector that could not forget; it created one
+ * that forgets too fast. The jog's stop bounce crossed the threshold at
+ * t+1.0 s, and MIN_TRAVEL_MS does not open the arrival gate until t+3.2 s --
+ * by which point the bounce had rolled out of the 1-2 s window and the FSM
+ * read 0.03. The stop was detected and then discarded, unused.
+ *
+ * A LATCH IS SAFE HERE IN A WAY A RUNNING MAX WAS NOT. A max creeps upward
+ * through cruise vibration and crosses any threshold given enough time -- that
+ * is what the windowing exists to stop. A latch only ever fires if cruise
+ * genuinely exceeds ARRIVAL_PEAK_VALUE, and measured cruise tops out at 0.23
+ * against 0.70. So the window keeps bounding the false-trigger risk while this
+ * restores the memory the FSM needs to act on a real crossing.
+ */
+static volatile bool     arr_hit       = false;
+
+/*
+ * DEPARTURE BURST RECORDER -- an instrument, not a detector.
+ *
+ * Question it exists to answer (Dave, 2026-08-11): does a jog have a signature
+ * that differentiates it from a real departure? The hypothesis is that a jog
+ * produces TWO large transients about a second apart -- its own departure
+ * bounce and its stop bounce -- where a real departure produces one and then
+ * goes quiet. That is a difference in TIME STRUCTURE, not amplitude.
+ *
+ * It cannot be answered from the normal log. LOG_DECIMATE_N is 8 and ~20% of
+ * snapshots are lost to overrun, so printed samples land ~670 ms apart -- and
+ * the structure being resolved is about 1 s wide. Two points across the thing
+ * you are trying to measure is not a measurement, and the decimated traces
+ * already produced one real departure (the 22 s run, arrival 0.713) that is
+ * indistinguishable from a jog. That may be a genuine counter-example or an
+ * artefact of sampling; nothing in the current log can tell the difference.
+ *
+ * So: capture EVERY sample around a departure, undecimated, and dump it once.
+ *
+ * PRE-TRIGGER. The departure bounce happens before the FSM knows a departure
+ * occurred, so a recorder that starts on the trigger misses the very event it
+ * is for. This writes continuously into a ring and freezes BURST_POST samples
+ * after the trigger, keeping BURST_PRE samples of history.
+ *
+ * Values are SIGNED (a - zero) in milli-m/s^2, int16 -- 0.001 resolution over
+ * +/-32 m/s^2, comfortably past anything this device survives.
+ *
+ * SIGN IS THE WHOLE POINT for the second question this instrument answers
+ * (Dave, 2026-08-11): can velocity be inferred over a jog? A jog accelerates
+ * and then decelerates by an equal and opposite amount, so its integral
+ * CANCELS to roughly zero net velocity change, while a real departure
+ * integrates to the cruise speed and holds it. Storing magnitude would make
+ * a deceleration indistinguishable from an acceleration, every sample would
+ * sum positive, and nothing would ever cancel -- which is exactly the
+ * discriminator being looked for.
+ */
+#define BURST_N     80      /* 3.2 s at 25 Hz, 160 bytes                     */
+#define BURST_PRE   20      /* 0.8 s of history kept before the trigger      */
+
+static volatile int16_t  burst[BURST_N];
+static volatile uint8_t  burst_head  = 0;
+static volatile uint8_t  burst_post  = 0xFF;   /* 0xFF = not triggered       */
+static volatile bool     burst_ready = false;  /* frozen, waiting for dump   */
+
+/* Called from the FSM when a departure latches. */
+void burst_trigger()
+{
+    noInterrupts();
+    if (!burst_ready && burst_post == 0xFF) {
+        burst_post = BURST_N - BURST_PRE;
+    }
+    interrupts();
+}
+
 /* Called from the FSM on entering STATE_MOVING. */
 void arrival_peak_reset()
 {
@@ -201,7 +275,18 @@ void arrival_peak_reset()
     arr_bucket_ms = millis();
     arr_quiet     = 0;
     arr_armed     = false;
+    arr_hit       = false;
     interrupts();
+}
+
+/* True once the windowed peak has crossed ARRIVAL_PEAK_VALUE this run. */
+bool arrival_peak_hit()
+{
+    bool v;
+    noInterrupts();
+    v = arr_hit;
+    interrupts();
+    return v;
 }
 
 float arrival_peak_get()
@@ -374,6 +459,7 @@ void emit_acc_int_log();
 void poll_acc_int_status();
 
 void emit_sample_log();
+void emit_burst_log();
 
 uint16_t read_battery_voltage();
 extern int configure_adc_channel();
@@ -522,6 +608,7 @@ void loop()
         ms.fsm_run();
 
         emit_sample_log();
+        emit_burst_log();
         emit_acc_int_log();
         poll_acc_int_status();
 
@@ -647,6 +734,38 @@ float read_acceleration_mss()
             if (dev > arr_peak_cur) {
                 arr_peak_cur = dev;
             }
+
+            if (arr_peak_cur > ARRIVAL_PEAK_VALUE) {
+                arr_hit = true;
+            }
+        }
+
+        /*
+         * Burst recorder. Writes continuously so the pre-trigger history is
+         * always there; freezes once the post-trigger count runs out, and
+         * stops writing until loop() has dumped it.
+         */
+        if (!burst_ready) {
+            {
+                float sdev = accel_value - arr_zero;
+                int16_t sv;
+
+                if (sdev >= 32.0f)       sv =  32000;
+                else if (sdev <= -32.0f) sv = -32000;
+                else                     sv = (int16_t)(sdev * 1000.0f);
+
+                burst[burst_head] = sv;
+            }
+            burst_head = (uint8_t)((burst_head + 1) % BURST_N);
+
+            if (burst_post != 0xFF) {
+                if (burst_post > 0) {
+                    burst_post--;
+                } else {
+                    burst_post  = 0xFF;
+                    burst_ready = true;
+                }
+            }
         }
     }
 
@@ -674,6 +793,51 @@ float read_acceleration_mss()
     sample_pending = true;
 
     return (bosch_acceleration_avg_g.avg());
+}
+
+/*
+ * Dump a frozen departure burst. loop() only.
+ *
+ * ~80 values of up to 5 digits is roughly 350 characters, so this blocks the
+ * serial link for about a third of a second. That is acceptable and bounded:
+ * the peak detector and arr_hit live entirely in the ISR, so a blocked loop()
+ * delays the FSM's reaction rather than corrupting the decision, and the burst
+ * itself is already captured. The velocity and lateral windows lose samples
+ * for the duration -- both are instrumentation now, so that is a fair trade
+ * for the one measurement that can settle the jog question.
+ *
+ * BURST_PRE samples of pre-trigger history come first, so the trigger sits at
+ * a known offset and the departure bounce is inside the window rather than
+ * clipped off its front.
+ */
+void emit_burst_log()
+{
+    uint8_t i, head;
+
+    if (!burst_ready) {
+        return;
+    }
+
+    noInterrupts();
+    head = burst_head;
+    interrupts();
+
+    Serial.print(F("BURST pre="));
+    Serial.print(BURST_PRE);
+    Serial.print(F(" n="));
+    Serial.print(BURST_N);
+    Serial.print(F(" signed_mmss="));
+
+    /* Oldest first: the ring is full, so the oldest entry is at head. */
+    for (i = 0; i < BURST_N; i++) {
+        Serial.print(burst[(uint8_t)((head + i) % BURST_N)]);
+        Serial.print(' ');
+    }
+    Serial.print(F("\r\n"));
+
+    noInterrupts();
+    burst_ready = false;
+    interrupts();
 }
 
 /*
