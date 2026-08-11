@@ -82,3 +82,63 @@ failure this product exists to prevent. Plan, per protocol §3.1:
 - The handling bump (row 1) latched the alarm with zero car movement and
   ran the full failsafe — the defect demonstrating itself on the bench,
   unprompted, as the session opened.
+
+## 6. Late-evening cartop session: jog boundary, ratio-39, and the gentle floor
+
+Continued same evening from the cartop tether. Two more logs
+(`device-monitor-260811-144408.log` post-reflash section — NOTE this file
+spans two boots, split on `Device Booted` before analysing — and
+`device-monitor-260811-152209.log`).
+
+### 6.1 The rest of the JOGV record
+
+| # | event | ratio % | opk | verdict | correct? |
+|---|---|---|---|---|---|
+| 10 | 2 s medium jog | 98 | 3467 | JOG | ✔ |
+| 11 | 27 fpm departure, up | **39** | 251 | RUN | ✔ **opk gate saved it** |
+| 12 | 27 fpm departure, down | 0 | 98 | RUN | ✔ |
+| 13 | 125 fpm departure, up | 0 | 137 | RUN | ✔ |
+| 14 | hard-stop run departure, down | 15 | 260 | RUN | ✔ |
+| 15 | 125 fpm departure, down | 1 | 214 | RUN | ✔ |
+
+15/15 lifetime. Two findings of consequence:
+
+- **The 2 s jog closed the boundary question**: 98% cancellation, hardest
+  brake shock recorded (±4.2 ringing). The jog band blip→2 s all reads JOG;
+  ≥3 s exits the blind window into normal arrival detection. Armed, every
+  movement-duration class has a release path — no residual gap.
+- **Row 11 is the false-JOG near-miss the AND design exists for.** A slow
+  up departure with heavy rollback crossed the ratio gate (39 vs 33) and
+  was held RUN only by opk (251 vs 900). Real departures now span ratio
+  0–39 against jogs' 46–98 — a 7-point gap. **The ratio axis is dead as an
+  independent discriminator; opk carries the verdict** (real ≤ 440, jogs
+  ≥ 1914, 4.4×). Keep the AND, but any future retune moves the opk gate,
+  not the ratio gate.
+
+### 6.2 Gentle arrivals: the floor is 0.575 and it is a mechanism
+
+Terminal approaches at 125 fpm force the controller through its leveling
+transition, producing a brake set from crawl speed — the §14.7 shape:
+
+| stop | peak |
+|---|---|
+| hard cartop brake sets (4 this session) | 1.215 – 4.391 |
+| **terminal leveling stop, 125 fpm up** | **0.579** |
+| **terminal leveling stop, 125 fpm down** | **0.573** |
+
+The arrival distribution is bimodal. The soft mode is tightly reproducible
+(0.006 apart, opposite directions) and moves the measured floor **0.713 →
+0.573**, margin over the 0.45 gate **1.58× → 1.27×**. At 27 fpm no leveling
+transition occurs (the car is already below leveling speed) — the soft mode
+needs an approach fast enough to force the transition. The release still
+rests on a fixed mechanism (brake set from leveling speed), not headroom:
+**a controller with a finer crawl will land lower — check per installation.**
+
+### 6.3 Session incidents
+
+- **Third device lockup of the day** (log froze parked, device silent,
+  avrdude signature read revived it). **One 125 fpm down run was lost** to
+  it and re-run. The monitor was also not restarted after the retune
+  reflash, so `…144408.log` spans two boots — the standing trap.
+- Pack ended at avg 2227 with one raw print at 2212. Replace before next
+  session.
