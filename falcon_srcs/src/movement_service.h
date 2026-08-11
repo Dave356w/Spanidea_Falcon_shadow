@@ -287,8 +287,51 @@
  *
  * The symptom that it is still too short is a FAILSAFE line followed shortly
  * by a second departure latch.
+ *
+ * ── RAISED 300 s -> 600 s, 2026-08-11, on measurement ────────────────────────
+ *
+ * Dave, testing 8/10: "An eight floor run at 18FPM expired on failsafe
+ * timeout." That is the symptom described above, observed in the field. At
+ * 18 fpm (0.0914 m/s) 300 s covers 27.4 m, so eight floors of ~3.4 m sits
+ * exactly on the boundary -- the estimate in the table above assumed 3.3 m
+ * floors and had no margin at all.
+ *
+ * 600 s covers 55 m, roughly 16 floors at this building's pitch.
+ *
+ * ⚠️ THIS TIMEOUT IS DOING TWO JOBS THAT NOW CONFLICT, and the conflict is not
+ * resolvable until the jog defect is fixed:
+ *
+ *   1. bounding a FAULT -- a missed arrival must not alarm until the battery
+ *      is flat. Wants to be generous, because a legitimate slow run genuinely
+ *      does take many minutes and should alarm for all of it.
+ *   2. bounding the JOG DEFECT -- a movement finishing inside MIN_TRAVEL_MS
+ *      latches and cannot release, so it sounds for exactly this long on a
+ *      stationary counterweight. Wants to be short.
+ *
+ * Raising it therefore makes the jog case worse: a stuck alarm now sounds for
+ * ten minutes instead of five. That is accepted deliberately. Splitting a
+ * legitimate run in two is a failure of the core function -- the beacon stops
+ * while the counterweight is still travelling, then re-alarms, and the
+ * mechanic sees a gap that means nothing. The jog case is already unusable at
+ * five minutes; it is not made meaningfully worse at ten, and it needs fixing
+ * on its own terms rather than being papered over by a short timeout.
+ *
+ * A signal-based split was considered and rejected: the only candidate for
+ * telling "stuck at rest" from "still travelling" is the windowed raw peak,
+ * and the 2026-08-11 125 fpm run measured cruise at 0.05-0.10 against rest at
+ * 0.02-0.05. They overlap, so a quiet-for-N-seconds rule would fire during a
+ * genuine slow run and drop the beacon mid-travel.
+ *
+ * ⬜ UNVERIFIED: battery endurance for a ten-minute continuous alarm. The duty
+ * cycle is 2/5 on the piezo, but no measurement of alarm current against pack
+ * capacity exists. If a full-length failsafe alarm is found to flatten the
+ * pack, that is an argument for fixing the jog defect rather than for
+ * shortening this again.
+ *
+ * REVISIT once jogs release correctly -- at that point job 2 disappears and
+ * this can be sized purely for the tallest realistic inspection run.
  */
-#define LATCH_FAILSAFE_MS              300000
+#define LATCH_FAILSAFE_MS              600000
 
 /*
  * How long the average must stay inside STOP_BAND_VALUE of the zero
