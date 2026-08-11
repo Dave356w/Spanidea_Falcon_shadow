@@ -150,14 +150,75 @@ arrival ring has only been seen inside a jog. That needs a second trigger.
 
 ---
 
+## 4a. 🔴 The stillness release is dead too — cruise level is not a function of speed
+
+Proposed mid-session on two points and killed by a third within the hour.
+
+The idea, prompted by Dave's *"a stable Z and baseline stable x/y = no motion"*
+and by his 350 fpm failure: cruise vibration looked like it scaled with speed
+(3.6× rest at 18 fpm, 9.2× at 120 fpm), so a **self-calibrating** release could
+measure each run's own contrast and, where it was high, treat a sustained
+return to baseline as the stop. That would have covered exactly the case the
+brake-transient detector cannot — a smooth drive-controlled stop at speed.
+
+| run | cruise `pk` | ratio to rest |
+|---|---|---|
+| 18 fpm down, 8/10 | 0.09 | 3.6× |
+| 120 fpm down, 8/10 | 0.23 | 9.2× |
+| high speed up, 8/10 | 0.23 | 9.2× |
+| **125 fpm up, 8/11** | **0.07** | **2.8×** |
+
+**Two runs at the same speed differ threefold, and today's 125 fpm is quieter
+than yesterday's 18 fpm.** Cruise level is not a function of speed.
+
+Most likely cause: **the unit was remounted between sessions** — resting
+attitude moved from x≈0.63 to x≈0.57. How rigidly it is clamped governs how
+much rail excitation reaches the sensor, and that swamps the speed effect.
+
+That is worth knowing independently of this design: **cruise vibration measures
+the mounting as much as the machine**, so any threshold derived from it is
+hostage to how the mechanic attached the unit that morning.
+
+The self-calibrating design would have *behaved* correctly here — 2.8× falls
+under the cut-off, the release declines to arm, and the run falls back to
+brake detection. It fails safe. But it would seldom arm, which makes it close
+to useless rather than wrong, and it cannot rescue the 350 fpm case because
+there is now no reason to assume contrast is high there.
+
+---
+
 ## 5. Open problems
 
 | # | Problem | Status |
 |---|---|---|
-| 1 | 🔴 **Jogs latch the alarm until the 300 s failsafe** | Unsolved. Under inspection jogging the device is effectively always sounding |
-| 2 | ~20% of samples lost to snapshot overrun | Unfixed. Every threshold rests on 80% of the data. Needs a ring buffer; bench work |
-| 3 | Weakest arrival is 0.713 and moved 3× in five runs | Needs more soft stops. The number the approach rests on |
-| 4 | Flash 95.0%, RAM 67% | Room for nothing much. Driver swap frees ~4.9 KB |
+| 1 | 🔴 **Normal operation has no brake transient at the stop** | Dave, 350 fpm from the cab: the drive decelerates smoothly to a standstill and sets the brake afterwards, so the unit alarmed and never released. No second mechanism survives contact with data |
+| 2 | 🔴 **Jogs latch the alarm until the 300 s failsafe** | Unsolved, four closed doors. Under inspection jogging the device is effectively always sounding |
+| 3 | **An 8-floor 18 fpm run expired on `LATCH_FAILSAFE_MS`** | Measured by Dave. 300 s is too short for slow travel in a tall building. Straightforward fix, not yet made |
+| 4 | ~20% of samples lost to snapshot overrun | Unfixed. Every threshold rests on 80% of the data. Needs a ring buffer; bench work |
+| 5 | Weakest arrival is 0.713 and moved 3× in five runs | Needs more soft stops. The number the approach rests on |
+| 6 | Flash 95.0%, RAM 67% | Room for nothing much. Driver swap frees ~4.9 KB and is the prerequisite for on-device recording |
+
+### 5.0 The product boundary, stated plainly
+
+**The device works where a brake sets abruptly** — inspection operation, which
+is the stated primary use case, and where Dave reports it "stable at all speeds
+on cartop and counterweight" with performance "great so far". Five arrivals
+measured, 0.713 to 4.58.
+
+**It does not yet cover normal automatic operation**, because that stop has no
+transient to detect. That is a boundary to document and decide about, not a bug
+to tune away.
+
+### 5.1 A note on method — three single-run conclusions overturned in one day
+
+The 22.6× arrival margin, the speed-scaling hypothesis, and two proposed jog
+fixes were all built on one run or one idea and corrected by the next
+measurement. In each case the first result looked decisive and was not.
+
+**Treat any single-run number as a hypothesis until a second run under
+different conditions agrees with it.** The burst recorder exists because of
+this, and §4's detector should not be written until the arrival ring has been
+captured on more than one machine state.
 
 ### 5.1 The jog problem, and three closed doors
 
