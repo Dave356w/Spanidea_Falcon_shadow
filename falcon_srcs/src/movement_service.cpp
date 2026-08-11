@@ -10,7 +10,9 @@ extern void  arrival_peak_reset();
 extern float arrival_peak_get();
 extern bool  arrival_peak_hit();
 extern void  arrival_zero_set(float z);
-extern void  burst_trigger();
+extern void  burst_trigger(uint8_t post, uint8_t kind);
+#define BURST_POST_DEP  60
+#define BURST_POST_ARR  20
 
 MovementService::MovementService(RollingAvg<float> *acc_avg, float *acc_mss, float *adj_acc, float *vel_ms, RollingAvg<float> *pres_avg)
 {
@@ -386,7 +388,7 @@ void MovementService::fsm_run()
         if (any_motion_pending) {
             any_motion_pending = false;
             Serial.print(F("FSM: Departure latched (any-motion) \r\n"));
-            burst_trigger();
+            burst_trigger(BURST_POST_DEP, 0);
             vel_departure = vel_window.valid() ? vel_window.w() : 0.0f;
             start_timer = millis();
             set_state(STATE_MOVEMENT_DETECTED);
@@ -796,6 +798,26 @@ void MovementService::fsm_run()
             last_state = MotionStates::STATE_DECELERATING;
 #if LATCHED_FSM
             stop_confirm_timer = millis();
+
+            /*
+             * Record the stop at full rate. Placed at the entry to this state
+             * rather than at each arrival test, so it catches EVERY release
+             * path -- clustered any-motion, polled peak, velocity conservation
+             * and the failsafe -- from one call.
+             *
+             * Mostly pre-trigger: by the time any of those have fired, the stop
+             * is underway or over. See burst_trigger() in main.cpp.
+             *
+             * The question it exists to answer: a smooth drive-controlled
+             * deceleration should integrate like a departure does, which is
+             * what the velocity conservation release depends on. The only stop
+             * measured so far was a jog's brake ring, and that did NOT
+             * integrate -- it flips sign almost every sample, so its area came
+             * out at -0.011 m/s where physics demands -0.18. Whether a smooth
+             * stop behaves better is assumed, not known, and it is the
+             * assumption the whole approach rests on.
+             */
+            burst_trigger(BURST_POST_ARR, 1);
 #endif
         }
 

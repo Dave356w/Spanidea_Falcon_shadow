@@ -282,19 +282,46 @@ static volatile bool     arr_hit       = false;
  * discriminator being looked for.
  */
 #define BURST_N     80      /* 3.2 s at 25 Hz, 160 bytes                     */
-#define BURST_PRE   20      /* 0.8 s of history kept before the trigger      */
+#define BURST_POST_DEP  60  /* departure: 20 pre / 60 post                   */
+#define BURST_POST_ARR  20  /* arrival:   60 pre / 20 post -- see burst_trigger */
 
 static volatile int16_t  burst[BURST_N];
 static volatile uint8_t  burst_head  = 0;
 static volatile uint8_t  burst_post  = 0xFF;   /* 0xFF = not triggered       */
 static volatile bool     burst_ready = false;  /* frozen, waiting for dump   */
 
-/* Called from the FSM when a departure latches. */
-void burst_trigger()
+static volatile uint8_t  burst_kind = 0;       /* 0 = departure, 1 = arrival */
+
+/*
+ * Arm the recorder. `post` is how many samples to keep AFTER the trigger; the
+ * remaining BURST_N - post are pre-trigger history.
+ *
+ * THE TWO TRIGGERS WANT OPPOSITE SPLITS, because they fire at opposite ends of
+ * the event they are recording:
+ *
+ *   DEPARTURE fires at the START -- the any-motion edge arrives within ~100 ms
+ *     of the machine moving -- so the interesting data is ahead of it. 20 pre
+ *     / 60 post, the pre-roll only there to catch the bounce that precedes the
+ *     FSM knowing anything happened.
+ *
+ *   ARRIVAL fires at the END. The peak has to cross ARRIVAL_PEAK_VALUE before
+ *     the FSM decides anything, so by the time this is called the stop is
+ *     already underway or over. 60 pre / 20 post gives 2.4 s of history --
+ *     enough to hold a smooth drive-controlled deceleration ramp, which is the
+ *     whole reason this trigger exists. A fixed 20-sample pre-roll would have
+ *     captured the tail and missed the ramp.
+ *
+ * Ignored if a burst is already armed or waiting to be dumped. On a short run
+ * the departure burst may still be in flight when the arrival fires; the
+ * departure wins, which is the right precedence -- on a movement that brief the
+ * departure burst already contains the stop.
+ */
+void burst_trigger(uint8_t post, uint8_t kind)
 {
     noInterrupts();
     if (!burst_ready && burst_post == 0xFF) {
-        burst_post = BURST_N - BURST_PRE;
+        burst_post = post;
+        burst_kind = kind;
     }
     interrupts();
 }
@@ -876,8 +903,10 @@ void emit_burst_log()
     head = burst_head;
     interrupts();
 
-    Serial.print(F("BURST pre="));
-    Serial.print(BURST_PRE);
+    Serial.print(F("BURST k="));
+    Serial.print(burst_kind ? F("arr") : F("dep"));
+    Serial.print(F(" pre="));
+    Serial.print(burst_kind ? (BURST_N - BURST_POST_ARR) : (BURST_N - BURST_POST_DEP));
     Serial.print(F(" n="));
     Serial.print(BURST_N);
     Serial.print(F(" signed_mmss="));

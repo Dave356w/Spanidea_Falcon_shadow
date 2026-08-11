@@ -295,6 +295,82 @@ under load, with a meter rather than the on-board ADC — which is averaging awa
 the very sag that is killing it. That separates cells from regulator from
 decoupling near the piezo. Bench work, no hoistway.
 
+## 4e. 🟢 Arrival bursts: a brake set and a deceleration are different events
+
+The burst recorder gained a **second trigger** on entry to `STATE_DECELERATING`,
+with the pre/post split reversed — 60 pre / 20 post, 2.4 s of history — because
+an arrival trigger fires at the *end* of the event it must record, where a
+departure trigger fires at the start.
+
+Three arrivals captured, and Dave's observation that *"brake set causes jerk
+forces"* is confirmed and quantified:
+
+| run | peak m/s² | plateau | **directionality** | integral vs actual |
+|---|---|---|---|---|
+| 115 fpm down, levelled in | 0.67 | 0.52 | **1.000** | 67% (under) |
+| 87 fpm up, stopped on brake | 4.28 | 1.08 | **0.417** | 128% (over) |
+| 48 fpm down, long level + brake | 1.65 | 0.67 | **0.019** | 5% |
+
+**Directionality (`|Σa| / Σ|a|`) separates them absolutely: 1.000 for the one
+deceleration ramp, 0.42 and 0.02 for the two brake stops.** Two populations, no
+overlap, and the physical reason is exactly Dave's: a brake set is a jerk that
+shocks the structure and rings; a drive deceleration is a sustained push in one
+direction. It is a difference in *character*, not amplitude — note the brake
+stops have the LARGER peaks.
+
+**Sign inverted as predicted** between the down run (+0.387 m/s) and the up run
+(−0.561), so the device is tracking real physics rather than a mounting
+artefact.
+
+### 4e.1 Velocity inference works only on the ramp
+
+- **smooth deceleration** reads 67% of true speed — the ramp was still running
+  when the 3.2 s window closed, since the car levelled in
+- **brake stop** reads 128% — the shock impulse inflates it past anything the
+  car did
+
+So the integral is usable where there is a ramp and meaningless where there is
+a jerk. **That kills the velocity-conservation ratio for good** (`VEL_ARMED`
+stays 0): its gate is a fraction of the departure, and neither end of that
+comparison is reliably measurable. It leaves the *ramp* measurement intact,
+which does not reference the departure at all.
+
+This is the correction to §4's hope. Dave's instinct — use a physical
+requirement rather than an appearance — was right; the requirement that is
+actually measurable is **"a sustained one-signed deceleration occurred"**, not
+"it matched the departure".
+
+### 4e.2 ⬜ The instrument cannot yet see a slow deceleration
+
+The 48 fpm ramp was NOT captured, and the reason is structural: the burst
+triggers when the FSM declares the arrival, i.e. when the peak crosses
+`ARRIVAL_PEAK_VALUE`. At 115 fpm the deceleration itself reached 0.67 and *was*
+the trigger. At 48 fpm it was too gentle to cross, so the FSM waited and
+triggered on the brake set instead — the ramp had happened before, outside even
+the 2.4 s pre-roll.
+
+**The trigger is downstream of the event it needs to record.** So whether the
+deceleration plateau holds near 0.5 m/s² at low speed, or scales with speed, is
+still unknown — that decides whether a ramp detector can use a fixed magnitude
+floor or must learn one per run.
+
+### 4e.3 Where this leaves the architecture
+
+Two mechanisms, each covering the other's blind spot, both now measured:
+
+| | deceleration | brake event | covered by |
+|---|---|---|---|
+| slow inspection | too gentle to see | pronounced | **peak detector — works today** |
+| fast, drive-controlled | large ramp | absent | **ramp detector — not built** |
+
+The crossover sits where the deceleration stops being big enough to notice.
+350 fpm has far more speed to shed than the 115 fpm run that produced a clean
+1.000 ramp, so the failing case is the one where a ramp detector should be
+strongest.
+
+⬜ **Before building it:** a ramp detector needs its own trigger below the
+arrival threshold, and the plateau-versus-speed question answered.
+
 ## 5. Open problems
 
 | # | Problem | Status |
