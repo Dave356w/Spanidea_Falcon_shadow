@@ -247,6 +247,54 @@ job unattended on a counterweight.
 measurement, it needs no hoistway, and it should happen before anyone relies on
 the 600 s failsafe in the field.
 
+## 4d. 🔴 THE DEVICE BROWNS OUT AFTER ~4 MINUTES OF CONTINUOUS ALARM
+
+This outranks everything else in this note.
+
+Measured on **fresh cells**, during an 8-floor 20 fpm descent:
+
+```
+t=203554   2442     before the run
+t=362315   2357      75 s into the alarm
+t=479281   2324     192 s into the alarm
+t=530006   dead     243 s into the alarm
+
+ADC_VOLTAGE_THRESHOLD  2000    never reached
+```
+
+**It stopped at 2324, over 300 counts above the low-battery trip.** The battery
+alarm never fired because by its own measure the pack was healthy. So this is
+**not depletion** — it is the rail sagging under sustained piezo load, and the
+averaged ADC reading never sees the instantaneous dip inside a beep. An earlier
+failure at 2124 the same morning is the same mechanism; fresh cells bought
+runway, not immunity.
+
+**Alarm endurance is therefore ~4 minutes**, measured once.
+
+### Consequences, all immediate
+
+- **`LATCH_FAILSAFE_MS` reverted 600 s → 240 s.** A failsafe longer than the
+  hardware survives can never fire. The 600 s was set hours earlier on the
+  assumption a ten-minute alarm was affordable; it is not, and that assumption
+  was never measured. The cost is real and was predicted by the original 300 s
+  comment: an 8-floor 18 fpm run needs ~300 s and will now be cut short.
+- **The long-slow-run case is currently untestable.** Both attempts at an
+  8-floor 20 fpm descent died mid-run — not coincidence, the run simply lasts
+  longer than the device's alarm endurance. So the low-speed long-run cruise
+  ceiling, the number the 0.45 threshold most needs, cannot be measured until
+  this is fixed.
+- **It re-prices the jog defect a second time.** A stuck jog runs the failsafe
+  to completion, so every one of them now costs a substantial fraction of the
+  device's total alarm budget.
+- **It threatens the primary use case directly.** The device is meant to sit on
+  a counterweight for a whole job. If four minutes of alarm kills it, that is
+  ahead of every detection question here.
+
+⬜ **The measurement that unblocks it:** alarm current against pack voltage
+under load, with a meter rather than the on-board ADC — which is averaging away
+the very sag that is killing it. That separates cells from regulator from
+decoupling near the piezo. Bench work, no hoistway.
+
 ## 5. Open problems
 
 | # | Problem | Status |

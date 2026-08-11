@@ -330,8 +330,45 @@
  *
  * REVISIT once jogs release correctly -- at that point job 2 disappears and
  * this can be sized purely for the tallest realistic inspection run.
+ *
+ * ── 🔴 REVERTED 600 s -> 240 s, 2026-08-11, hours later ─────────────────────
+ *
+ * The 600 s above was set on reasoning: that a legitimate slow run deserves to
+ * alarm for its whole duration, and that the device could afford to sound for
+ * ten minutes. The second half was an assumption and it is false.
+ *
+ * MEASURED THE SAME AFTERNOON, on FRESH cells: the board died 242.7 s into a
+ * continuous alarm, part-way through an 8-floor 20 fpm descent.
+ *
+ *     t=203554   2442     before the run
+ *     t=362315   2357      75 s into the alarm
+ *     t=479281   2324     192 s into the alarm
+ *     t=530006   dead     243 s into the alarm
+ *
+ * It stopped at 2324, more than 300 counts ABOVE ADC_VOLTAGE_THRESHOLD (2000),
+ * so the battery alarm never fired -- by its own measure the pack was healthy.
+ * This is not depletion. It is the rail sagging under sustained piezo load,
+ * and the averaged ADC reading never sees the instantaneous dip inside a beep.
+ * An earlier failure at 2124 the same morning is the same mechanism; fresh
+ * cells bought runway, not immunity.
+ *
+ * SO A FAILSAFE LONGER THAN ~240 s CAN NEVER FIRE -- the hardware quits first,
+ * and the only failsafe worth having is one the device outlives. 240 s is set
+ * just under the single measured endurance figure.
+ *
+ * ⚠️ THIS IS A PLACEHOLDER AROUND A HARDWARE DEFECT, not a tuning value, and
+ * it costs exactly what the original 300 s comment warned about: an 8-floor
+ * 18 fpm run needs ~300 s and will now be cut short. That regression is
+ * accepted only because the alternative is a timeout that never runs.
+ *
+ * WHAT UNBLOCKS IT: a bench measurement of alarm current against pack voltage
+ * under load, with a meter rather than the on-board ADC. That distinguishes
+ * cells from regulator from decoupling near the piezo. Until the device can
+ * sustain a long alarm, no failsafe value is defensible and the whole
+ * long-slow-run case is untestable -- both attempts at it died mid-run for
+ * exactly this reason.
  */
-#define LATCH_FAILSAFE_MS              600000
+#define LATCH_FAILSAFE_MS              240000
 
 /*
  * How long the average must stay inside STOP_BAND_VALUE of the zero
