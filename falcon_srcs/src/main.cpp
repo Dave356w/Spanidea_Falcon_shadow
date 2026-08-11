@@ -66,8 +66,8 @@ MovementService ms(&acceleration_avg_g, &acc_mss_g, &adj_acc_g, &vel_ms_g, &pres
  */
 typedef struct {
     uint32_t t_ms;          /* millis() at time of sample                   */
-    float    accel;         /* z acceleration, m/s^2                        */
-    float    avg;           /* rolling average after this sample was added  */
+    int16_t  accel;         /* z acceleration, MILLI-m/s^2                  */
+    int16_t  avg;           /* rolling average after this sample, milli      */
     /*
      * Lateral axes, m/s^2. Logged but not yet used by the FSM.
      *
@@ -89,15 +89,48 @@ typedef struct {
      * total power, so sample variance of x/y is a usable vibration estimate
      * even at 3.13 Hz.
      */
-    float    ax;            /* x acceleration, m/s^2                        */
-    float    ay;            /* y acceleration, m/s^2                        */
+    int16_t  ax;            /* x acceleration, MILLI-m/s^2                  */
+    int16_t  ay;            /* y acceleration, MILLI-m/s^2                  */
     uint16_t read_us;       /* duration of the bma456 I2C read, microseconds */
     uint8_t  fsm_state;     /* MovementService state at time of sample      */
     uint8_t  err_run;       /* consecutive failed sensor reads, 0 = healthy */
 } sample_log_t;
 
-static volatile sample_log_t isr_sample;
-static volatile bool         sample_pending = false;
+/*
+ * SAMPLE RING -- replaces the single-slot snapshot, 2026-08-11.
+ *
+ * The single slot lost ~20% of samples at 25 Hz, and every threshold measured
+ * on 2026-08-10/11 therefore rests on 80% of the data. The cause is not the
+ * ISR: Serial.print() BLOCKS once the 64-byte TX buffer fills, for roughly
+ * 85 ms of a 145-character line, and the ISR keeps publishing into the one
+ * slot throughout. At 3.13 Hz a 151 ms line fitted inside a 320 ms period; at
+ * 25 Hz it spans two periods and the loser is always the sample.
+ *
+ * A ring lets loop() drain what accumulated during a blocking print instead of
+ * watching it be overwritten. Single producer (the timer ISR) and single
+ * consumer (loop), so no locking is needed: head is written only by the ISR,
+ * tail only by loop, and uint8_t access is atomic on AVR.
+ *
+ * WHY THE STRUCT SHRANK. RAM, not taste. Static was already 1374 bytes of 2048
+ * with ~176 more on the heap, leaving ~500 for stack; a ring of 8 at the old
+ * 24-byte layout would have taken 192 of that. Storing the four floats as
+ * scaled 16-bit integers cuts the record 24 -> 16 bytes, so 8 slots cost 128
+ * and the single slot it replaces gives 16 back: net +104, measured.
+ *
+ * That leaves ~390 bytes for stack. Workable, not roomy. The next thing that
+ * wants RAM should shrink the ring to 6 or shorten the sample line rather than
+ * assume there is headroom.
+ *
+ * The precision lost is real but confined to the LOG: milli-m/s^2 resolution,
+ * so a= prints 3 decimals instead of 4. Nothing that decides anything reads
+ * these fields -- the arrival peak, arr_hit and the burst recorder all work
+ * from the float in the ISR and never touch the ring.
+ */
+#define SAMPLE_RING_N 8
+
+static volatile sample_log_t ring[SAMPLE_RING_N];
+static volatile uint8_t      ring_head = 0;   /* ISR writes  */
+static volatile uint8_t      ring_tail = 0;   /* loop reads  */
 static volatile uint16_t     sample_overrun = 0;
 
 /*
@@ -631,6 +664,39 @@ void loop()
 }
 
 /*
+ * Commit one record to the ring. ISR context only.
+ *
+ * Drops the NEW sample when full rather than overwriting the oldest, so the
+ * records loop() does drain stay contiguous in time -- vel_window and
+ * lat_monitor both reason from consecutive timestamps and a hole in the middle
+ * is worse for them than a gap at the end.
+ */
+static void ring_push(uint32_t t_ms, float accel, float avg, float ax, float ay,
+                      uint16_t read_us, uint8_t st, uint8_t err)
+{
+    uint8_t next = ring_head + 1;
+
+    if (next >= SAMPLE_RING_N) {
+        next = 0;
+    }
+    if (next == ring_tail) {
+        sample_overrun++;
+        return;
+    }
+
+    ring[ring_head].t_ms      = t_ms;
+    ring[ring_head].accel     = (int16_t)(accel * 1000.0f);
+    ring[ring_head].avg       = (int16_t)(avg   * 1000.0f);
+    ring[ring_head].ax        = (int16_t)(ax    * 1000.0f);
+    ring[ring_head].ay        = (int16_t)(ay    * 1000.0f);
+    ring[ring_head].read_us   = read_us;
+    ring[ring_head].fsm_state = st;
+    ring[ring_head].err_run   = err;
+
+    ring_head = next;
+}
+
+/*
  * Read z-axis accelerometer data and convert to m/(s*s)
  */
 
@@ -660,15 +726,9 @@ float read_acceleration_mss()
             sensor_err_run++;
         }
 
-        if (sample_pending) {
-            sample_overrun++;
-        }
-
-        isr_sample.t_ms      = millis();
-        isr_sample.read_us   = (uint16_t)(micros() - read_start);
-        isr_sample.fsm_state = (uint8_t)ms.get_state();
-        isr_sample.err_run   = sensor_err_run;
-        sample_pending = true;
+        ring_push(millis(), 0.0f, 0.0f, 0.0f, 0.0f,
+                  (uint16_t)(micros() - read_start),
+                  (uint8_t)ms.get_state(), sensor_err_run);
 
         return (bosch_acceleration_avg_g.avg());
     }
@@ -716,7 +776,7 @@ float read_acceleration_mss()
             if (dev < ARRIVAL_QUIET_MSS) {
                 if (++arr_quiet >= ARRIVAL_ARM_SAMPLES) {
                     arr_armed = true;
-                    arr_bucket_ms = isr_sample.t_ms;
+                    arr_bucket_ms = millis();
                 }
             } else {
                 arr_quiet = 0;
@@ -772,25 +832,19 @@ float read_acceleration_mss()
     /*
      * Publish a snapshot for loop() to print. No serial I/O in here.
      */
-    if (sample_pending) {
+    {
         /*
-         * loop() has not printed the previous sample yet, so it is about to be
+         * (historical) loop() has not printed the previous sample yet, so it is about to be
          * overwritten. A non-zero overrun count means the log is decimated by
          * something other than LOG_DECIMATE_N and sample timing cannot be
          * inferred from the log alone.
          */
-        sample_overrun++;
     }
 
-    isr_sample.t_ms      = millis();
-    isr_sample.accel     = accel_value;
-    isr_sample.avg       = acceleration_avg_g.avg();
-    isr_sample.ax        = x / 1000.0 * 9.81;
-    isr_sample.ay        = y / 1000.0 * 9.81;
-    isr_sample.read_us   = (uint16_t)(micros() - read_start);
-    isr_sample.fsm_state = (uint8_t)ms.get_state();
-    isr_sample.err_run   = 0;
-    sample_pending = true;
+    ring_push(millis(), accel_value, acceleration_avg_g.avg(),
+              x / 1000.0f * 9.81f, y / 1000.0f * 9.81f,
+              (uint16_t)(micros() - read_start),
+              (uint8_t)ms.get_state(), 0);
 
     return (bosch_acceleration_avg_g.avg());
 }
@@ -851,21 +905,27 @@ void emit_sample_log()
     uint16_t        ticks;
     uint16_t        err_total;
 
-    if (!sample_pending) {
+    /*
+     * Drain everything the ISR has queued, not just the newest record.
+     *
+     * ONE PASS PER CALL, deliberately: the caller is loop(), which runs far
+     * faster than 25 Hz, so a queue never persists -- and returning after each
+     * record keeps the FSM being serviced between them rather than stalling it
+     * behind a backlog we are only draining for the log's benefit.
+     *
+     * No masking needed. Single producer, single consumer, and uint8_t access
+     * is atomic on AVR: the ISR only advances head, this only advances tail.
+     */
+    if (ring_tail == ring_head) {
         return;
     }
 
-    /*
-     * Copy the snapshot with interrupts masked so the ISR cannot update it
-     * halfway through the read.
-     */
-    noInterrupts();
-    memcpy(&s, (const void *)&isr_sample, sizeof(s));
+    memcpy(&s, (const void *)&ring[ring_tail], sizeof(s));
+    ring_tail = (uint8_t)((ring_tail + 1) >= SAMPLE_RING_N ? 0 : ring_tail + 1);
+
     overrun   = sample_overrun;
     ticks     = isr_ticks;
     err_total = sensor_err_total;
-    sample_pending = false;
-    interrupts();
 
     /*
      * Feed the velocity window.
@@ -883,7 +943,7 @@ void emit_sample_log()
      * than interpolating across it.
      */
     if (!s.err_run) {
-        vel_window.add(s.accel, s.t_ms);
+        vel_window.add(s.accel / 1000.0f, s.t_ms);
 
         /*
          * Same placement, same reasons: the FSM reads the quiet run from
@@ -892,7 +952,7 @@ void emit_sample_log()
          * return -- LOG_DECIMATE_N thins the log and must never thin a
          * detector, least of all one that RELEASES the beacon.
          */
-        lat_monitor.add(s.ax, s.ay, s.t_ms);
+        lat_monitor.add(s.ax / 1000.0f, s.ay / 1000.0f, s.t_ms);
     }
 
     if (++decimate < LOG_DECIMATE_N) {
@@ -913,9 +973,9 @@ void emit_sample_log()
         Serial.print(s.err_run);
     } else {
         Serial.print(F(" a="));
-        Serial.print(s.accel, 4);
+        Serial.print(s.accel / 1000.0f, 3);
         Serial.print(F(" avg="));
-        Serial.print(s.avg, 4);
+        Serial.print(s.avg / 1000.0f, 3);
     }
 
     Serial.print(F(" st="));
@@ -948,9 +1008,9 @@ void emit_sample_log()
      * that z physically cannot (see the sample_log_t comment).
      */
     Serial.print(F(" x="));
-    Serial.print(s.ax, 3);
+    Serial.print(s.ax / 1000.0f, 3);
     Serial.print(F(" y="));
-    Serial.print(s.ay, 3);
+    Serial.print(s.ay / 1000.0f, 3);
 
     /*
      * The lateral metric the release path actually decides on, and the quiet
