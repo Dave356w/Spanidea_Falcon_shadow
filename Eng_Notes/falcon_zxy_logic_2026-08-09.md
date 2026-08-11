@@ -1,5 +1,32 @@
 # Z + X/Y confirmation logic — design, before any hardware
 
+> ## ⛔ CLOSED, 2026-08-11. The lateral path does not work on this equipment.
+>
+> Measured, not argued. Cruise-versus-parked contrast on the lateral metric:
+>
+> | sample rate | parked median | cruise median | ratio |
+> |---|---|---|---|
+> | 3.13 Hz | 0.016 | 0.019 | **1.19×** |
+> | 25 Hz | 0.016 | 0.019 | **1.19×** |
+>
+> An eight-fold sample-rate increase moved it by nothing — and the reason was
+> predicted in `main.cpp`'s own comment before any of this was measured:
+> *aliasing hurts an ENERGY measure far less than it hurts transient
+> detection*. The vertical axis was transformed at 25 Hz because it detects a
+> **transient**; the lateral metric measures a **level**, and levels survive
+> aliasing. It was already telling the truth at 3.13 Hz.
+>
+> **So 1.19× is a property of this counterweight, not of the firmware.** No
+> sample rate fixes it, including the 100 Hz fuse change. This design is not
+> blocked pending better hardware — it is ruled out on this machine.
+>
+> `XY_RELEASE_ARMED` stays 0, the module remains as instrumentation, and the
+> ⛔ stillness-backstop block in `movement_service.h` keeps its authority.
+>
+> The reasoning below is kept as the record of how it was arrived at, including
+> its two reversals. The arrival problem it was built to solve was instead
+> solved on the vertical axis — see `falcon_signature_2026-08-11.md`.
+
 **Date:** 2026-08-09
 **Status:** design only. Nothing here is implemented and nothing is measured.
 **Depends on:** `falcon_use_case_2026-08-09.md` §8 (the spec), §9 (the 1–2 s

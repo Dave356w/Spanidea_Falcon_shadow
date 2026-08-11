@@ -190,7 +190,13 @@ evidence that would justify arming.
   1 g pedestal, and it does not transfer to gravity-free axes — but its
   conclusion does, arriving by the route §8 of the design note predicted.
 - Risk 2 is no longer a risk. It is a measured failure.
-- The z + x/y architecture is not dead; it is blocked on roadmap item 5.
+- ~~The z + x/y architecture is not dead; it is blocked on roadmap item 5.~~
+  **Wrong, corrected 2026-08-11.** Item 5 was done that afternoon (25 Hz) and
+  the lateral contrast did not move: 1.19× at 3.13 Hz and 1.19× at 25 Hz.
+  Levels survive aliasing in a way transients do not, so the rate was never
+  what was holding it back — the 1.19× is a property of this machine. The
+  architecture is **ruled out on this equipment**, not blocked. See
+  `falcon_zxy_logic_2026-08-09.md`'s closing banner.
 
 ### 5.6 ✅ The reset budget was wrong, and that reshapes the roadmap
 

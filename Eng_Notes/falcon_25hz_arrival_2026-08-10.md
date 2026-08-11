@@ -1,5 +1,24 @@
 # 25 Hz, and the arrival problem solved
 
+> ## 🔴 CORRECTION, 2026-08-11 — read this first
+>
+> **The margins in this note are overstated and the title is too strong.**
+>
+> Two further runs the same afternoon produced arrivals of **0.713** and 1.413
+> against a threshold of 0.70, and a cruise ceiling of **0.28**. The 0.713
+> cleared the threshold by 1.9% — it fired by luck.
+>
+> So the honest separation is 0.28 → 0.713, about **2.55×**, not the 22.6× §3
+> reports. The 18 fpm run was an unusually clean case and the headline drawn
+> from it did not survive two more runs. `ARRIVAL_PEAK_VALUE` is now 0.45.
+>
+> Everything about the *mechanism* below still holds — the timer arithmetic,
+> why arrival must read the raw sample, why the peak must be windowed. It is
+> only the margin, and the confidence, that were wrong.
+>
+> See `falcon_signature_2026-08-11.md`, which supersedes this note and explains
+> why amplitude alone was never going to separate these populations.
+
 **Date:** 2026-08-10, afternoon, cartop, live building
 **Status:** measured across three runs at two speeds. Provisional but strong.
 **Supersedes:** the conclusion in `falcon_hoistway_protocol.md` §5 that the

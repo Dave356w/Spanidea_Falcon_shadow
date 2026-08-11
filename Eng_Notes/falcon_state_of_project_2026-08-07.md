@@ -1,5 +1,21 @@
 # Falcon firmware — state of the project
 
+> ## ⚠️ SUPERSEDED, 2026-08-11. Historical only.
+>
+> This describes the project as of 2026-08-07 and several of its conclusions
+> have since been overturned by measurement. In particular: the sample rate is
+> now 25 Hz (roadmap item 5), arrival detection no longer reads the rolling
+> average, the 1–3 s reset budget has been relaxed by the customer to ~8 s, and
+> the Z + X/Y approach designed after this note was written has been measured
+> and ruled out on this equipment.
+>
+> **For the current state read `falcon_signature_2026-08-11.md`**, then work
+> backwards through `falcon_25hz_arrival_2026-08-10.md` (which carries its own
+> correction banner) and `falcon_hoistway_protocol.md`.
+>
+> Kept because the baseline comparison against `59e945f` and the 2026-08-07
+> hoistway numbers are still the reference for how far things have moved.
+
 **Date:** 2026-08-07
 **Baseline compared against:** `59e945f` ("Added a workaround") — the vendor
 firmware as received, and the last commit before this work began
