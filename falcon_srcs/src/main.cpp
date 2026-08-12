@@ -10,6 +10,49 @@
 #include "common.h"
 #include "velocity.h"
 #include "lateral.h"
+#include <avr/wdt.h>
+
+/*
+ * LOCKUP DEFENCES -- added 2026-08-12 after three freezes in one session.
+ *
+ * Mechanism: the sample read runs in the timer ISR, and Wire1's TWI driver
+ * waits in unbounded while-loops (twi_timeout_us defaults to 0 = disabled).
+ * A bus glitch mid-transaction -- rail disturbance from the piezo/LEDs is the
+ * suspected source; all three freezes followed alarm activity -- wedges the
+ * TWI state machine, the ISR never returns, loop() never resumes, and the
+ * device is a silent corpse with an LED latched until an external reset.
+ * 25 Hz made this ~15x more exposed than 3.13 Hz: 8x the transactions at
+ * ~11.5 ms each puts the bus busy ~30% of wall clock.
+ *
+ * The defence that fits: a 2 s watchdog, kicked from loop(). A wedged TWI
+ * wait stops loop() from ever being reached, the WDT expires, and the device
+ * reboots into a fresh calibration instead of freezing -- on a beacon a
+ * ~12 s self-recovery beats a silent corpse on the counterweight. Longest
+ * legitimate loop() stalls are well inside 2 s (burst dump ~350 ms, init
+ * chase ~1.6 s, ready chirps ~1.0 s).
+ *
+ * ⬜ The defence that does NOT fit yet: -DWIRE_TIMEOUT bounds the waits in
+ * the driver itself, turning a wedge into an ordinary failed read that the
+ * err_run path already handles -- no reboot, no lost run. It measured
+ * +1818 bytes against 714 free. Enable it (platformio.ini) plus
+ * twi_setTimeoutInMicros1(25000, true) here the moment the bma4 driver swap
+ * frees its ~4.9 KB.
+ *
+ * The .init3 hook below runs BEFORE C++ constructors: it captures the reset
+ * cause and disables the watchdog immediately, because after a WDT reset the
+ * hardware re-arms the WDT at 16 ms -- waiting until setup() risks a reset
+ * loop. Boot cause is printed in setup(): WDRF (0x8) in that byte means the
+ * previous boot died to the watchdog, i.e. a lockup was caught in the field.
+ */
+uint8_t boot_mcusr __attribute__((section(".noinit")));
+
+void wdt_early_disable(void) __attribute__((naked, used, section(".init3")));
+void wdt_early_disable(void)
+{
+    boot_mcusr = MCUSR;
+    MCUSR = 0;
+    wdt_disable();
+}
 
 uint8_t alarm_status_g = 0;
 uint8_t chase_led_status_g = 0;
@@ -698,6 +741,14 @@ void setup() {
     Serial.begin(9600);
 
     Serial.print(F("\r\n\nDevice Booted \r\n"));
+
+    /*
+     * Reset cause, captured by the .init3 hook. 0x8 (WDRF) = the watchdog
+     * caught a lockup last boot; 0x1 PORF, 0x2 EXTRF, 0x4 BORF.
+     */
+    Serial.print(F("Reset cause: 0x"));
+    Serial.print(boot_mcusr, HEX);
+    Serial.print(F("\r\n"));
     /*
      * Configure the ADC chip here for SPI protocol.
     */
@@ -719,6 +770,8 @@ void setup() {
 
     bma456.initialize(RANGE_2G, ODR_100_HZ, NORMAL_AVG4, CONTINUOUS);
     Serial.print(F("Configured BMA456 \r\n"));
+
+    /* (TWI timeout call goes here when WIRE_TIMEOUT fits -- see above.) */
 
     /*
      * Arm the any-motion engine and listen on INT1_ACC / PD2. Observation only
@@ -751,6 +804,9 @@ void setup() {
     */
 
     configure_adc_channel();
+
+    /* Last: nothing above may run again, so arm the watchdog on the way out. */
+    wdt_enable(WDTO_2S);
 }
 
 void initialization()
@@ -793,6 +849,13 @@ void initialization()
 
 void loop()
 {
+    /*
+     * The only watchdog kick. Deliberately nowhere else -- if loop() stops
+     * being reached, whatever stopped it is exactly what the reboot exists
+     * to recover from.
+     */
+    wdt_reset();
+
     switch (state) {
 
     case SystemStates::SYSTEM_STATE_INITIALIZING:
