@@ -10,19 +10,14 @@
 #include "common.h"
 #include "velocity.h"
 #include "lateral.h"
-#include <EEPROM.h>
 
-uint16_t x_axis_1, x_axis_2, y_axis_1, y_axis_2, z_axis_1, z_axis_2;
-uint8_t sensor_value_updated = 0;
 uint8_t alarm_status_g = 0;
 uint8_t chase_led_status_g = 0;
 uint8_t battery_alarm_status_g = 0;
 uint32_t temp_timer = 0;
 uint32_t init_time_g = 0;
-float acc_mss_g = 0.0, vel_ms_g = 0.0, adj_acc_g = 0.0;
 SystemStates state = SystemStates::SYSTEM_STATE_INITIALIZING;
 static boolean in_isr = false;
-RollingAvg<float> pressure_avg_g(2);
 /*
  * 4 -> 32 alongside the 3.13 Hz -> 25 Hz timer change (see enable_timer()).
  *
@@ -40,16 +35,12 @@ RollingAvg<float> pressure_avg_g(2);
  * quieter floor is what would make it visible.
  */
 RollingAvg<float> acceleration_avg_g(32);
-//RollingAvg<float> adj_acc_avg_g(16);
 RollingAvg<uint16_t> battery_avg(8);
 float x = 0, y = 0, z = 0;
 float g_value, accel_value;
-RollingAvg<float> bosch_acceleration_avg_g(4);
-float self_calib_acceleration = 0.0;
-extern eeprom_db eeprom_db_g;
 
 MCP3208 adc(ADC_VREF, PIN_ADC_CS);
-MovementService ms(&acceleration_avg_g, &acc_mss_g, &adj_acc_g, &vel_ms_g, &pressure_avg_g);
+MovementService ms(&acceleration_avg_g);
 
 #define EN_3_AXIS_SENS 1
 
@@ -282,8 +273,8 @@ static volatile bool     arr_hit       = false;
  * discriminator being looked for.
  */
 #define BURST_N     80      /* 3.2 s at 25 Hz, 160 bytes                     */
-#define BURST_POST_DEP  60  /* departure: 20 pre / 60 post                   */
-#define BURST_POST_ARR  60  /* arrival:   20 pre / 60 post -- see burst_trigger */
+/* BURST_POST_DEP / BURST_POST_ARR live in movement_service.h -- single
+ * source, shared with the FSM that calls burst_trigger(). See the ⚠️ there. */
 
 /*
  * JOG VERDICT -- log-only classifier, NOT a release path (2026-08-11).
@@ -616,14 +607,6 @@ void setup() {
 
     Serial.print(F("\r\n\nDevice Booted \r\n"));
     /*
-     * Configure the ADC chip-select line here
-    */
-#if 0
-    pinMode(PIN_ADC_CS, OUTPUT);
-    digitalWrite(PIN_ADC_CS, HIGH);
-#endif
-
-    /*
      * Configure the ADC chip here for SPI protocol.
     */
     SPISettings settings(ADC_CLK, MSBFIRST, SPI_MODE0);
@@ -631,7 +614,6 @@ void setup() {
     SPI.beginTransaction(settings);
     Serial.print(F("Configured SPI interface \r\n"));
 
-    // read_calib_data_from_eeprom();
     /*
      * Configure all Alarm Ports here
     */
@@ -717,10 +699,8 @@ void initialization()
 }
 
 
-void loop() 
+void loop()
 {
-    static int  bma_read_counter = 0;
-
     switch (state) {
 
     case SystemStates::SYSTEM_STATE_INITIALIZING:
@@ -752,11 +732,6 @@ void loop()
         emit_burst_log();
         emit_acc_int_log();
         poll_acc_int_status();
-
-        if (bma_read_counter++ > 1000 ) {
-            log_data();
-            bma_read_counter = 0;
-        }
 
         check_for_battery_voltage();
 
@@ -808,7 +783,7 @@ static void ring_push(uint32_t t_ms, float accel, float avg, float ax, float ay,
  * Read z-axis accelerometer data and convert to m/(s*s)
  */
 
-float read_acceleration_mss()
+void read_acceleration_mss()
 {
     uint32_t read_start;
     uint16_t rslt;
@@ -838,7 +813,7 @@ float read_acceleration_mss()
                   (uint16_t)(micros() - read_start),
                   (uint8_t)ms.get_state(), sensor_err_run);
 
-        return (bosch_acceleration_avg_g.avg());
+        return;
     }
 
     sensor_err_run = 0;
@@ -940,21 +915,10 @@ float read_acceleration_mss()
     /*
      * Publish a snapshot for loop() to print. No serial I/O in here.
      */
-    {
-        /*
-         * (historical) loop() has not printed the previous sample yet, so it is about to be
-         * overwritten. A non-zero overrun count means the log is decimated by
-         * something other than LOG_DECIMATE_N and sample timing cannot be
-         * inferred from the log alone.
-         */
-    }
-
     ring_push(millis(), accel_value, acceleration_avg_g.avg(),
               x / 1000.0f * 9.81f, y / 1000.0f * 9.81f,
               (uint16_t)(micros() - read_start),
               (uint8_t)ms.get_state(), 0);
-
-    return (bosch_acceleration_avg_g.avg());
 }
 
 /*
@@ -1200,7 +1164,7 @@ void emit_sample_log()
 
     Serial.print(F("\r\n"));
 }
-#if 1
+
 void enable_timer()
 {
     cli();
@@ -1288,32 +1252,7 @@ void enable_timer()
     TCCR1B |= ((1 << CS11) | (1 << CS10));
     sei();
 }
-#endif
 
-#if 0
-void enable_timer()
-{
-    cli();
-
-    // Reset control registers
-    TCCR1A = 0;
-    TCCR1B = 0;
-
-    // Set CTC mode (Mode 4)
-    TCCR1B |= (1 << WGM12);
-
-    // Set compare value (for ~10 ms interrupt)
-    OCR1A = 156;
-
-    // Enable Compare Match A interrupt
-    TIMSK1 |= (1 << OCIE1A);
-
-    // Start timer with prescaler = 1024
-    TCCR1B |= (1 << CS12) | (1 << CS10);
-
-    sei();
-}
-#endif
 void disable_timer1()
 {
     // reset Control Register to disable timer
@@ -1352,7 +1291,6 @@ ISR(TIMER1_COMPA_vect)
      */  
     noInterrupts();
 
-    sensor_value_updated = 1;
     in_isr = false;
     return;
 }
@@ -1395,7 +1333,6 @@ void emit_acc_int_log()
     }
     last_reported = count;
 
-#if LATCHED_FSM
     /*
      * Hand the departure to the FSM. It only acts on this in STATE_MONITORING,
      * so the constant stream of interrupts the buzzer raises while alarming
@@ -1406,7 +1343,6 @@ void emit_acc_int_log()
      * context.
      */
     ms.notify_any_motion(when);
-#endif
 
     Serial.print(F("ACC-INT n="));
     Serial.print(count);
@@ -1533,25 +1469,7 @@ void poll_acc_int_status()
     }
 }
 
-void log_data()
-{
-    static int loop_cnt = 0;
-    static int index = 1;
-
-    if (loop_cnt++ > 100) {
-        loop_cnt = 0; 
-        index++;
-    }
-
-}
-
-void debug_log(char *p_log)
-{
-    Serial.print(p_log);
-
-}
-
-inline uint16_t read_battery_voltage() 
+inline uint16_t read_battery_voltage()
 {
     float vol_temp = (((float) adc.read(BATT_SENSE) / 4096.0) * 3300) * (VBATT_CONST) * (1.06);
 

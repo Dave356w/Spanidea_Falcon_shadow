@@ -12,15 +12,10 @@
  * Velocity change is the right observable. A departure to 20 fpm is
  * dv = 0.1016 m/s NO MATTER HOW GENTLY IT RAMPS -- softness spreads the same
  * integral over more time instead of shrinking it. Vibration is zero-mean and
- * cancels under integration; a run does not. And on arrival, conservation is
- * free: the car that left at 20 fpm must shed exactly 20 fpm to stop, so the
- * arrival integral equals the departure integral with the opposite sign,
- * regardless of how soft the stop was.
+ * cancels under integration; a run does not.
  *
- * That last point is what this buys that nothing else does. ARRIVAL_CLUSTER_DELTA
- * is a constant fitted to twelve cartop runs and §14.3 shows it degrades as runs
- * get longer. The conservation test calibrates itself from the departure that
- * was actually measured on THIS run, in THIS shaft, on THIS machine.
+ * (The arrival-side conservation test that once lived here is dead -- see the
+ * ⛔ block below.)
  *
  * It also reaches a departure any-motion cannot. A car ramping to 20 fpm over
  * 4 s averages 0.025 m/s^2 -- SIX TIMES below ANYMOTION_THRESHOLD (32 counts =
@@ -270,38 +265,19 @@
 #define VEL_DEPART_THRESHOLD      (2.0f * VEL_PARKED_PEAK)
 
 /*
- * Arrival: conservation test.
+ * ⛔ THE CONSERVATION ARRIVAL TEST IS GONE, and it is not coming back.
  *
- * The arrival must be opposite in sign to the departure and at least this
- * fraction of its magnitude. 0.5 rather than something nearer 1.0 because
- * guard 3 systematically under-counts arrivals measured through a beep cycle.
- */
-#define VEL_ARRIVE_FRACTION       (0.50f)
-
-/*
- * ...but never below the parked peak, whatever the departure measured. Without
- * this floor a weak departure measurement would set an arrival gate inside the
- * noise and release the alarm mid-ride -- the catastrophic direction (§14.4).
+ * The idea was that the arrival integral must cancel the departure integral.
+ * The 2026-08-11 arrival bursts killed it: a smooth drive deceleration
+ * integrates to 67% of true speed (window closes mid-ramp) and a brake stop
+ * to 128% (the shock impulse inflates it), so NEITHER end of the comparison
+ * is reliably measurable -- falcon_signature_2026-08-11.md §4e.1. The code
+ * (VEL_ARRIVE_FRACTION, VEL_ARRIVE_MIN, VEL_ARRIVAL_ENABLE and the FSM's 1b
+ * path) was removed in the 2026-08-12 cleanup; last version at 8308cdd.
  *
- * Consequence at 3.13 Hz: runs whose departure integral is under 0.255 m/s
- * (~50 fpm) get no velocity arrival path at all, and fall through to the
- * existing any-motion and polled paths exactly as today.
+ * What survives is the RAMP measurement, which references nothing about the
+ * departure -- see the ramp detector in main.cpp.
  */
-#define VEL_ARRIVE_MIN            (2.0f * VEL_PARKED_PEAK)
-
-/*
- * Set to 0 to compile the velocity arrival path out and keep departure only,
- * once VEL_ARMED is 1.
- *
- * Departure is strictly additive -- it can only make the unit alarm sooner.
- * Arrival adds a RELEASE path, which is the direction that can hurt someone,
- * so it should be the first thing switched off if field data ever shows a
- * premature release. The replay also showed arrival integrals reaching 159-270%
- * of the departure on some runs, which is buzzer coupling inflating the number
- * (§5); harmless while it only makes the gate easier to clear in the correct
- * direction, but a reason not to trust this path until it is characterised.
- */
-#define VEL_ARRIVAL_ENABLE        1
 
 
 class VelocityWindow

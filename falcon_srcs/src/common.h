@@ -64,11 +64,4 @@
 
 #endif
 
-typedef struct _eeprom_db_
-{
-    uint32_t magic;
-    uint32_t version;
-    float    thresh_value;
-} eeprom_db;
-
 #endif

@@ -2,25 +2,25 @@
  ***********************************************************
  * File   : lateral.h
  *
- * X/Y stillness detector -- the RESET half of the Z + X/Y design.
+ * X/Y lateral monitor -- INSTRUMENTATION and calibration quality gate.
  *
- * See Eng_Notes/falcon_spec_primary_usecase_2026-08-09.md. In one line:
+ * This began as the RESET half of a Z + X/Y design ("Z sets the beacon, X/Y
+ * resets it"). That release path is DEAD, permanently: the parked-vs-cruise
+ * contrast measured 1.19x at 3.13 Hz AND at 25 Hz (falcon_signature
+ * 2026-08-11 §1.2) -- an energy level survives aliasing, so no sample rate
+ * fixes it. It is a property of this machine, not of the sampling. The
+ * release code (XY_RELEASE_ARMED and its FSM block, XY_RELEASE_POLLS,
+ * XY_MIN_BEACON_MS, XY_REARM_MS) was removed in the 2026-08-12 cleanup;
+ * last version at 8308cdd.
  *
- *     Z sets the beacon. X/Y resets it. Neither axis can do both.
+ * What remains, and why it stays:
  *
- * Z carries a 1 g pedestal, so a car cruising and a car parked read the same
- * (§3) -- z can see the transient at the start of a move and cannot see
- * whether the move is still going on. X and Y carry no gravity component, so
- * what they measure is guide-shoe and rail excitation: present while
- * travelling, absent while parked. That is a LEVEL, which is exactly the
- * question "is it still moving".
- *
- * The ⛔ stillness-backstop block in movement_service.h forbids a rest
- * detector, and this is a rest detector. Its numbers are all z and its
- * argument is the 1 g pedestal, which does not transfer here -- but it was
- * written after a real mid-ride release on hardware, and its safety lesson
- * stands. If the x/y contrast measures marginal in a hoistway, that block wins
- * and XY_RELEASE_ARMED goes back to 0.
+ *   - the m= / q= log fields -- the lateral level is still the only
+ *     per-run mounting-quality signal the capture has, and cruise
+ *     vibration measures the MOUNTING as much as the machine;
+ *   - the in-situ calibration, whose movement/quorum verdict is the
+ *     quality gate the z zero-calibration retry logic keys off
+ *     (see CALIB_RETRIES in movement_service.h).
  ***********************************************************
  */
 
@@ -28,36 +28,6 @@
 #define _LATERAL_H_
 
 #include <Arduino.h>
-
-/*
- * Compile the x/y release path into the FSM.
- *
- * 0 leaves everything here running and logged -- the learned threshold, the
- * per-sample metric, the quiet run -- while the FSM releases exactly as it
- * does today. That is the mode to fall back to if a hoistway session shows a
- * release the car did not deserve, and it is the same discipline velocity.h
- * applies to itself.
- */
-/*
- * ⛔ NOT ARMED for the first hoistway session (2026-08-10, Phase 1a).
- *
- * The bench closed risk 1 -- the buzzer does not block the release. It cannot
- * say anything about risk 2, a smooth machine letting the metric fall below
- * XY_STILL mid-cruise and dropping the beacon while the car is still moving.
- * That is the dangerous direction, and it is the exact failure that got the
- * stillness backstop banned on 2026-08-07 after it released mid-ride twice.
- *
- * So: log what this WOULD have done, replay it against the capture, and only
- * then arm. Unarmed, the FSM releases on the existing z paths and behaviour
- * is identical to the previous build, while m= and q= are logged throughout.
- * This is the sequence §11 used to introduce any-motion before §12 promoted
- * it, and it is why that path works.
- *
- * WHAT UNBLOCKS IT: one measurement -- the lateral level during the slowest
- * cruise the machine can produce, against the parked floor in the same shaft.
- * If the quietest travel clears the noisiest parked with margin, set this to 1.
- */
-#define XY_RELEASE_ARMED          0
 
 /*
  * THE METRIC: |dx| + |dy| between consecutive unblanked samples, m/s^2.
@@ -187,47 +157,6 @@
  * ordinary parked excursions reach 0.103. UNMEASURED on x/y.
  */
 #define XY_CALIB_MOVE_MSS         (0.80f)
-
-/* ---- release ------------------------------------------------------------- */
-
-/*
- * Consecutive quiet metrics required to release the beacon.
- *
- * Hysteresis against a smooth patch mid-travel -- risk 2 in the spec, and the
- * way the mid-ride release of 2026-08-07 could come back. At ~1.5 samples/s
- * through a beep cycle, 2 metrics is roughly 0.6-1.3 s of confirmed quiet on
- * top of the beacon minimum below.
- */
-#define XY_RELEASE_POLLS          2
-
-/*
- * Minimum beacon duration, milliseconds.
- *
- * Anti-flicker, and it also sets the floor of the second working-range axis:
- * a movement burst shorter than this still produces a beacon of this length.
- * That is the correct trade -- inspection operation is continuous-pressure
- * and therefore bursty, and a counterweight moving six inches is worth
- * announcing for a second and a half.
- *
- * Replaces MIN_TRAVEL_MS (3000) for this path only. MIN_TRAVEL_MS exists to
- * stop the departure transient from satisfying the z arrival tests; the x/y
- * path is not looking for a transient, so it does not need 3 s of protection.
- */
-#define XY_MIN_BEACON_MS          1500
-
-/*
- * Re-arm blanking after an x/y release, milliseconds. Replaces
- * MONITOR_REARM_MS (6000) for this path only.
- *
- * 6 s of deafness after a release is unacceptable under inspection operation,
- * where the next jog can follow the last one by a second. MONITOR_REARM_MS
- * exists because a harsh stop keeps generating any-motion -- ringing, doors,
- * passengers -- and a plain state check would read that tail as a fresh
- * departure. An x/y release does not have that problem by construction: it
- * only happens after XY_RELEASE_POLLS metrics BELOW the stillness threshold,
- * so the lateral ringing the blanking was invented for has already stopped.
- */
-#define XY_REARM_MS               500
 
 class LateralMonitor
 {

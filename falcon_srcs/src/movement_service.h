@@ -4,11 +4,6 @@
 #include "velocity.h"
 #include "lateral.h"
 
-#define TEMP_WAIT                      100
-#define VEL_MAX_LIMIT                  (2.0)
-#define VEL_THRESHOLD_SET_TIMEOUT      400
-#define VEL_THRESHOLD_ADJ              2
-#define MOVING_ACC_THRESHOLD           (0.05)
 #define CALIB_TIMEOUT_MS               10000
 
 /*
@@ -58,10 +53,9 @@
  * would be paid for much later. 200 ms still spans a sample at 3.13 Hz.
  *
  * COUPLING, since it is not obvious: this moves movement_start_timer 800 ms
- * earlier, and that is the reference for both MIN_TRAVEL_MS (3000) and
- * XY_MIN_BEACON_MS (1500). Both still clear the departure transient with
- * room, but anything that shortens either of those must be checked against
- * this number rather than against the old 1 s.
+ * earlier, and that is the reference for MIN_TRAVEL_MS (3000). It still
+ * clears the departure transient with room, but anything that shortens it
+ * must be checked against this number rather than against the old 1 s.
  *
  * ⬜ THE DURATION AXIS IS STILL UNMEASURED. No deliberate short jog has ever
  * been recorded on this device. The test is cheap -- taps at roughly 0.25,
@@ -69,27 +63,36 @@
  * movement" is reasoning, not a measurement.
  */
 #define MOVEMENT_DETECTION_TIMEOUT_MS  200
-#define STOP_TIMEOUT_MS                15000
 
 /*
- * Roadmap item 8 -- latch on departure, release on arrival (Eng_Notes §3, §12).
+ * LATCHED FSM -- latch on departure, release on arrival (Eng_Notes §3, §12).
  *
- * Set to 0 to restore the timeout-based behaviour of 59e945f exactly. Nothing
- * else in the tree changes; every difference is inside #if LATCHED_FSM blocks.
+ * The alarm holds from departure until an arrival transient is seen, per the
+ * §3 table. The original timeout-based design (fixed 10 s buzzer / 15 s LED,
+ * then "is the average still displaced?") cleared mid-ride during constant
+ * velocity -- §3's physical constraint -- and was the original complaint this
+ * whole investigation started from.
  *
- * The old design alarmed for a fixed 10 s buzzer / 15 s LED window and then
- * asked "is the average still displaced from calibration?". During constant
- * velocity it is not -- that is §3's physical constraint -- so the alarm cleared
- * mid-ride regardless of whether the car had arrived. That is the original
- * complaint this whole investigation started from.
- *
- * The latched design instead holds the alarm from departure until an arrival
- * transient is seen, per the §3 table. It is only possible now because:
- *
- *   - departures are detectable at all (§12, any-motion at 18 fpm), and
- *   - something is listening during the alarm (§5 item 7, ~45% coverage)
+ * The LATCHED_FSM compile switch and the old timeout FSM were removed in the
+ * 2026-08-12 cleanup; the last commit carrying them is in history at 8308cdd,
+ * and the pre-latch behaviour itself at 59e945f.
  */
-#define LATCHED_FSM                    1
+
+/*
+ * BURST RECORDER SPLITS -- samples kept AFTER each trigger; the remaining
+ * BURST_N - post are pre-trigger history. See burst_trigger() in main.cpp
+ * for why the two triggers want different splits.
+ *
+ * ⚠️ SINGLE SOURCE, deliberately in this header. Until 2026-08-12 main.cpp
+ * and movement_service.cpp each carried private copies, and the 2026-08-11
+ * "20 -> 60" change (329ce6d) edited only main.cpp's -- which is used for
+ * nothing but the pre= label on the dump. The FSM kept triggering at 20 post
+ * while every dump CLAIMED 60, so the 350 fpm arrival bursts of runs 4-5
+ * were analysed against a trigger index 40 samples off. The intended 60-post
+ * arrival split takes real effect from this change onward.
+ */
+#define BURST_POST_DEP  60  /* departure: 20 pre / 60 post */
+#define BURST_POST_ARR  60  /* arrival:   20 pre / 60 post */
 
 /*
  * ARRIVAL DETECTION -- two independent paths, plus a stillness backstop.
@@ -117,15 +120,6 @@
  */
 
 /*
- * Polled arrival threshold, m/s^2 on the rolling average.
- *
- * Raised from 0.20 to 0.30. Demoted to a backup for violent stops, it no longer
- * needs to reach for gentle arrivals, so it can have real margin over the 0.18
- * cruise noise instead of the 1.1x it had at 0.20. Run 1's 0.441 still clears it.
- */
-#define ARRIVAL_THRESHOLD_VALUE        (0.30)
-
-/*
  * Clustered any-motion: edges required, and the window they must fall inside.
  *
  * ACC-STAT polls and clears the sensor status every ACC_INT_POLL_MS (1 s), so
@@ -144,43 +138,12 @@
 #define ARRIVAL_EDGE_WINDOW_MS         2500
 
 /*
- * A cluster alone is not enough -- the polled average must corroborate it.
- *
- * The two detectors fail in OPPOSITE places, which is what makes this work:
- *
- *   speed     cruise asserts?          polled arrival margin
- *   18 fpm    no, 0.4 edges/min        0.312 vs cruise 0.271  = 1.15x
- *   58 fpm    YES, 999 ms pair         brake set 1.275        = comfortable
- *
- * So clustering is safe at low speed but does not fire there (an 18 fpm
- * arrival produced a single edge), while at 58 fpm it fires when it should
- * not -- on 2026-08-07 it released 12 s into a 54 s ride. Polled is the
- * mirror image: marginal slow, strong fast.
- *
- * Requiring both weak signals to agree covers the range without weakening
- * either. Measured against every case that day:
- *
- *   case                     cluster   delta    result
- *   real arrival, descent      yes     0.278    fires (polled alone missed it)
- *   FALSE release, 58 fpm      yes     0.175    REJECTED
- *   18 fpm arrival             no      0.312    fires on polled alone
- *   brake set                  no      1.275    fires on polled alone
- *
- * 0.20 sits above the 0.175 false case and below the 0.278 real one. That is
- * a 1.14x / 1.39x margin on four samples -- thin, and the first thing to
- * revisit as more speeds are measured.
- */
-#define ARRIVAL_CLUSTER_DELTA          (0.20)
-
-/*
- * ⬆️ SUPERSEDED at 25 Hz by ARRIVAL_PEAK_VALUE below. Kept for the record and
- * for anyone reverting the sample rate.
- *
- * ARRIVAL_CLUSTER_DELTA and ARRIVAL_THRESHOLD_VALUE both read the rolling
- * average, and on 2026-08-10 the first 25 Hz run showed why that no longer
- * works: a stop whose RAW excursion was 0.938 m/s^2 registered 0.0072 on the
- * 1.28 s average, because one large sample inside a 32-sample window is
- * divided by 32. The signal did not get smaller -- the averaging got longer.
+ * (The rolling-average corroboration constants ARRIVAL_THRESHOLD_VALUE and
+ * ARRIVAL_CLUSTER_DELTA were removed in the 2026-08-12 cleanup: both read the
+ * 1.28 s average, which the 25 Hz change made blind to arrival transients --
+ * a stop whose RAW excursion was 0.938 m/s^2 registered 0.0072 on the
+ * average. ARRIVAL_PEAK_VALUE on the raw sample replaced them at 5bd499e;
+ * their tuning history is in this header at 8308cdd.)
  */
 
 /*
@@ -437,31 +400,19 @@ enum MotionStates
     STATE_ERROR_RESET,
 };
 
-enum MonitorStates {
-    MONITORING = 0,
-    NOT_MONITORING
-};
-
 class MovementService {
   public:
     MotionStates state;
     MotionStates last_state;
-    bool log_printed;
-    RollingAvg<float> *pressure_avg_ref;
     RollingAvg<float> *acceleration_avg_ref;
-    float *vel_ms_ref, *adj_acc_ref, *acc_mss_ref;
-    float vel_threshold;
-    float variance_acc, variance_pres;
     float zero_calib_value;
     float threshold_value;
-    
-    MovementService(RollingAvg<float> *acc_avg, float *acc_mss, float *adj_acc, float *vel_ms, RollingAvg<float> *pres_avg);
 
-//    void run(void);
+    MovementService(RollingAvg<float> *acc_avg);
+
     void fsm_run(void);
     int  get_state();
 
-#if LATCHED_FSM
     /*
      * Called from loop() when the BMA456 any-motion interrupt has fired.
      * edge_ms is when the ISR saw it, NOT when loop() got round to it -- see
@@ -484,17 +435,12 @@ class MovementService {
      * next run (belt-and-braces: MOVING entry clears it too).
      */
     void jog_release(void);
-#endif
 
   private:
-    uint8_t acc_varience_counter, pressure_varience_counter;
-    uint32_t timer_ms;
-    MonitorStates monitor_state;
     uint32_t reset_counter;
     uint32_t start_timer;
     uint32_t movement_start_timer;
     uint32_t current_time;
-#if LATCHED_FSM
     bool     any_motion_pending;   /* departure seen, not yet acted on   */
     bool     arrival_seen;         /* arrival transient seen while MOVING */
     bool     jog_release_pending = false;  /* jog verdict release request */
@@ -515,18 +461,6 @@ class MovementService {
     bool     vel_reported;
 
     /*
-     * Re-arm blanking to apply on the NEXT entry to STATE_MONITORING.
-     *
-     * Set per release path rather than fixed, because the two paths have
-     * opposite requirements. A z arrival is followed by ringing that would
-     * re-latch, so it needs MONITOR_REARM_MS. An x/y release has already
-     * observed XY_RELEASE_POLLS quiet metrics, so the ringing is over and
-     * 6 s of deafness would only lose the next inspection jog. See
-     * XY_REARM_MS.
-     */
-    uint32_t rearm_ms;
-
-    /*
      * Calibration bookkeeping for the learned XY_STILL. calib_moved is set by
      * an any-motion edge during the window; calib_attempts bounds how many
      * times a rejected window is retried before the device arms on the
@@ -534,17 +468,6 @@ class MovementService {
      */
     bool     calib_moved;
     uint8_t  calib_attempts;
-#endif
 
-    void reset_counters();
-    void setErrorResetState();
     void set_state(int);
-    bool isAtRestOrStable();
-
-    inline bool isStartedMoving();
-    inline bool isMovingConfirmed();
-    inline bool isDecelerating();
-    inline void startMonitoring();
-    inline void stopMonitoring();
-    inline bool isMonitoring();
 };

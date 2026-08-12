@@ -11,10 +11,6 @@
 #include "main.h"
 #include "arduino_bma456.h"
 #include "common.h"
-#include <EEPROM.h>
-
-uint16_t read_battery_voltage();
-
 
 int configure_adc_channel()
 {  

@@ -1,0 +1,59 @@
+FALCON MOVEMENT-ALARM FIRMWARE — TEST STATUS REPORT
+Date: 2026-08-11
+Testing: full-day hoistway session (cab interior + cartop), Dave W.
+
+SUMMARY
+A major usability defect was fixed and verified today, the device's
+behavior at full speed was characterized for the first time, and the
+detection limits of the current design are now measured rather than
+estimated. One serious hardware issue remains open and is the top
+priority.
+
+COMPLETED TODAY
+
+1. Jog false-alarm defect: FIXED AND VERIFIED.
+   Previously, any short inspection movement ("jog") locked the alarm on
+   for 4 minutes, making the device impractical during normal inspection
+   work. A new classifier now recognizes a jog by its motion signature
+   and releases the alarm after a ~4 second chirp. Verified live on the
+   cartop: 5 out of 5 jogs released correctly, 20 of 20 classifier
+   decisions correct across the day. The safety-critical failure
+   direction (silencing the alarm on a genuinely moving car) has
+   measured margin of 2x, and all known drift directions fail safe.
+
+2. Normal-speed (350 fpm) automatic operation: NOW CHARACTERIZED.
+   Four full-speed express runs from inside the cab. All stops released
+   the alarm correctly — but with as little as 1% margin. The release
+   currently works on luck, not headroom. The drive's braking profile
+   was measured precisely (constant 0.6 m/s2 both directions), which
+   fully defines the robust fix: a "ramp detector" keyed to sustained
+   deceleration. Design is justified by data; implementation is the next
+   firmware work item.
+
+3. Inspection-mode stop detection: floor measured.
+   Gentle "leveling" stops at terminal landings produce the weakest
+   detectable arrival signal: 0.573 vs an alarm-release threshold of
+   0.45 (27% margin, highly repeatable). Adequate, but the margin
+   depends on each installation's controller behavior — recommend a
+   brief per-site verification step in any deployment procedure.
+
+OPEN ITEMS (priority order)
+
+1. POWER: the device browns out after ~4 minutes of continuous alarm on
+   fresh batteries (rail sag under sounder load, not battery depletion —
+   the low-battery warning never triggers). This caps every long-alarm
+   scenario and is the product's most serious open issue. A firmware
+   mitigation (halved sounder duty cycle) is in place but unverified;
+   bench measurement with a meter is scheduled next.
+2. Ramp detector for normal-speed stops (design complete, not built).
+3. Intermittent device lockup: three occurrences today requiring an
+   external reset; cost one test run. Root cause not yet identified.
+4. Battery telemetry produced no valid readings for one multi-hour
+   period (recovered after clean restart); under investigation.
+
+OVERALL
+The device is now solid in its primary use case (inspection operation),
+usable during inspection jogging for the first time, and its remaining
+detection gap at normal speed has a data-backed fix designed. The power
+issue is the main risk to the product concept and gates further
+long-duration testing.

@@ -15,7 +15,6 @@
 #include <RollingAvg.h>
 #include <Mcp320x.h>
 #include <SPI.h>
-#include <Adafruit_DPS310.h>
 #include "movement_service.h"
 #include "alarm.h"
 
@@ -56,11 +55,8 @@
 
 void enable_timer();
 void disable_timer1();
-float read_acceleration_mss();
-uint8_t read_pressure();
+void read_acceleration_mss();
 void check_for_battery_voltage();
-void log_data();
-void init_pressure_sensor();
 uint16_t read_adc_pc2();
 uint16_t read_adc_pc2_voltage();
 
