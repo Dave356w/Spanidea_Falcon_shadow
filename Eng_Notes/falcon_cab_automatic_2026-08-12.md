@@ -421,3 +421,70 @@ centred on its own threshold.
 **Arming the ramp detector is the change that would actually improve the
 product.** The reason it has not been armed is that it shares a gate whose
 behaviour at the thin end of the shaft is the remaining open question.
+
+---
+
+# Addendum 3 — the bottom terminal, repeated
+
+Five further automatic runs at the thin end of the shaft, plus one two-floor
+control. Same firmware and mounting as addendum 2.
+
+## 15. The margin gradient, completed
+
+| run type | q= | margin |
+|---|---|---|
+| 4→2, two floors (has cruise) | **119** | 23.8x |
+| single floor, top of shaft | 36, 38 | ~7x |
+| single floor, mid shaft | 16, 18 | ~3x |
+| single floor, bottom | 8, 8, 8, 9, 9 | ~1.7x |
+
+The two-floor control behaves exactly as the mechanism predicts: a run with
+real cruise has unlimited quiet to arm on, and q= jumps an order of magnitude.
+It also confirms the fixed instrument reports a real quantity rather than
+saturating — 119 is nothing like the constant 5 the broken version printed.
+
+## 16. 🔵 The bottom terminal is tight but STABLE — so the failure is an event, not a tail
+
+Five measurements at the bottom, both directions:
+
+```
+2→1:  9, 8, 9
+1→2:  8, 8
+```
+
+**Range 8–9. Spread of one sample across five runs.** This is not a
+distribution whose tail reaches the ~4 that the morning's failure implies. It
+is a stable property of the extended slowdown profile at that floor.
+
+**That reclassifies the 08-12 morning failure.** It is no longer "the thin end
+of a distribution occasionally losing the toss" — something specific to that
+one run roughly halved its available quiet samples.
+
+⬜ **Leading hypothesis, testable:** it was the FIRST run after the
+cartop→cab remount. The unit's resting attitude had shifted (x 0.64 → 0.61),
+and this project has already measured a 3x swing in cruise vibration between
+sessions attributable to remounting (`falcon_signature_2026-08-11.md` §4a:
+"cruise vibration measures the MOUNTING as much as the machine"). A
+mounting-sensitive arming margin would be checkable at install time, which
+makes this a better answer than "sometimes it fails".
+
+Not confirmed. What would confirm it: deliberately remount the unit and re-run
+the bottom terminal before and after.
+
+## 17. Status of the two mechanisms at end of day
+
+**Arming**: comfortable and STRUCTURED — margin varies with cruise content and
+shaft position, both explicable, none of it marginal. The reversal path
+(`ARM_REV_SAMPLES`) remains insurance for the thin end, unexercised in ~15 live
+runs (`v=2` has never appeared), gating the ramp detector only, unpromoted.
+
+**Ramp detector**: 17/17 on automatic stops across the day, means 470–513,
+directionality 100% on every single one, against complete negative evidence
+from inspection operation. **Nineteen automatic stops now put the arrival peak
+at 0.456–0.544 against a 0.45 gate.**
+
+The peak path — the one that ships and decides the release — is decided by a
+distribution centred on its own threshold. The ramp path has never been within
+a factor of 1.5 of a wrong answer. Arming the ramp detector is the change that
+would improve the product; the reason to hold is that it shares a gate whose
+behaviour on a fresh mounting is the one thing still unexplained.
