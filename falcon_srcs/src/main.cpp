@@ -461,6 +461,28 @@ static volatile uint8_t  ramp_opp      = 0;  /* independent reversal counter  */
 static volatile bool     ramp_gate     = false;
 
 /*
+ * ⚠️ ro= MUST KEEP COUNTING AFTER THE GATE OPENS, or it measures nothing.
+ *
+ * The first version of this counter lived inside `if (!ramp_gate ...)` and so
+ * stopped the instant the gate opened -- capped at ARM_REV_SAMPLES by
+ * construction, reading ro=8 on every run where g=1 and meaning only "it
+ * armed". That is EXACTLY the defect already found and fixed in the q=
+ * instrument (2c3546a), where a capped counter made "q=5 every time" mean
+ * nothing and cost a withdrawn margin claim. It was reintroduced here on
+ * 2026-08-12 in a brand-new counter, the same afternoon, after reading that
+ * note.
+ *
+ * So, same discipline as arr_quiet_hi/arr_q_frozen: track the high-water mark
+ * and freeze it only when the reversal stretch BREAKS. ro is then the true
+ * length of the stretch that opened the gate -- ro=8 means it opened on the
+ * last possible sample with no margin, ro=25 means roughly 3x headroom. That
+ * distinction is the whole point, because the reversal gate is new and has
+ * never been exercised on a short run.
+ */
+static volatile uint8_t  ramp_opp_hi   = 0;
+static volatile bool     ramp_o_frozen = false;
+
+/*
  * Sticky record that the windowed peak crossed ARRIVAL_PEAK_VALUE at some
  * point during this run. Added 2026-08-10 after a 1 s jog latched the alarm
  * for a minute with the car provably still.
@@ -778,8 +800,10 @@ void arrival_peak_reset()
     arr_opp      = 0;
     arm_via      = 0;
 
-    ramp_opp   = 0;      /* the ramp's own reversal gate, per run */
-    ramp_gate  = false;
+    ramp_opp      = 0;   /* the ramp's own reversal gate, per run */
+    ramp_gate     = false;
+    ramp_opp_hi   = 0;
+    ramp_o_frozen = false;
 
     ramp_sum   = 0;
     ramp_abs   = 0;
@@ -1328,13 +1352,20 @@ void read_acceleration_mss()
          * accumulator. See the ramp_gate block above for the burst that forced
          * this and why arm_via cannot serve.
          */
-        if (!ramp_gate && arr_dep_sign != 0) {
+        if (arr_dep_sign != 0) {
             if (ssign != 0 && ssign != arr_dep_sign) {
-                if (++ramp_opp >= ARM_REV_SAMPLES) {
+                ++ramp_opp;
+                if (!ramp_o_frozen && ramp_opp > ramp_opp_hi) {
+                    ramp_opp_hi = ramp_opp;    /* true stretch length, not 8 */
+                }
+                if (!ramp_gate && ramp_opp >= ARM_REV_SAMPLES) {
                     ramp_gate = true;
                 }
             } else {
                 ramp_opp = 0;
+                if (ramp_gate) {
+                    ramp_o_frozen = true;  /* the stretch that gated has ended */
+                }
             }
         }
 
@@ -1586,7 +1617,7 @@ void emit_arm_log()
         hi    = arr_quiet_hi;
         armed = arr_armed;
         rgate = ramp_gate;
-        ropp  = ramp_opp;
+        ropp  = ramp_opp_hi;   /* high-water mark, NOT the live counter */
         interrupts();
 
         /*
@@ -1594,8 +1625,13 @@ void emit_arm_log()
          * g/ro are the RAMP's own reversal gate, which is independent of both
          * -- see the ramp_gate block. g=1 means the departure ramp was seen to
          * end, so a RAMP verdict on this run is trustworthy; g=0 means the ramp
-         * detector never ran at all, whatever the peak did. ro is how far the
-         * reversal counter got, so g=0 ro=7 is a near miss worth knowing about.
+         * detector never ran at all, whatever the peak did.
+         *
+         * ro is the TRUE length of the reversal stretch, counted past the gate
+         * opening and frozen when the stretch breaks -- see the ramp_opp_hi
+         * block for why that matters and how it was got wrong first. Read it as
+         * margin against ARM_REV_SAMPLES: ro=8 opened on the last possible
+         * sample, ro=24 had 3x headroom. g=0 with ro=7 is a near miss.
          */
         Serial.print(F("ARM q="));
         Serial.print(hi);
