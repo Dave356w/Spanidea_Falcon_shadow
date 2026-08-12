@@ -488,3 +488,86 @@ distribution centred on its own threshold. The ramp path has never been within
 a factor of 1.5 of a wrong answer. Arming the ramp detector is the change that
 would improve the product; the reason to hold is that it shares a gate whose
 behaviour on a fresh mounting is the one thing still unexplained.
+
+---
+
+# Addendum 4 — 🔴 CONFIRMED: mounting modulates the arming margin
+
+The remount hypothesis from §16 was tested directly and is **confirmed**.
+
+## 18. Method, including a false start worth recording
+
+First remount attempt produced a mounting the device could not distinguish
+from the previous one:
+
+| | original | attempt 1 |
+|---|---|---|
+| x | 0.643 | 0.642 |
+| Zero-Calib (z) | 9.761 | 9.756 |
+| XY-Still | 0.0465 | 0.0480 |
+
+Everything within noise. Running the test there would have produced a null
+result that meant nothing, and it was flagged as a weak test BEFORE the runs
+rather than explained away afterwards. Second attempt moved properly:
+
+| | original | **tested mounting** |
+|---|---|---|
+| x | 0.643 | **0.710** |
+| y | −0.086 | **−0.309** |
+| Zero-Calib (z) | 9.761 | **9.750** |
+| XY-Still | 0.0465 | **0.0555** (+19%) |
+
+Calibration clean both times (`b=10 mv=0`). Device reset over the programmer
+after each remount so it recalibrated on the new attitude — matching the
+morning failure's condition (new mounting, fresh calibration).
+
+## 19. 🔴 The result
+
+| | old mounting | tested mounting |
+|---|---|---|
+| **2→1 (down)** | 9, 8, 9 | **6, 5, 5** |
+| **1→2 (up)** | 8, 8 | **10, 11** |
+
+**On the old mounting up and down were indistinguishable (~8–9). On the tested
+mounting they diverge sharply: down fell to the threshold, up rose above the
+old range.** Same shaft, same floor pair, same firmware, same slowdown profile.
+Only how the unit sits changed.
+
+`q=5` means arming succeeded on the LAST POSSIBLE SAMPLE — zero margin, twice
+in three descents. One more sample lost to buzzer phase and neither detector
+runs at all through the stop.
+
+## 20. What this settles, and what it overturns
+
+**The 08-12 morning failure is explained.** Not a coin flip in a comfortable
+distribution, not an unexplained one-off: a mounting-sensitive margin that
+reaches zero at the worst point in the shaft. Reproducible on demand now.
+
+**It overturns my own recommendation from §14 and addendum 3.** I described
+the reversal path as "insurance, not a fix", argued the defect was rarer than
+feared, and advised against promoting it. That was wrong. On this mounting the
+quiet gate has nothing left, and the reversal path is the only thing that
+would keep both detectors alive through that stop.
+
+⬜ **Promote `ARM_REV_SAMPLES` to gate the peak collector as well**, not just
+the ramp detector. The replay basis for its safety (zero false peaks, zero
+false ramps across 51 departure bursts) already exists.
+
+⚠️ **And it remains UNEXERCISED.** `v=2` has never fired in ~20 live runs,
+including every one of these, because arming kept succeeding by a single
+sample. The path is now known to be NEEDED and still has never been seen to
+work on real hardware. That is an uncomfortable position and it should not be
+smoothed over: the first time it matters will be the first time it runs.
+
+## 21. Consequences beyond this device
+
+**Arming margin is an install-time property.** Two mountings in the same car,
+minutes apart, differ by 40% on the same runs — and the unfavourable one sits
+at zero. A mechanic's placement decides whether the beacon works at the bottom
+terminal. That is a commissioning check, and arguably a product requirement:
+the device should be able to report its own margin.
+
+It also matches the earlier finding that **cruise vibration measures the
+mounting as much as the machine** (`falcon_signature_2026-08-11.md` §4a, a 3x
+swing between sessions after a remount). Same cause, now with a consequence
+that reaches the release path.
