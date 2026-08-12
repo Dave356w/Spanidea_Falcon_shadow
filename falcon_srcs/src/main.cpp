@@ -13,6 +13,13 @@
 #include <avr/wdt.h>
 
 /*
+ * Wire1 is vendored into lib/Wire1 so its TWI wait loops can be bounded -- see
+ * the bounded-waits block in lib/Wire1/src/utility/twi1.c for why, and for the
+ * rollback. This is the trip counter, logged as tw= when nonzero.
+ */
+extern "C" uint8_t twi1_guard_trips1(void);
+
+/*
  * LOCKUP DEFENCES -- added 2026-08-12 after three freezes in one session.
  *
  * Mechanism: the sample read runs in the timer ISR, and Wire1's TWI driver
@@ -1667,6 +1674,23 @@ void emit_sample_log()
     if (err_total) {
         Serial.print(F(" et="));
         Serial.print(err_total);
+    }
+
+    /*
+     * TWI wait-guard trips, printed only when nonzero -- same discipline as
+     * et=. Each one is a wedged TWI transaction that the vendored Wire1's spin
+     * bound caught and recovered by re-initialising the peripheral. Before the
+     * guard existed this was a hard freeze inside the sample ISR, ending in a
+     * watchdog reset (Reset cause: 0x8) with the beacon dropped -- and on
+     * 2026-08-12 a pair of them cost an entire car run. So tw= appearing at all
+     * is GOOD NEWS about the recovery and BAD NEWS about the bus: the wedge is
+     * still happening, it is just no longer fatal. Watch it alongside ov=.
+     * Details and the rollback in lib/Wire1/src/utility/twi1.c.
+     */
+    uint8_t tw = twi1_guard_trips1();
+    if (tw) {
+        Serial.print(F(" tw="));
+        Serial.print(tw);
     }
 
     Serial.print(F("\r\n"));
