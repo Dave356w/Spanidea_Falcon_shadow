@@ -616,13 +616,22 @@ static volatile bool     arr_hit       = false;
  * which stretches the 36 samples over more wall clock but does not change
  * the count; the plateau outlives it at speed.
  *
- * ⛔ SHIPS UNARMED (RAMP_ARMED 0), protocol §3.1: every release path runs
- * log-only on its first hoistway exposure. The FSM prints what it would have
- * done (FSM: Arrival (ramp) ...) and ALSO uses the hit as the arrival-burst
- * trigger -- the "own trigger below ARRIVAL_PEAK_VALUE" that §4e.2 said the
- * slow-stop capture needs. Arm after one session shows RAMP lines on real
- * drive stops and none anywhere else. RAMP_ARMED lives in movement_service.h
- * because the FSM is what acts on it.
+ * ✅ ARMED 2026-08-12 (RAMP_ARMED 1) on Dave's instruction. The unarmed
+ * exposure protocol §3.1 asks for is satisfied: 17/17 automatic drive stops
+ * latched (means 472-513, directionality 100% on every one), against complete
+ * negative evidence -- zero RAMP lines across a full cartop session of brake
+ * stops, jogs, cruise and repositioning moves, and zero false ramps across 51
+ * replayed departure bursts. A ramp hit now sets arrival_seen and releases the
+ * latch; it remains the arrival-burst trigger either way.
+ *
+ * ⚠️ WHAT THIS DOES NOT FIX, and the rollback. The detector is gated on
+ * arr_armed, which is the only thing keeping it off the departure ramp (see
+ * the ALL FOUR DEPARTURE bursts paragraph above) -- so arming buys nothing on
+ * a run where arming itself fails, which is exactly the single-floor terminal
+ * approach that produced the 78 s false beacon. It covers the automatic stop
+ * whose peak margin is 1.009x, not the blind spot. If a RAMP release ever
+ * silences a moving car: RAMP_ARMED 0 first, diagnose after.
+ * RAMP_ARMED lives in movement_service.h because the FSM is what acts on it.
  */
 #define RAMP_BLOCK_N      12    /* samples per block, 0.48 s at 25 Hz       */
 #define RAMP_BLOCKS       3     /* consecutive qualifying blocks, same sign */

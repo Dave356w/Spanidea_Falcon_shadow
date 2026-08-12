@@ -95,18 +95,19 @@
 #define BURST_POST_ARR  60  /* arrival:   20 pre / 60 post */
 
 /*
- * ⛔ RAMP DETECTOR NOT ARMED -- protocol §3.1, log-only on first exposure.
+ * ✅ RAMP DETECTOR ARMED 2026-08-12 -- the third arrival path now releases.
  *
- * The detector itself (design, thresholds, measured basis) lives in main.cpp
- * above the RAMP_* constants; this flag is here because the FSM is what acts
- * on the verdict. Unarmed, a ramp hit prints FSM: Arrival (ramp) once per
- * run and fires the arrival burst, and the latch releases only on the
- * existing paths. WHAT ARMS IT: one hoistway session with RAMP lines on
- * every drive-controlled stop and none during cruise, jogs, or brake-only
- * stops -- then set 1, and the 350 fpm release stops depending on a 1.009x
- * peak margin.
+ * The detector itself (design, thresholds, measured basis, and the rollback)
+ * lives in main.cpp above the RAMP_* constants; this flag is here because the
+ * FSM is what acts on the verdict. Armed, a ramp hit sets arrival_seen and
+ * transitions to STATE_DECELERATING, so the 350 fpm release no longer depends
+ * on a 1.009x peak margin. It still fires the arrival burst, armed or not.
+ *
+ * The unarmed exposure §3.1 requires is done: 17/17 automatic drive stops,
+ * zero hits across a full inspection session and 51 replayed departure bursts.
+ * ROLLBACK if a RAMP release ever silences a moving car: set 0, diagnose after.
  */
-#define RAMP_ARMED      0
+#define RAMP_ARMED      1
 
 /*
  * ARRIVAL DETECTION -- two independent paths, plus a stillness backstop.
