@@ -155,7 +155,19 @@ has still never been seen to work.
 
 ---
 
-## 6. ⬜ Cruise peak reached 0.32 against a 0.45 gate
+## 6. ~~Cruise peak reached 0.32~~ — DEAD, did not reproduce
+
+> **RESOLVED the same evening, and the answer is no.** A second 4→1 descent
+> (firmware `9d57c9a`, §6a below) put cruise at a **maximum of 0.12**, with 34
+> of 35 MOVING samples between 0.02 and 0.07. The 0.32 does not reproduce, so
+> **the peak detector is not being squeezed from below and the 1.47×
+> separation claim is withdrawn.** The original reasoning is kept below because
+> it was the basis for asking, and because the caveat matters: attitude
+> differed slightly between the two runs (`x` 0.604–0.615 then, 0.635–0.645
+> now), and cruise vibration is known to track mounting by 3×, so mounting and
+> plain run-to-run variance are both live explanations. Either way 0.32 is not
+> the cruise ceiling. **This is the fifth single-run number this project has
+> overturned with the next measurement.**
 
 On run 1 — the only run long enough to establish real cruise — the windowed
 peak reached **0.32**. Previous cruise ceilings were 0.02–0.04 in the cab and
@@ -171,6 +183,71 @@ Single run, and the short runs 2–4 peaked at 0.02 because they never cruise �
 so this is **neither confirmed nor contradicted**, and by the 08-10/11 method
 lesson it stays a hypothesis until a second long run agrees. It wants one
 multi-floor run, deliberately, to settle.
+
+---
+
+## 6a. Run 5 — the first run on the bounded-wait build, and the guard under load
+
+4→1 down, automatic, 15.7 s, firmware `9d57c9a` (32056 bytes).
+
+    JOGV pos=0 neg=31354 ratio=0 opk=38 verdict=RUN (armed)
+    FSM: Arrival (polled), peak 0.493
+    ARM q=228 a=1 v=1
+    RAMP latched mean=599 dir=100
+
+- **Cruise max 0.12** — kills §6, above.
+- **Arrival 0.493 against 0.45, 1.096×.** Another automatic stop on its
+  threshold. That distribution is settled beyond dispute now.
+- **Ramp 599 at 100% directionality — fifth latch, again after the peak
+  released.** The armed branch has still never executed.
+- **`ARM q=228`** — confirms §5 emphatically. A long descent banks an enormous
+  arming margin; the thin end is only visible on short runs.
+
+**🟢 The TWI guard held under load: `tw` stayed at 2 for the whole run.** Zero
+new trips across 15.7 s of real vibration with the buzzer sounding, while `ov`
+grew 39→52. This matters for calibration: a spin bound set too tight would trip
+under exactly these conditions and it did not. Combined with the two parked
+trips (§8a), the reading is that 8000 spins is not marginal and the trips it
+does record are genuine wedges.
+
+Battery: `Voltage value : 2324 (settling, ignored)`. Still blind.
+
+---
+
+## 8a. 🟢 The guard caught two real wedges within 200 s, and the device never reset
+
+Unplanned, and the most valuable result of the bench work. Parked and idle
+after flashing `9d57c9a`:
+
+    ACC-STAT read FAILED
+    t=125566 ... et=1 tw=1
+    t=130727 ... et=2 tw=2
+
+**Two guard trips, zero `Reset cause` lines, device still sampling normally.**
+Before this build each of those was a frozen ISR ending in a watchdog reset —
+which is precisely what ate the 2→1 run in §4. Caught and recovered
+transparently, with no interruption to the FSM.
+
+**The ambiguity, and why it resolves toward "genuine wedge".** A trip could
+mean the bus actually wedged, or that the spin bound is too tight and the guard
+*caused* the failed read. Three pieces of evidence favour the former:
+
+1. `ACC-STAT read FAILED` also occurred **twice before any trip**, while `tw`
+   was still 0 — so read failures pre-exist the guard and are not manufactured
+   by it.
+2. Two trips in 200 s is intermittent, not the continuous tripping a too-tight
+   bound would produce.
+3. Zero trips across a full 15.7 s car run under load (§6a).
+
+⚠️ Not fully closed: the ~50 ms figure for 8000 spins is cycle-counted, not
+measured. The evidence bounds it as "not obviously too tight", which is weaker
+than a calibration. If `tw` ever climbs quickly, measure before adjusting.
+
+**The guard has moved from unproven to demonstrated in recovery, and remains
+unproven only in the sense that no lockup has recurred to test whether it
+prevents ALL of them.** If a freeze ever happens again *without* `tw`
+incrementing, the cause is not the TWI waits and the brownout explanation
+returns.
 
 ---
 
@@ -296,15 +373,15 @@ untested against a real wedge. Third armed-but-unexercised path on this device.
 
 ## 9. Next, in order
 
-1. **A long multi-floor automatic run** — settles §6's 0.32 cruise peak, which
-   is currently a one-run hypothesis about the gate the product actually ships
-   on. Cheap, and it is the only open question that could move a threshold.
-2. **Two or three more bottom-terminal descents** — confirm q=6 is stable on
-   this mounting and watch for `v=2`. The margin is an install-time property
-   and the thin end is where it decides whether the beacon works.
-3. **Watch `tw=`.** If it appears, the wedge is still happening and is no
-   longer fatal; if the lockup recurs *without* `tw=`, the cause is not the
-   TWI waits and the brownout explanation comes back.
+1. ~~A long multi-floor automatic run~~ — **DONE, §6a. §6 is dead.**
+2. **Two or three more bottom-terminal descents** — now the top open question.
+   Confirm q=6 is stable on this mounting and watch for `v=2`. The margin is an
+   install-time property and the thin end is where it decides whether the
+   beacon works. Note §5: it must be a run *starting* near the bottom.
+3. **Watch `tw=`.** Two trips recorded, both recovered (§8a). If the lockup
+   recurs *without* `tw=` incrementing, the cause is not the TWI waits and the
+   brownout explanation comes back. If `tw=` climbs fast, measure the spin
+   bound rather than guessing at it.
 4. **Arming-gate redesign** — key on "the departure ramp has ended" (sign
    reversal) rather than "the signal went quiet". Still the only fix for the
    single-floor blind spot, which arming the ramp detector did **not**
@@ -329,7 +406,12 @@ untested against a real wedge. Third armed-but-unexercised path on this device.
   within one run. Arming completes near the top.
 - **"`-DWIRE_TIMEOUT` costs 1818 bytes."** 1554 with relaxation.
 - **"Arming the ramp detector improves the product."** Not demonstrably, yet.
-  It is armed, it is correct, and it has changed nothing observable in four
+  It is armed, it is correct, and it has changed nothing observable in five
   runs — because the path it protects has not been needed. The honest claim is
   that it removes a dependence on a 1.016× margin, and run 3 shows how thin
   that margin gets.
+- **"Cruise reached 0.32, so the peak detector is squeezed from both ends."**
+  My own hypothesis, contradicted by the very next long run at 0.12 (§6, §6a).
+  Raised and killed inside one session. The fifth single-run number this
+  project has overturned with the next measurement — the method lesson is not
+  getting old.
