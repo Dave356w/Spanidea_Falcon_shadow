@@ -202,6 +202,43 @@ Seventh ramp latch, still post-release. `v=1` both.
 
 ---
 
+## 5b. 🟢 The reversal gate works, including on short runs
+
+Runs 9–12, on `74e2f1c` then `3993abb` (the `ramp_gate` fix and the `ro=`
+instrument fix — see §11).
+
+| # | move | peak | path | ARM |
+|---|---|---|---|---|
+| 9 | 4→1 down | 0.494 | polled | q=235 a=1 v=1 **g=1 ro=8** |
+| 10 | 1→2 up | 0.551 | any-motion | q=15 a=1 v=1 **g=1 ro=14** |
+| 11 | 2→1 down | 0.544 | any-motion | q=9 a=1 v=1 **g=1 ro=12** |
+
+**The open question is answered: the reversal gate opens with margin on a ~4 s
+single-floor run.** `ro=14` and `ro=12` against the 8 required — 1.75× and
+1.5×. The risk in §11's fix was that requiring 44 samples instead of 36 would
+starve the detector on exactly the short runs it exists for. It does not, and
+the ramp latched on all three.
+
+The two gates carry **comparable** margin, so reversal is not a marginal
+substitute for quiet: quiet 3.0× and 1.8× (q=15, q=9 against 5) against
+reversal 1.75× and 1.5×.
+
+⚠️ Run 9's `ro=8` is NOT a margin reading — it predates the instrument fix and
+is capped by construction. §11.
+
+**Bottom-terminal margin, four runs each direction:**
+
+| direction | q= | span |
+|---|---|---|
+| down | 6, 6, 9, 9 | **6–9** |
+| up | 6, 8, 13, 15 | **6–15** |
+
+Down is both thinner AND more stable; up is more variable. Sharper than §5a's
+"6 to 13 overall" and consistent with down being the harder direction across
+both mountings. Four runs each — hold loosely.
+
+---
+
 ## 6. ~~Cruise peak reached 0.32~~ — DEAD, did not reproduce
 
 > **RESOLVED the same evening, and the answer is no.** A second 4→1 descent
@@ -473,3 +510,105 @@ a hypothesis until a second run under different conditions agrees — is not a
 historical caution about earlier sessions. It applied twice today, to me, and
 the correct habit is to write the confidence level into the note at the moment
 the number is recorded, not after it fails.
+
+---
+
+## 11. 🔴 Arming the ramp detector opened a real hole, and the replay found it
+
+`graph/arming_replay.py` replays candidate arming rules against all 186 bursts
+on file (89 departure, 88 arrival), mirroring the ISR arithmetic exactly. Read
+its header before quoting any number from it: departure-burst SAFETY is sound,
+arrival-side capability is PARTIAL because bursts do not span whole runs.
+
+**THE HOLE. A slow departure starts BELOW the quiet band.** From the latch, in
+a real logged burst:
+
+    -65 -38 -56 -64 -129 | -142 -170 -228 -301 -488 -496 -506 ...
+    \___ all inside the 150 mm/s^2 quiet band ___/
+
+The quiet path arms on the departure's own opening samples. From that instant
+the ramp accumulator is fed the departure ramp, which qualifies at **mean 499,
+directionality 100%** — arithmetically indistinguishable from an arrival. With
+`RAMP_ARMED 1` that **releases the latch seconds after a car starts moving**:
+§14.4's catastrophic direction. **1–2 departures in 89 on logged data.**
+
+Until this session it was latent — unarmed, the verdict printed and nothing
+happened. **Arming it is what made it reachable, and arming it was my change.**
+
+**It survived only on an undesigned coupling.** The exposure vanishes only if
+arming begins ≥200 ms after the latch, and `MOVEMENT_DETECTION_TIMEOUT_MS` is
+exactly 200. But that is a **ceiling, not a floor**:
+`STATE_MOVEMENT_DETECTED` exits early whenever `|w| > |vel_departure|`, and
+`vel_departure` logs as `0.000` on every run. So the ramp detector's safety
+rested on a debounce the header itself describes as having "bought nothing".
+
+| arming starts after latch | union RAMPFIRE | union ARMED-INTO-RAMP |
+|---|---|---|
+| 0 ms | 2/89 | 5/89 |
+| 40–80 ms | 1/89 | 3/89 |
+| 120–160 ms | 0/89 | 1–2/89 |
+| ≥200 ms | 0/89 | 0/89 |
+
+**THE FIX (`74e2f1c`): the ramp gets its own reversal-only gate**, `ramp_gate`,
+tracked independently of the union the peak uses. A sign reversal against the
+departure means the departure ramp has ENDED — what the ramp detector actually
+needs to know, and what "the signal went quiet" only approximates. The peak
+keeps the union because it must arm readily; the thin end arms by one sample.
+Replay: **zero departure-ramp fires at every arming offset 0–6**, arrival
+capability **unchanged at 42/88**. Firmware is stricter than the replay
+modelled — `arr_dep_sign` needs 25 samples, so `ramp_gate` cannot arm before
+then. Verified live in §5b.
+
+**`arm_via == 2` is NOT the fix, and I proposed it before checking.** `arm_via`
+records whichever path armed FIRST, and the reversal block sits inside
+`if (!arr_armed ...)`, so once quiet arms, `arr_opp` stops being evaluated and
+`arm_via` can never become 2. Quiet has won that race in every run on file
+(`v=1`, ~27 runs). Gating on it would have made the ramp detector **permanently
+dead**.
+
+**Cost:** the ramp now needs 44 samples (~1.76 s) of deceleration instead of
+36. §5b shows that costs nothing on short runs; a very short deceleration
+remains the thing to watch.
+
+### 11a. Two methodology bugs in the replay itself, same root cause
+
+The first version claimed the shipping firmware fires the ramp on **53% of
+departures**. Thirty-plus live runs with zero false releases flatly contradict
+that, which is what prompted the re-check. Both bugs were the same mistake:
+
+1. Replaying a departure burst from sample 0 arms on the **parked pre-trigger
+   samples**, which are quiet by definition.
+2. The counters actually start at `STATE_MOVING` entry, not at the departure
+   latch — `burst_trigger` fires at the latch, `arrival_peak_reset()` on MOVING.
+
+**A replay that contradicts observed behaviour is wrong until proven
+otherwise.** That check is what caught both.
+
+### 11b. I reintroduced a bug this project had already fixed
+
+The `ro=` counter added with the gate sat inside `if (!ramp_gate ...)` and so
+stopped the instant the gate opened — **capped at `ARM_REV_SAMPLES` by
+construction**, reading `ro=8` on every run where `g=1`, meaning only "it
+armed".
+
+That is **exactly** the defect already found and fixed in the `q=` instrument
+(`2c3546a`), where a capped counter made "q=5 every time" mean nothing and cost
+a withdrawn margin claim. I reintroduced it in a brand-new counter the same
+afternoon, having read that note. Fixed in `3993abb` by mirroring
+`arr_quiet_hi`/`arr_q_frozen`. Run 10's `ro=14` is the fix working; run 9's
+`ro=8` is the bug.
+
+**Corrected estimate, for the record:** I called it "~20 bytes". It cost **56**.
+Flash is now **32226/32256 — 30 bytes free**, the tightest this firmware has
+been. Anything further needs the bma4 work, which reclaims ~1500 bytes, not
+4.9 KB (§8).
+
+### 11c. Score for the session
+
+Four of my own claims or artifacts needed correcting: the 0.32 cruise peak, the
+"reproducible" bottom-terminal margin, `arm_via == 2`, and the capped `ro=`
+counter. Each was caught — but by checking after the fact, and 11b was
+avoidable by following the pattern sitting in the same file. **The habit that
+actually worked was distrusting results that contradicted live behaviour
+(11a).** The habit that failed was reading a note about a bug and then writing
+it again.
