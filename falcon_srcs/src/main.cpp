@@ -360,18 +360,39 @@ static volatile bool     arr_q_frozen  = false;
  * >= 8 one-signed samples -- but the end-to-end rescue is inference until a
  * capture spans it.
  *
- * ── SO IT GATES THE RAMP DETECTOR ONLY, NOT THE PEAK ──────────────────────
+ * ── PROMOTED TO GATE THE PEAK COLLECTOR TOO, 2026-08-12 ───────────────────
  *
- * arr_armed keeps its original quiet-only rule and still gates the peak
- * collector, so the PRODUCTION RELEASE PATH IS BIT-FOR-BIT UNCHANGED. The new
- * union gates ramp_armed, which feeds the ramp accumulator -- and the ramp
- * detector is itself unarmed (RAMP_ARMED 0). Two independent safety layers
- * between this and the beacon, on a change whose benefit is still inference.
- * Protocol §3.1.
+ * It first shipped gating the ramp detector only, on the reasoning that its
+ * benefit was inference and it should sit behind two safety layers. That was
+ * the right call at the time and the WRONG conclusion an hour later:
  *
- * WHAT PROMOTES IT: one session where ARM lines show via=rev on short runs,
- * RAMP latched appears on stops the peak missed, and via=rev never appears
- * during a departure. Then arr_armed can adopt the same union.
+ *   MOUNTING MODULATES THE ARMING MARGIN, AND IT REACHES ZERO. Confirmed by
+ *   direct test -- same shaft, floors, firmware and slowdown profile, only
+ *   the unit's mounting changed (x 0.643 -> 0.710, XY-Still +19%):
+ *
+ *       2->1 down    9, 8, 9   ->   6, 5, 5
+ *       1->2 up      8, 8      ->   10, 11
+ *
+ *   q=5 is arming on the LAST POSSIBLE SAMPLE, twice in three descents. One
+ *   more sample lost to buzzer phase and NEITHER detector runs through the
+ *   stop -- which is exactly the 85 s false beacon that started this.
+ *
+ * So the quiet gate has nothing left on an unfavourable mounting, and this
+ * path is the only thing that keeps the PEAK collector -- the production
+ * release path -- alive through that stop. Gating the ramp detector alone
+ * protected a detector that is itself unarmed, i.e. it protected nothing
+ * that ships.
+ *
+ * Safety basis for the promotion, re-verified against the full corpus at the
+ * exact shipping constants: ZERO false peaks and ZERO false ramps across 51
+ * departure bursts, with and without the union.
+ *
+ * ⚠️ STILL UNEXERCISED. v=2 has never fired in ~20 live runs, because arming
+ * kept succeeding by a single sample every time. This path is now known to be
+ * NEEDED and has never been seen to work on hardware; the first occasion it
+ * matters will be the first occasion it runs. Watch ARM lines on the first
+ * session: v=2 on a short run is the path working, v=2 during a departure is
+ * the failure the replay says cannot happen -- disarm on sight if it appears.
  */
 #define ARM_REV_SAMPLES    8    /* consecutive opposite-signed samples       */
 #define ARM_DEP_SIGN_N     25   /* samples used to fix the departure's sign  */
@@ -380,8 +401,7 @@ static volatile int32_t  arr_dep_acc  = 0;
 static volatile uint8_t  arr_dep_n    = 0;
 static volatile int8_t   arr_dep_sign = 0;   /* 0 = not yet determined       */
 static volatile uint8_t  arr_opp      = 0;   /* consecutive opposite samples */
-static volatile bool     ramp_armed   = false;
-static volatile uint8_t  ramp_arm_via = 0;   /* 1 = quiet, 2 = reversal      */
+static volatile uint8_t  arm_via      = 0;   /* 1 = quiet, 2 = reversal      */
 static volatile bool     arr_armed     = false;
 
 /*
@@ -691,8 +711,7 @@ void arrival_peak_reset()
     arr_dep_n    = 0;
     arr_dep_sign = 0;
     arr_opp      = 0;
-    ramp_armed   = false;
-    ramp_arm_via = 0;
+    arm_via      = 0;
 
     ramp_sum   = 0;
     ramp_abs   = 0;
@@ -1207,13 +1226,31 @@ void read_acceleration_mss()
                 arr_quiet_hi = arr_quiet;
             }
             if (!arr_armed && arr_quiet >= ARRIVAL_ARM_SAMPLES) {
-                arr_armed = true;
+                arr_armed    = true;
+                arm_via      = 1;              /* quiet */
                 arr_bucket_ms = millis();
             }
         } else {
             arr_quiet = 0;
             if (arr_armed) {
                 arr_q_frozen = true;   /* the arming stretch has ended */
+            }
+        }
+
+        /*
+         * Second arming path: ARM_REV_SAMPLES consecutive samples opposite in
+         * sign to this run's departure. Gates the PEAK collector as well as
+         * the ramp accumulator -- see the promotion note above.
+         */
+        if (!arr_armed && arr_dep_sign != 0) {
+            if (ssign != 0 && ssign != arr_dep_sign) {
+                if (++arr_opp >= ARM_REV_SAMPLES) {
+                    arr_armed    = true;
+                    arm_via      = 2;          /* sign reversal */
+                    arr_bucket_ms = millis();
+                }
+            } else {
+                arr_opp = 0;
             }
         }
 
@@ -1236,25 +1273,6 @@ void read_acceleration_mss()
             }
         }
 
-        /*
-         * Second arming path, gating the RAMP detector only -- see the
-         * ARM_REV_SAMPLES block for why it is kept off the peak collector.
-         */
-        if (!ramp_armed) {
-            if (arr_armed) {
-                ramp_armed   = true;
-                ramp_arm_via = 1;                  /* quiet */
-            } else if (arr_dep_sign != 0) {
-                if (ssign != 0 && ssign != arr_dep_sign) {
-                    if (++arr_opp >= ARM_REV_SAMPLES) {
-                        ramp_armed   = true;
-                        ramp_arm_via = 2;          /* sign reversal */
-                    }
-                } else {
-                    arr_opp = 0;
-                }
-            }
-        }
 
         /*
          * Signed sample, shared by the burst recorder and the ramp detector.
@@ -1286,11 +1304,9 @@ void read_acceleration_mss()
             }
 
             /*
-             * Ramp detector, gated on ramp_armed -- the UNION of arm-on-quiet
-             * and arm-on-sign-reversal, so a short run with no cruise can
-             * still open it. The peak collector keeps the quiet-only rule.
+             * Ramp detector, gated on the same arr_armed union as the peak.
              */
-            if (ramp_armed && !ramp_hit_v) {
+            if (arr_armed && !ramp_hit_v) {
                 ramp_sum += sv;
                 ramp_abs += (sv < 0) ? -(int32_t)sv : (int32_t)sv;
 
@@ -1492,7 +1508,7 @@ void emit_arm_log()
         Serial.print(F(" a="));
         Serial.print(armed ? 1 : 0);
         Serial.print(F(" v="));
-        Serial.print(ramp_arm_via);
+        Serial.print(arm_via);
         Serial.print(F("\r\n"));
     }
     last_state = st;
