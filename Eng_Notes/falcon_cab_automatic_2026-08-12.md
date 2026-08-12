@@ -259,3 +259,87 @@ mechanism.
 Item 2 outranks item 1: a marginal release is a reliability problem, a
 78-second false beacon on a stationary car is the failure the product exists to
 prevent.
+
+---
+
+# Addendum — arming redesign and the floor-by-floor descent (same day, later)
+
+Firmware `6ee1b4a`. Four automatic single-floor runs, cab, descending 4→3→2→1
+with the last into the bottom terminal on the extended slowdown profile.
+
+## 7. ⚠️ A claim withdrawn: the arming margin was never measured
+
+Between §4 and this addendum I asserted, from a `q_hi` diagnostic I had just
+written, that arming succeeds with **zero margin** — "q_hi = 5 against need =
+5, four runs, the gate delivers exactly the minimum and never more" — and drew
+a coin-flip conclusion from it.
+
+**That was an artefact of the instrument.** Once `arr_armed` goes true the
+counting branch is skipped, so `arr_quiet` stops at `ARRIVAL_ARM_SAMPLES` and
+`q_hi` is capped at 5 by construction. `q=5` means only *"it armed"*; `q<5`
+means *"it never armed"*. The instrument cannot distinguish a run that armed
+comfortably from one that scraped through, and every "5/5" reported here and
+in `6ee1b4a`'s message is that cap, not a measurement.
+
+Withdrawn. What survives unaffected:
+
+- the failing run **never armed at all** (`pk` 0.00 across a real +0.64
+  excursion) — that is what `q<5` reports faithfully;
+- every run since has armed.
+
+Whether the successful ones arm with margin is **unknown**. Measuring it needs
+the longest quiet run bounded to the departure→deceleration window, which this
+counter does not provide. ⬜ Instrument fix outstanding.
+
+The reversal path does not depend on the withdrawn claim: it exists because a
+run went completely unarmed.
+
+## 8. The descent: 4 runs, all clean, the fix unexercised
+
+| run | ARM | arrival peak | ramp |
+|---|---|---|---|
+| 4→3 | q=5 a=1 **v=1** | 0.477 | 472 / 100% |
+| 3→2 | q=5 a=1 **v=1** | 0.464 | 481 / 100% |
+| 2→1 terminal | q=5 a=1 **v=1** | 0.498 | 479 / 100% |
+
+**`v=2` never appeared.** The sign-reversal path has never once been needed in
+live running. It is committed, proven *safe* against 51 departure bursts, and
+entirely unexercised — an honest status for a fix to a failure that has
+occurred once in roughly thirty runs and will not reproduce on demand.
+
+**Four attempts at the failing configuration** (single floor into the bottom
+terminal, extended slowdown) across the day, all clean. Absence over four
+attempts says little about an intermittent failure that took ~25 runs to
+appear once; it is not evidence the defect is gone.
+
+## 9. What the day did settle
+
+**The ramp detector is the strongest result on this device.** Nine automatic
+stops, both directions, distances from one floor to express:
+
+```
+ramp mean   472 481 479 489 490 495 496 501 508     (spread 36, i.e. 7%)
+directionality  100% on every single one
+```
+
+Against inspection operation's negative evidence — brake stops, jogs, cruise,
+repositioning, departures, all declined — this is a detector with a clean
+signature on both sides.
+
+**The peak path continues to sit on its gate.** Eleven automatic stops now
+measured at 0.454–0.544 against 0.45. Not a tail; a distribution centred on the
+threshold.
+
+## 10. Next, in order
+
+1. **Fix the arming-margin instrument** (§7) — the margin question is still
+   open and currently unanswerable.
+2. **bma4 driver swap.** Flash is at 32184/32256, **72 bytes free**. It blocks
+   `-DWIRE_TIMEOUT` (the real TWI lockup fix, +1818 bytes) and everything else.
+3. **Promote the reversal path** only after a session shows `v=2` on a short
+   run with `RAMP latched` on a stop the peak missed.
+4. **Arm the ramp detector** — the evidence is there; the reason to wait is
+   that it shares a gate whose behaviour on short runs is still the open
+   question.
+5. Brownout + lockup electrical work, and the battery settling-logic bug
+   (still "(settling, ignored)" on every read).

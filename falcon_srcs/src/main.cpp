@@ -294,11 +294,22 @@ static volatile uint8_t  arr_quiet_hi  = 0;
  * THE DEFECT: arm-on-quiet needs ARRIVAL_ARM_SAMPLES *consecutive* samples
  * inside ARRIVAL_QUIET_MSS. A run with cruise provides them; a short run goes
  * departure ramp straight into deceleration ramp and only SWEEPS through the
- * quiet band. Measured on four runs this session: q_hi = 5 against need = 5,
- * every time -- the gate delivers exactly the minimum and never more, so
- * anything that shaves one sample (buzzer phase, a brisker transition) drops
- * it. One run that lost the coin toss alarmed 85 s over a car stationary for
- * 78 of them, with BOTH detectors switched off throughout.
+ * quiet band. One such run alarmed for 85 s over a car that was stationary
+ * for 78 of them, with BOTH detectors switched off throughout -- pk reported
+ * 0.00 across a real +0.64 m/s^2 deceleration.
+ *
+ * ⚠️ THE ARMING MARGIN IS UNMEASURED, and the q= diagnostic CANNOT measure
+ * it. Once arr_armed goes true the counting branch is skipped, so arr_quiet
+ * stops at ARRIVAL_ARM_SAMPLES and q_hi is capped there by construction:
+ * q=5 means only "it armed", q<5 means "it never armed". An earlier reading
+ * of this note claimed the gate "delivers exactly the minimum and never
+ * more" across four runs -- that was an artefact of the instrument, not a
+ * measurement, and it is withdrawn. Measuring the real margin needs the
+ * longest quiet run bounded to the departure-to-deceleration window, which
+ * this counter does not provide.
+ *
+ * The second path below does not rest on that claim: it exists because a run
+ * went COMPLETELY unarmed, which q<5 does report faithfully.
  *
  * THE SECOND PATH: arm on ARM_REV_SAMPLES consecutive samples whose sign is
  * OPPOSITE to the departure's. Physics guarantees the sign: to stop, a car
