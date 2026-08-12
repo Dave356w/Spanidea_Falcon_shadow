@@ -43,6 +43,10 @@ err_re = re.compile(r"t=(\d+)\s+a=ERR\s+er=(\d+)\s+st=(\d+)")
 # count under the learned threshold. Searched separately from new_re so that
 # captures from older firmware keep parsing unchanged.
 xym_re = re.compile(r"\sm=(-?\d+\.?\d*)\s+q=(\d+)")
+
+# Windowed raw arrival peak. This is what the FSM actually decides an arrival
+# on, and reading it back is what exposes the arming defect below.
+pk_re = re.compile(r"\spk=(\d+\.?\d*)")
 xycal_re = re.compile(r"XY:\s*calib\s+b=(\d+)\s+peak=(-?\d+\.?\d*)\s+mv=(\d+)")
 xystill_re = re.compile(r"XY-Still-Value\s*:\s*(-?\d+\.?\d*)")
 
@@ -94,6 +98,8 @@ class Capture(object):
         self.errs = []           # (t_ms, consecutive) sensor read failures
         self.xy_m = []           # lateral metric per sample, None if absent
         self.xy_q = []           # quiet run per sample
+        self.pk = []             # windowed raw arrival peak, None if absent
+        self.boots = 0           # 'Device Booted' markers seen
         self.xy_still = None     # learned threshold, m/s^2
         self.xy_calib = None     # (buckets, peak, moved)
         self._parse()
@@ -106,6 +112,9 @@ class Capture(object):
             s = line.strip()
             if not s or "PuTTY log" in s:
                 continue
+
+            if "Device Booted" in s:
+                self.boots += 1
 
             m = new_re.search(s)
             if m:
@@ -120,6 +129,8 @@ class Capture(object):
                 xy = xym_re.search(s)
                 self.xy_m.append(float(xy.group(1)) if xy else None)
                 self.xy_q.append(int(xy.group(2)) if xy else None)
+                pkm = pk_re.search(s)
+                self.pk.append(float(pkm.group(1)) if pkm else None)
                 continue
 
             m = old_re.search(s) or old_gonly_re.search(s)
@@ -136,6 +147,7 @@ class Capture(object):
                 self.im.append(None)
                 self.xy_m.append(None)
                 self.xy_q.append(None)
+                self.pk.append(None)
                 continue
 
             # --- new-format lines the old parser mistook for corruption -----
@@ -244,6 +256,17 @@ class Capture(object):
 
         print("=" * 74)
         print("%s   [%s format]" % (self.path, self.fmt))
+
+        # A capture that spans reflashes contains several millis() epochs, and
+        # every timing figure below silently mixes them -- the symptom is a
+        # NEGATIVE inter-edge gap. This trap has produced a completely false
+        # result at least twice (13 phantom "false departures" on 2026-08-11,
+        # and a bogus 11.5 s late-release on 2026-08-12). Warn rather than
+        # guess: splitting is a judgement about which section matters.
+        if self.boots > 1:
+            print("  ** %d BOOT SECTIONS IN THIS CAPTURE -- timestamps restart"
+                  " at each one and every figure below mixes them. Split on"
+                  " 'Device Booted' and analyse one section. **" % self.boots)
         print("=" * 74)
         print("  samples          : %d" % n)
         print("  sample rate      : %.2f Hz   (%s)" % (rate, how))
@@ -358,6 +381,143 @@ def report_xy(cap):
                   " holding x/y up and the beacon can never release. **")
 
 
+"""
+LATE-RELEASE AND ARMING CHECK -- added 2026-08-12.
+
+A run on 2026-08-12 (single floor, intermediate to bottom terminal, extended
+slowdown) alarmed for 85 s over a car that had been stationary for 78 of them.
+The deceleration itself was textbook -- one-signed, +0.5 to +0.64 m/s^2 for
+3.2 s -- and BOTH detectors were switched off through all of it, because
+arr_armed never armed: arming needs 5 consecutive quiet samples and a short
+run has no cruise between its departure and deceleration ramps.
+
+WHY THIS NEEDS A CHECK RATHER THAN AN EYEBALL. It logged as
+
+    FSM: Arrival (polled), peak 0.458
+
+which is indistinguishable from a healthy release. The beacon was actually
+freed by an unrelated disturbance (doors, or someone moving in the cab) 78 s
+after the stop. Every historical per-run summary could contain this and read
+as a clean release, so the two signatures below are tested for explicitly.
+
+  ARMING FAILURE -- pk == 0.00 while the raw deviation is well above
+    ARRIVAL_QUIET_MSS, AND late enough in the run that the departure cannot
+    explain it. The window matters: pk is DELIBERATELY 0.00 through the
+    departure ramp, which is the arming gate working correctly, and a naive
+    "pk==0 during an excursion" test fires on every healthy run. Departure
+    ramps measured up to 3.3 s at 300 fpm, so only excursions later than
+    ARM_GRACE_MS after the latch count as evidence of a stuck gate.
+
+  LATE RELEASE -- the run's last sustained one-signed excursion (the
+    deceleration that physically brought the car to rest) ended long before
+    the release fired.
+
+    Two rejected approaches, both wrong for reasons worth keeping:
+
+      "quiet immediately before the release" -- defeated by the very
+      disturbance that caused the release. The 0.458 spike that finally freed
+      the beacon is itself out of band, so the walk-back stops after one
+      sample and measures nothing.
+
+      "longest in-band stretch in the run" -- cannot work at all. At constant
+      velocity z reads 1 g exactly as it does parked (§3), so a long quiet
+      stretch is equally consistent with cruising and with being stopped.
+      That is the same trap that got the stillness backstop banned.
+
+    Keying on the deceleration ramp avoids both: a sustained one-signed
+    excursion is a real, dated, physical event, and once the car has shed its
+    speed it IS stopped. Everything after that ramp is a stationary car.
+
+Both are reported per run, and neither changes any existing output.
+"""
+
+ARM_QUIET_MSS   = 0.15      # ARRIVAL_QUIET_MSS in main.cpp
+LATE_QUIET_MS   = 8000      # gap after the decel ramp that means "already parked"
+
+# What counts as deceleration-ramp content in the decimated log. 0.30 sits
+# above cartop cruise peaks (0.07-0.28) and well under the measured plateau
+# (0.49-0.61); 1.5 s is half the shortest ramp measured, so a ramp cannot be
+# missed while a single vibration spike cannot qualify.
+RAMP_DEV_MSS    = 0.30
+RAMP_MIN_MS     = 1500
+
+# How long after the departure latch a pk==0.00 excursion is still explained
+# by the departure ramp itself. 5 s against measured ramps of up to 3.3 s.
+ARM_GRACE_MS    = 5000
+
+
+def check_release(cap, calib, i0, i1):
+    """Return (arming_failed, quiet_ms_before_release) for one run.
+
+    i0/i1 are sample indices bounding the run. Returns (None, None) when the
+    capture lacks pk= (pre-2026-08-10 firmware), so old logs stay silent
+    rather than reporting a defect the firmware could not have had.
+    """
+    if not cap.pk or i1 is None or i0 is None:
+        return (None, None)
+
+    seg = [(cap.pk[i], cap.accel[i], cap.t_ms[i])
+           for i in range(i0, min(i1 + 1, len(cap.pk)))
+           if cap.pk[i] is not None and cap.accel[i] is not None]
+    if not seg:
+        return (None, None)
+
+    # 1. Arming failure: a real excursion the peak collector reported as zero,
+    #    late enough that the departure ramp cannot account for it.
+    t_start = seg[0][2]
+    blind = 0.0
+    if t_start is not None:
+        blind = max((abs(a - calib) for pk, a, t in seg
+                     if pk == 0.0 and t is not None
+                     and (t - t_start) > ARM_GRACE_MS), default=0.0)
+    arming_failed = blind > ARM_QUIET_MSS * 2
+
+    # 2. Late release: how long after the last deceleration ramp did the
+    #    release fire? A ramp is a run of same-signed samples above
+    #    RAMP_DEV_MSS lasting at least RAMP_MIN_MS. The log is decimated 8:1,
+    #    so a 3 s ramp is ~10 logged samples -- coarse but unambiguous.
+    #    THE DEPARTURE RAMP MUST BE EXCLUDED. It is a sustained one-signed
+    #    excursion of exactly the same shape, and on a healthy fast stop the
+    #    FSM releases on the DECELERATION'S LEADING EDGE -- so the
+    #    deceleration lies mostly after the release and the only complete
+    #    ramp inside the run window is the departure. Measuring from that
+    #    reports every healthy run as "released 11 s late". Only ramps ending
+    #    beyond the departure grace count.
+    late_ms = None
+    t_rel = seg[-1][2]
+    ramp_end = None
+    cur_sign, cur_start, cur_last = 0, None, None
+
+    def close(end):
+        if cur_start is None or end is None:
+            return None
+        if end - cur_start < RAMP_MIN_MS:
+            return None
+        if t_start is None or (end - t_start) <= ARM_GRACE_MS:
+            return None        # the departure ramp itself
+        return end
+
+    for pk, a, t in seg:
+        if t is None:
+            continue
+        dev = a - calib
+        sign = 1 if dev > RAMP_DEV_MSS else (-1 if dev < -RAMP_DEV_MSS else 0)
+        if sign != 0 and sign == cur_sign:
+            cur_last = t
+        elif sign != 0:
+            ramp_end = close(cur_last) or ramp_end
+            cur_sign, cur_start, cur_last = sign, t, t
+        else:
+            ramp_end = close(cur_last) or ramp_end
+            cur_sign, cur_start, cur_last = 0, None, None
+    ramp_end = close(cur_last) or ramp_end
+
+    if ramp_end is not None and t_rel is not None:
+        late_ms = t_rel - ramp_end
+
+    return (arming_failed, late_ms)
+
+
 def report_runs(cap):
     """Per-run summary of the latched FSM (roadmap item 8).
 
@@ -390,7 +550,7 @@ def report_runs(cap):
         t = at(idx)
         if kind == "departure":
             open_run = {"start": t, "release": None, "detail": None,
-                        "ramp_obs": []}
+                        "ramp_obs": [], "i0": idx, "i1": None}
         elif kind == "ramp_obs" and open_run:
             # Unarmed ramp verdict: informational, does not close the run.
             open_run["ramp_obs"].append((t, detail))
@@ -398,6 +558,7 @@ def report_runs(cap):
                       "stillness", "xy_rel", "failsafe") and open_run:
             open_run["release"] = t
             open_run["detail"] = (kind, detail)
+            open_run["i1"] = idx
             runs.append(open_run)
             open_run = None
     if open_run:
@@ -423,6 +584,22 @@ def report_runs(cap):
         for rt, rd in r.get("ramp_obs", []):
             ts = ("t=%d " % rt) if rt is not None else ""
             how += "  [ramp obs %smean/dir=%s]" % (ts, rd)
+
+        # Arming / late-release check -- see the block above check_release().
+        arming_failed, late_ms = check_release(cap, calib,
+                                               r.get("i0"), r.get("i1"))
+        warn = []
+        if arming_failed:
+            warn.append("** DETECTOR NEVER ARMED: pk=0.00 across a real"
+                        " excursion well after the departure. Both the peak"
+                        " and ramp paths were OFF for this run -- no cruise"
+                        " gap to arm on. **")
+        if late_ms is not None and late_ms >= LATE_QUIET_MS:
+            warn.append("** LATE RELEASE: fired %.1f s AFTER the last"
+                        " deceleration ramp ended. The car was already"
+                        " stopped, so this did not detect the arrival --"
+                        " read it as a false beacon of that length. **"
+                        % (late_ms / 1000.0))
 
         # Any-motion edges inside the run, split by buzzer state.
         #
@@ -488,6 +665,8 @@ def report_runs(cap):
                 peak = max(peak, abs(av - calib))
 
         print("    run %d  held %-8s  released by %-18s" % (i, held, how))
+        for w in warn:
+            print("           %s" % w)
         print("           edges %d quiet / %d buzzer   closest quiet pair %s"
               % (len(quiet), loud,
                  ("%d ms" % gap) if gap is not None else "n/a"))
