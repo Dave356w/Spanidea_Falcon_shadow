@@ -257,6 +257,113 @@ static volatile float    arr_peak_cur  = 0.0f; /* max in the open bucket     */
 static volatile float    arr_peak_prev = 0.0f; /* max in the one before it   */
 static volatile uint32_t arr_bucket_ms = 0;
 static volatile uint8_t  arr_quiet     = 0;
+
+/*
+ * ARMING DIAGNOSTIC -- 2026-08-12, for the arming redesign.
+ *
+ * A single-floor terminal approach left BOTH detectors switched off for the
+ * whole run because arr_armed never armed: the run went departure ramp
+ * straight into deceleration ramp with no cruise, so five CONSECUTIVE quiet
+ * samples never occurred. Estimated from the decimated log, that run had
+ * 4.0-4.9 unblanked in-band samples against the 5 required -- it missed by
+ * about one sample -- but that is arithmetic over two decimated points
+ * assuming a linear sweep, not a measurement.
+ *
+ * The measurement cannot be reconstructed offline: the transition falls
+ * between the departure burst's end and the arrival burst's start, so no
+ * capture on file contains it at full rate.
+ *
+ * So record the high-water mark of the quiet counter for the run, and where
+ * it happened. Printed at the arm (or, if arming never happens, alongside
+ * the release) as:
+ *
+ *     ARM q_hi=4 t=63140 armed=0
+ *
+ * q_hi < ARRIVAL_ARM_SAMPLES on a run that stopped normally is the defect,
+ * measured. How far below tells us whether the gate is marginal (4) or
+ * structurally wrong (0-1), and that decides whether the redesign can lean
+ * on a shorter quiet run at all or must key on the departure's sign
+ * reversal instead. Two bytes of RAM, no behaviour change.
+ */
+static volatile uint8_t  arr_quiet_hi  = 0;
+
+
+/*
+ * ARMING REDESIGN -- second arming path, 2026-08-12.
+ *
+ * THE DEFECT: arm-on-quiet needs ARRIVAL_ARM_SAMPLES *consecutive* samples
+ * inside ARRIVAL_QUIET_MSS. A run with cruise provides them; a short run goes
+ * departure ramp straight into deceleration ramp and only SWEEPS through the
+ * quiet band. Measured on four runs this session: q_hi = 5 against need = 5,
+ * every time -- the gate delivers exactly the minimum and never more, so
+ * anything that shaves one sample (buzzer phase, a brisker transition) drops
+ * it. One run that lost the coin toss alarmed 85 s over a car stationary for
+ * 78 of them, with BOTH detectors switched off throughout.
+ *
+ * THE SECOND PATH: arm on ARM_REV_SAMPLES consecutive samples whose sign is
+ * OPPOSITE to the departure's. Physics guarantees the sign: to stop, a car
+ * must shed exactly the velocity it gained, so its deceleration is opposite
+ * to its departure. Unlike the quiet test this does not need the signal to
+ * LINGER anywhere -- the deceleration itself supplies the samples, and it
+ * lasts 2.8 s.
+ *
+ * Sign is usable HERE and not in the ramp block because this compares against
+ * the departure measured on THIS run, rather than needing sign to mean
+ * something absolute. arr_dep_sign is fixed from the first ARM_DEP_SIGN_N
+ * samples after the latch, while the departure ramp is still running.
+ *
+ * ── WHY 8, AND WHY NOT THE OBVIOUS RULES ─────────────────────────────────
+ *
+ * Replayed against all 100 bursts on file (51 departure, 49 arrival):
+ *
+ *   rule                       false arrivals on 51 dep bursts
+ *   2 consecutive opposite     12   <- the obvious rule, CATASTROPHIC
+ *   3 consecutive opposite      8
+ *   4-6 consecutive opposite    3
+ *   7 consecutive opposite      1
+ *   8 consecutive opposite      0   <- here
+ *
+ * The obvious formulation -- "arm as soon as the sign reverses" -- would have
+ * released the beacon on a moving car in 12 of 51 departures, because the
+ * departure IMPULSE contains large opposite-signed content before the ramp
+ * settles. Reasoning alone would have shipped it; the replay caught it.
+ *
+ * 8 is bracketed on both sides by measurement, not chosen for roundness:
+ * 7 still produces a false arrival, and 10 stops covering one of the eight
+ * automatic arrivals. All 8 automatic (drive-ramp) arrivals carry >= 8
+ * consecutive one-signed samples, median 70.
+ *
+ * ⬜ WHAT IS PROVEN AND WHAT IS NOT. Proven: this path is SAFE -- zero false
+ * peaks and zero false ramps across 51 departure bursts. NOT proven: that it
+ * RESCUES the failing case, because no burst on file contains a short run's
+ * departure-to-deceleration transition at full rate (the departure burst ends
+ * before the deceleration starts, which is the same blind spot that hid the
+ * defect). The mechanism is measured -- every automatic deceleration supplies
+ * >= 8 one-signed samples -- but the end-to-end rescue is inference until a
+ * capture spans it.
+ *
+ * ── SO IT GATES THE RAMP DETECTOR ONLY, NOT THE PEAK ──────────────────────
+ *
+ * arr_armed keeps its original quiet-only rule and still gates the peak
+ * collector, so the PRODUCTION RELEASE PATH IS BIT-FOR-BIT UNCHANGED. The new
+ * union gates ramp_armed, which feeds the ramp accumulator -- and the ramp
+ * detector is itself unarmed (RAMP_ARMED 0). Two independent safety layers
+ * between this and the beacon, on a change whose benefit is still inference.
+ * Protocol §3.1.
+ *
+ * WHAT PROMOTES IT: one session where ARM lines show via=rev on short runs,
+ * RAMP latched appears on stops the peak missed, and via=rev never appears
+ * during a departure. Then arr_armed can adopt the same union.
+ */
+#define ARM_REV_SAMPLES    8    /* consecutive opposite-signed samples       */
+#define ARM_DEP_SIGN_N     25   /* samples used to fix the departure's sign  */
+
+static volatile int32_t  arr_dep_acc  = 0;
+static volatile uint8_t  arr_dep_n    = 0;
+static volatile int8_t   arr_dep_sign = 0;   /* 0 = not yet determined       */
+static volatile uint8_t  arr_opp      = 0;   /* consecutive opposite samples */
+static volatile bool     ramp_armed   = false;
+static volatile uint8_t  ramp_arm_via = 0;   /* 1 = quiet, 2 = reversal      */
 static volatile bool     arr_armed     = false;
 
 /*
@@ -556,9 +663,17 @@ void arrival_peak_reset()
     arr_peak_cur  = 0.0f;
     arr_peak_prev = 0.0f;
     arr_bucket_ms = millis();
-    arr_quiet     = 0;
+    arr_quiet       = 0;
+    arr_quiet_hi    = 0;
     arr_armed     = false;
     arr_hit       = false;
+
+    arr_dep_acc  = 0;
+    arr_dep_n    = 0;
+    arr_dep_sign = 0;
+    arr_opp      = 0;
+    ramp_armed   = false;
+    ramp_arm_via = 0;
 
     ramp_sum   = 0;
     ramp_abs   = 0;
@@ -764,6 +879,7 @@ void poll_acc_int_status();
 void emit_sample_log();
 void emit_burst_log();
 void emit_ramp_log();
+void emit_arm_log();
 
 uint16_t read_battery_voltage();
 extern int configure_adc_channel();
@@ -923,6 +1039,7 @@ void loop()
         emit_sample_log();
         emit_burst_log();
         emit_ramp_log();
+        emit_arm_log();
         emit_acc_int_log();
         poll_acc_int_status();
 
@@ -1046,11 +1163,28 @@ void read_acceleration_mss()
      * hold the largest excursion seen. See the ARRIVAL_QUIET_MSS block.
      */
     {
-        float dev = fabs(accel_value - arr_zero);
+        float   sdev = accel_value - arr_zero;
+        float   dev  = fabs(sdev);
+        int8_t  ssign = (sdev > 0.0f) ? 1 : ((sdev < 0.0f) ? -1 : 0);
+
+        /*
+         * Fix this run's departure sign from its opening samples, while the
+         * departure ramp is still running. See the ARM_REV_SAMPLES block.
+         */
+        if (arr_dep_sign == 0) {
+            arr_dep_acc += (int32_t)(sdev * 1000.0f);
+            if (++arr_dep_n >= ARM_DEP_SIGN_N) {
+                arr_dep_sign = (arr_dep_acc >= 0) ? 1 : -1;
+            }
+        }
 
         if (!arr_armed) {
             if (dev < ARRIVAL_QUIET_MSS) {
-                if (++arr_quiet >= ARRIVAL_ARM_SAMPLES) {
+                ++arr_quiet;
+                if (arr_quiet > arr_quiet_hi) {
+                    arr_quiet_hi = arr_quiet;
+                }
+                if (arr_quiet >= ARRIVAL_ARM_SAMPLES) {
                     arr_armed = true;
                     arr_bucket_ms = millis();
                 }
@@ -1077,10 +1211,29 @@ void read_acceleration_mss()
         }
 
         /*
+         * Second arming path, gating the RAMP detector only -- see the
+         * ARM_REV_SAMPLES block for why it is kept off the peak collector.
+         */
+        if (!ramp_armed) {
+            if (arr_armed) {
+                ramp_armed   = true;
+                ramp_arm_via = 1;                  /* quiet */
+            } else if (arr_dep_sign != 0) {
+                if (ssign != 0 && ssign != arr_dep_sign) {
+                    if (++arr_opp >= ARM_REV_SAMPLES) {
+                        ramp_armed   = true;
+                        ramp_arm_via = 2;          /* sign reversal */
+                    }
+                } else {
+                    arr_opp = 0;
+                }
+            }
+        }
+
+        /*
          * Signed sample, shared by the burst recorder and the ramp detector.
          */
         {
-            float sdev = accel_value - arr_zero;
             int16_t sv;
 
             if (sdev >= 32.0f)       sv =  32000;
@@ -1107,12 +1260,11 @@ void read_acceleration_mss()
             }
 
             /*
-             * Ramp detector. Gated on arr_armed for the same reason the peak
-             * is: the departure ramp must not feed it, and arr_armed cannot
-             * become true until the departure transient has been quiet for
-             * ARRIVAL_ARM_SAMPLES. See the RAMP_* block above.
+             * Ramp detector, gated on ramp_armed -- the UNION of arm-on-quiet
+             * and arm-on-sign-reversal, so a short run with no cruise can
+             * still open it. The peak collector keeps the quiet-only rule.
              */
-            if (arr_armed && !ramp_hit_v) {
+            if (ramp_armed && !ramp_hit_v) {
                 ramp_sum += sv;
                 ramp_abs += (sv < 0) ? -(int32_t)sv : (int32_t)sv;
 
@@ -1277,11 +1429,47 @@ void emit_ramp_log()
         Serial.print(ramp_mean_get());
         Serial.print(F(" dir="));
         Serial.print(ramp_dir_get());
-        Serial.print(F(" st="));
-        Serial.print(ms.get_state());
         Serial.print(F("\r\n"));
     }
     last = now;
+}
+
+/*
+ * One arming summary per run, printed when the FSM leaves STATE_MOVING --
+ * so it appears whether or not arming ever happened, which is the whole
+ * point. See the arr_quiet_hi block for why this cannot be measured offline.
+ *
+ *     ARM q_hi=4 t=63140 armed=0
+ *
+ * q_hi is the longest consecutive quiet run the detector achieved,
+ * ARRIVAL_ARM_SAMPLES is what it needed. arrival_peak_reset() clears the
+ * high-water mark on entry to STATE_MOVING, so this is per-run.
+ */
+void emit_arm_log()
+{
+    static uint8_t last_state = 0;
+    uint8_t st = (uint8_t)ms.get_state();
+
+    if (last_state == (uint8_t)MotionStates::STATE_MOVING &&
+        st != (uint8_t)MotionStates::STATE_MOVING) {
+        uint8_t hi;
+        bool    armed;
+
+        noInterrupts();
+        hi    = arr_quiet_hi;
+        armed = arr_armed;
+        interrupts();
+
+        /* q_hi vs ARRIVAL_ARM_SAMPLES; via = which path opened the ramp gate */
+        Serial.print(F("ARM q="));
+        Serial.print(hi);
+        Serial.print(F(" a="));
+        Serial.print(armed ? 1 : 0);
+        Serial.print(F(" v="));
+        Serial.print(ramp_arm_via);
+        Serial.print(F("\r\n"));
+    }
+    last_state = st;
 }
 
 /*
