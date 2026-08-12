@@ -140,6 +140,14 @@ mechanism.
 
 The direction asymmetry holds across both mountings: **down is the thin side.**
 
+> ⚠️ **"REPRODUCIBLE" WAS WRONG — corrected the same evening by runs 6–7
+> (§5a).** Two further bottom-terminal runs gave up q=**13** and down q=**9**,
+> against the 6/8/6 above. Five runs on nominally the same mounting span
+> **q=6 to q=13**. The worst observed is still 6, but 6 is a worst case, not a
+> typical value, and the margin is not stable enough to characterise a mounting
+> from three runs. **Sixth single-run-class claim overturned by the next
+> measurement — and this one was mine, made hours earlier in this same note.**
+
 ⚠️ **Method error, corrected mid-session.** Before run 1 I predicted a 4→1
 descent would test the bottom-terminal margin because it *ends* at the bottom.
 It does not. `q=` is the high-water mark of the quiet stretch that armed the
@@ -152,6 +160,45 @@ bottom. Runs 2–4 are the valid test; run 1 is not.
 without firing**, because the quiet path keeps succeeding — twice by exactly
 one sample. It is promoted (`46d1a5d`) and gating the peak collector, and it
 has still never been seen to work.
+
+---
+
+## 5a. Runs 6–7 — the bottom terminal again, and the margin moved
+
+Both on `9d57c9a`, parked attitude `x≈0.644`.
+
+| # | move | dur | opk | path | peak | margin | ARM | ramp |
+|---|---|---|---|---|---|---|---|---|
+| 6 | 1→2 up | 4.3 s | 12 | polled | 0.481 | 1.069× | **q=13** a=1 v=1 | 588 |
+| 7 | 2→1 down | 3.8 s | 17 | polled | 0.468 | 1.040× | **q=9** a=1 v=1 | 596 |
+
+**The margin went UP, and that is the finding.** Bottom-terminal margins on
+this mounting now read up 6, 8, **13** and down 6, **9** — a span of 6 to 13
+across five runs. §5's "reproducible" is withdrawn.
+
+**Most likely cause: parked attitude drifted `x≈0.61 → 0.64` between the two
+sets.** That is a small shift, but `6b5b2c3` measured `x 0.643→0.710` swinging
+margins from 9,8,9 to 6,5,5 — so a small attitude change producing a
+meaningful margin change is *consistent with*, and further evidence for, the
+install-time-property finding. Run-to-run variance is the alternative and five
+runs cannot separate them. **What this does settle: you cannot characterise a
+mounting's margin from three runs.**
+
+**⬜ Deliberately NOT claimed: the 0.32 cruise question is not reopened.** `pk`
+reads 0.33 and 0.36 during `st=4` on these runs, which looks like it
+contradicts §6a's 0.12. It almost certainly does not. These are ~4 s runs that
+barely reach cruise, `pk` only accumulates after arming (late on a short run),
+and those are one or two samples each — almost certainly the arrival ramp
+rising toward its 0.45 crossing rather than cruise content. §6's 0.32 sat
+across sustained cruise, which is a different measurement. The decimated log
+cannot separate them, so this is UNRESOLVED, not evidence either way. Settle it
+from the arrival burst of a long run, not from `pk` on a short one.
+
+**`tw=3`** — a third wedge caught, still zero resets, correlating with the
+`ACC-STAT read FAILED` after run 7's arrival burst. Three catches, three
+transparent recoveries.
+
+Seventh ramp latch, still post-release. `v=1` both.
 
 ---
 
@@ -253,10 +300,9 @@ returns.
 
 ## 7. The armed branch has still never executed
 
-Four ramp latches this session — **607, 615, 653, 585, all at 100%
-directionality**. The two highest means on record. Combined with the prior 17
-automatic stops the range is now 472–653, still with zero false latches
-anywhere.
+**Seven ramp latches this session — 585, 588, 596, 599, 607, 615, 653, all at
+100% directionality.** Combined with the prior 17 automatic stops the range is
+now 472–653, still with zero false latches anywhere.
 
 Not one of them released the latch. Every one landed *after* the peak or
 any-motion path had already fired:
@@ -271,10 +317,12 @@ latches, the FSM has left. What appears in the log is `emit_ramp_log()` from
 `loop()`, never `FSM: Arrival (ramp) … (armed)`.
 
 **This is correct behaviour, not a defect.** The ramp path is insurance: it can
-only release a stop the other paths miss, and no stop has missed yet. But it
-means arming remains **unexercised** — the same position the reversal path has
-been in for ~24 runs. Two release paths are now armed on the strength of
-replay and negative evidence, and neither has been observed to fire in anger.
+only release a stop the other paths miss, and no stop has missed yet. But after
+**seven opportunities** it means arming remains **unexercised** — the same
+position the reversal path has been in for ~27 runs. Two release paths are now
+armed on the strength of replay and negative evidence, and neither has been
+observed to fire in anger. Only the jog verdict earned its arming with live
+evidence (25/25), and those two carry the 350 fpm boundary between them.
 
 Run 3 is the closest it has come: 2% lower on that peak and the FSM would have
 stayed in `STATE_MOVING` and the ramp would have released it.
@@ -374,10 +422,12 @@ untested against a real wedge. Third armed-but-unexercised path on this device.
 ## 9. Next, in order
 
 1. ~~A long multi-floor automatic run~~ — **DONE, §6a. §6 is dead.**
-2. **Two or three more bottom-terminal descents** — now the top open question.
-   Confirm q=6 is stable on this mounting and watch for `v=2`. The margin is an
-   install-time property and the thin end is where it decides whether the
-   beacon works. Note §5: it must be a run *starting* near the bottom.
+2. ~~Two or three more bottom-terminal descents~~ — **DONE, §5a, and the
+   answer is that the margin is NOT stable: 6 to 13 across five runs.** What
+   follows from that: the margin cannot be characterised from a handful of
+   runs, so **the device should report its own margin** rather than anyone
+   inferring it from a commissioning test. That is the change §5a argues for.
+   `v=2` still never seen (~27 runs).
 3. **Watch `tw=`.** Two trips recorded, both recovered (§8a). If the lockup
    recurs *without* `tw=` incrementing, the cause is not the TWI waits and the
    brownout explanation comes back. If `tw=` climbs fast, measure the spin
@@ -412,6 +462,14 @@ untested against a real wedge. Third armed-but-unexercised path on this device.
   that margin gets.
 - **"Cruise reached 0.32, so the peak detector is squeezed from both ends."**
   My own hypothesis, contradicted by the very next long run at 0.12 (§6, §6a).
-  Raised and killed inside one session. The fifth single-run number this
-  project has overturned with the next measurement — the method lesson is not
-  getting old.
+  Raised and killed inside one session.
+- **"The bottom-terminal margin on this mounting is 6 down / 8 up, and
+  reproducible."** Mine too, written earlier in THIS note and overturned by
+  runs 6–7 at 9 down / 13 up (§5, §5a). Five runs span 6 to 13.
+
+**Two of the six were my own claims, and one of them survived only a few hours
+in its own note.** The standing method lesson — treat any single-run number as
+a hypothesis until a second run under different conditions agrees — is not a
+historical caution about earlier sessions. It applied twice today, to me, and
+the correct habit is to write the confidence level into the note at the moment
+the number is recorded, not after it fails.
