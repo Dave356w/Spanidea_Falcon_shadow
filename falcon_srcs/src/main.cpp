@@ -412,6 +412,55 @@ static volatile uint8_t  arm_via      = 0;   /* 1 = quiet, 2 = reversal      */
 static volatile bool     arr_armed     = false;
 
 /*
+ * ─── THE RAMP DETECTOR HAS ITS OWN GATE, AND IT IS NOT arr_armed ─────────────
+ *
+ * Found by graph/arming_replay.py on 2026-08-12 against all 89 departure
+ * bursts on file. THE HAZARD, in one real burst (from the departure latch):
+ *
+ *     -65 -38 -56 -64 -129 | -142 -170 -228 -301 -488 -496 -506 ...
+ *     \___ all inside the 150 mm/s^2 quiet band ___/
+ *
+ * A SLOW DEPARTURE STARTS BELOW THE QUIET BAND. The quiet path arms on the
+ * departure's own opening samples, and from that instant the ramp accumulator
+ * is fed the departure ramp itself -- which then qualifies at mean 499,
+ * directionality 100%, arithmetically indistinguishable from an arrival. With
+ * RAMP_ARMED 1 that RELEASES THE LATCH SECONDS AFTER A CAR STARTS MOVING:
+ * §14.4's catastrophic direction. 1-2 departures in 89 on logged data.
+ *
+ * Until 2026-08-12 this was latent -- unarmed, the verdict printed and nothing
+ * happened. Arming it is what made it reachable.
+ *
+ * WHY arr_armed CANNOT BE THE GATE, and why arm_via == 2 is NOT the fix
+ * (measured, not assumed): arm_via records whichever path armed FIRST, and the
+ * reversal block is inside `if (!arr_armed ...)`, so once quiet arms, arr_opp
+ * stops being evaluated and arm_via can never become 2. Quiet has won that race
+ * in every run on file -- v=1, ~27 runs. Gating the ramp on arm_via == 2 would
+ * make it permanently dead. It has to be an INDEPENDENT condition that keeps
+ * tracking after the union arms.
+ *
+ * SO: the peak collector keeps the union (it needs to arm readily -- the thin
+ * end of the shaft arms by a single sample), and the ramp gets ramp_gate, which
+ * is reversal-ONLY. A sign reversal against the departure means the departure
+ * ramp has ENDED, which is the thing the ramp detector actually needs to know
+ * and the thing "the signal went quiet" only approximates.
+ *
+ * REPLAY EVIDENCE: zero departure-ramp fires at EVERY arming offset 0-6
+ * samples, against 1-2 for the union, with arrival capability UNCHANGED at
+ * 42/88 paired arrival bursts. The union's safety depended on arming starting
+ * >=200 ms after the latch; MOVEMENT_DETECTION_TIMEOUT_MS is exactly 200, but
+ * that is a CEILING, not a floor -- STATE_MOVEMENT_DETECTED exits early
+ * whenever |w| > |vel_departure|, and vel_departure logs as 0.000 on every
+ * run. This gate does not depend on that coincidence.
+ *
+ * COST: the ramp now needs ARM_REV_SAMPLES + 3 blocks = 44 samples (~1.76 s) of
+ * deceleration rather than 36, because it cannot start counting until the
+ * reversal completes. Replay says that costs nothing on the bursts on file, but
+ * it is the thing to watch: a very short deceleration could fall inside it.
+ */
+static volatile uint8_t  ramp_opp      = 0;  /* independent reversal counter  */
+static volatile bool     ramp_gate     = false;
+
+/*
  * Sticky record that the windowed peak crossed ARRIVAL_PEAK_VALUE at some
  * point during this run. Added 2026-08-10 after a 1 s jog latched the alarm
  * for a minute with the car provably still.
@@ -728,6 +777,9 @@ void arrival_peak_reset()
     arr_dep_sign = 0;
     arr_opp      = 0;
     arm_via      = 0;
+
+    ramp_opp   = 0;      /* the ramp's own reversal gate, per run */
+    ramp_gate  = false;
 
     ramp_sum   = 0;
     ramp_abs   = 0;
@@ -1270,6 +1322,22 @@ void read_acceleration_mss()
             }
         }
 
+        /*
+         * The ramp detector's own gate: reversal-only, tracked INDEPENDENTLY of
+         * arr_armed so that quiet arming cannot hand the departure ramp to the
+         * accumulator. See the ramp_gate block above for the burst that forced
+         * this and why arm_via cannot serve.
+         */
+        if (!ramp_gate && arr_dep_sign != 0) {
+            if (ssign != 0 && ssign != arr_dep_sign) {
+                if (++ramp_opp >= ARM_REV_SAMPLES) {
+                    ramp_gate = true;
+                }
+            } else {
+                ramp_opp = 0;
+            }
+        }
+
         if (arr_armed) {
             uint32_t now = millis();
 
@@ -1320,9 +1388,10 @@ void read_acceleration_mss()
             }
 
             /*
-             * Ramp detector, gated on the same arr_armed union as the peak.
+             * Ramp detector, gated on ramp_gate -- reversal ONLY, deliberately
+             * NOT the arr_armed union the peak uses. See the ramp_gate block.
              */
-            if (arr_armed && !ramp_hit_v) {
+            if (ramp_gate && !ramp_hit_v) {
                 ramp_sum += sv;
                 ramp_abs += (sv < 0) ? -(int32_t)sv : (int32_t)sv;
 
@@ -1510,21 +1579,34 @@ void emit_arm_log()
 
     if (last_state == (uint8_t)MotionStates::STATE_MOVING &&
         st != (uint8_t)MotionStates::STATE_MOVING) {
-        uint8_t hi;
-        bool    armed;
+        uint8_t hi, ropp;
+        bool    armed, rgate;
 
         noInterrupts();
         hi    = arr_quiet_hi;
         armed = arr_armed;
+        rgate = ramp_gate;
+        ropp  = ramp_opp;
         interrupts();
 
-        /* q_hi vs ARRIVAL_ARM_SAMPLES; via = which path opened the ramp gate */
+        /*
+         * q_hi vs ARRIVAL_ARM_SAMPLES; v = which path armed the PEAK.
+         * g/ro are the RAMP's own reversal gate, which is independent of both
+         * -- see the ramp_gate block. g=1 means the departure ramp was seen to
+         * end, so a RAMP verdict on this run is trustworthy; g=0 means the ramp
+         * detector never ran at all, whatever the peak did. ro is how far the
+         * reversal counter got, so g=0 ro=7 is a near miss worth knowing about.
+         */
         Serial.print(F("ARM q="));
         Serial.print(hi);
         Serial.print(F(" a="));
         Serial.print(armed ? 1 : 0);
         Serial.print(F(" v="));
         Serial.print(arm_via);
+        Serial.print(F(" g="));
+        Serial.print(rgate ? 1 : 0);
+        Serial.print(F(" ro="));
+        Serial.print(ropp);
         Serial.print(F("\r\n"));
     }
     last_state = st;
