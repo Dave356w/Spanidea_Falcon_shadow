@@ -415,17 +415,53 @@ static volatile bool     arr_hit       = false;
  * and RAMP_BLOCKS consecutive qualifying blocks OF THE SAME SIGN latch
  * ramp_hit, sticky until arrival_peak_reset() -- same discipline as arr_hit.
  *
- * WHY IT CANNOT FIRE ON THE DEPARTURE RAMP: accumulation is gated on
- * arr_armed, which requires ARRIVAL_ARM_SAMPLES of quiet below
- * ARRIVAL_QUIET_MSS -- and a departure ramp at ~0.6 m/s^2 is never quiet, so
- * the detector does not begin counting until the departure transient is over
- * and cruise has been observed. MIN_TRAVEL_MS gates the FSM side as well.
+ * 🔴 WHY IT CANNOT FIRE ON THE DEPARTURE RAMP -- AND WHY THAT GATE IS
+ * LOAD-BEARING. Accumulation is gated on arr_armed, which requires
+ * ARRIVAL_ARM_SAMPLES of quiet below ARRIVAL_QUIET_MSS; a departure ramp is
+ * never quiet, so counting cannot begin until the departure is over and
+ * cruise has been observed. MIN_TRAVEL_MS gates the FSM side as well.
  *
- * WHY CRUISE CANNOT FIRE IT: cruise WINDOWED PEAKS measured 0.07-0.28
- * (means far lower), against a 0.40 floor on the block MEAN -- and cruise
- * vibration is symmetric, so the directionality gate starves it from both
- * sides. Margins vs the measured plateau: 0.605/0.40 = 1.5x amplitude,
- * measured ramp dir floor 0.888 vs 0.85 gate.
+ * THIS IS NOT BELT-AND-BRACES. Replayed against the 2026-08-12 cab captures,
+ * ALL FOUR DEPARTURE bursts satisfy the block test as readily as the
+ * arrivals do -- a 300 fpm departure sustains ~0.5 m/s^2 one-signed for the
+ * whole 3.2 s window. The block arithmetic CANNOT tell a departure ramp from
+ * an arrival ramp: they are the same shape with opposite sign, and sign
+ * cannot be used because it encodes direction of travel, not phase of the
+ * run. The arming gate is the ONLY thing standing between this detector and
+ * releasing the beacon seconds after the latch, on a moving car -- §14.4's
+ * catastrophic direction. Do not weaken it, do not "simplify" it away, and
+ * re-run that replay after any change to arming.
+ *
+ * Replay coverage for RAMP_FLOOR_MMSS 300 (2026-08-12): 24 cartop bursts --
+ * brake stops, jogs, slow and 350 fpm departures -- fire at neither 400 nor
+ * 300. The floor change opens no new false positive on any measured data.
+ *
+ * WHY CRUISE CANNOT FIRE IT: cruise WINDOWED PEAKS measured 0.07-0.28 on the
+ * cartop and 0.02-0.04 in the cab (block MEANS far lower), against a floor on
+ * the block MEAN -- and cruise vibration is symmetric, so the directionality
+ * gate starves it from both sides.
+ *
+ * ── FLOOR 400 -> 300, measured 2026-08-12 ────────────────────────────────
+ *
+ * 400 was set against 08-11's plateau of 0.605 +/- 0.008 (n=9), claiming 1.5x.
+ * Four automatic cab stops on 08-12 measured the plateau at 487-501 -- tight
+ * within the session, but 19% BELOW the other session:
+ *
+ *   2026-08-11, 350 fpm cab      0.605 +/- 0.008   n=9
+ *   2026-08-12, 300 fpm cab      0.487-0.501       n=4
+ *
+ * So "the drive holds a constant deceleration" is true PER CONFIGURATION,
+ * not universally, and 400 left only 1.23x on the newer figure. An
+ * installation 20% gentler than 08-12 would fail the floor outright and lose
+ * the detector SILENTLY -- the failure mode this project keeps being bitten
+ * by. 300 restores 1.63x against the measured plateau and costs nothing:
+ * DIRECTIONALITY is what discriminates (100% on every drive ramp measured
+ * against 0.02-0.42 for brake stops), and no cruise block mean comes near
+ * either gate.
+ *
+ * The 08-12 single-floor run is why a fixed floor is defensible at all: a
+ * stop that never reached top speed still held 0.501 for 2.6 s, so the drive
+ * sheds whatever speed it has at its own rate.
  *
  * TIME TO FIRE: 3 blocks x 12 samples = 36 samples =~ 1.44 s of observed
  * plateau. A 350 fpm stop sustains ~2.9 s of ramp, so the verdict lands
@@ -445,7 +481,7 @@ static volatile bool     arr_hit       = false;
  */
 #define RAMP_BLOCK_N      12    /* samples per block, 0.48 s at 25 Hz       */
 #define RAMP_BLOCKS       3     /* consecutive qualifying blocks, same sign */
-#define RAMP_FLOOR_MMSS   400   /* block mean |Σa|/N floor, milli-m/s^2     */
+#define RAMP_FLOOR_MMSS   300   /* block mean |Σa|/N floor, milli-m/s^2     */
 #define RAMP_DIR_PCT      85    /* directionality floor, percent            */
 
 static volatile int32_t  ramp_sum   = 0;    /* Σa over the open block       */
@@ -727,6 +763,7 @@ void poll_acc_int_status();
 
 void emit_sample_log();
 void emit_burst_log();
+void emit_ramp_log();
 
 uint16_t read_battery_voltage();
 extern int configure_adc_channel();
@@ -885,6 +922,7 @@ void loop()
 
         emit_sample_log();
         emit_burst_log();
+        emit_ramp_log();
         emit_acc_int_log();
         poll_acc_int_status();
 
@@ -1206,6 +1244,44 @@ void emit_burst_log()
     noInterrupts();
     burst_ready = false;
     interrupts();
+}
+
+/*
+ * Report the ramp verdict when it latches, from loop(), REGARDLESS OF FSM
+ * STATE. Added 2026-08-12 after the first two automatic cab runs.
+ *
+ * The FSM's own ramp check lives inside STATE_MOVING, and on a fast
+ * drive-controlled stop it never gets there: the deceleration plateau
+ * (~0.5 m/s^2) is ITSELF above ARRIVAL_PEAK_VALUE (0.45), so the polled peak
+ * crosses on the ramp's leading edge ~0.3 s in, the FSM leaves STATE_MOVING,
+ * and the ramp verdict -- which needs RAMP_BLOCKS x RAMP_BLOCK_N samples,
+ * ~1.44 s -- latches about a second later with nobody looking. Both cab runs
+ * (300 fpm, both directions) qualified five blocks at 100% directionality
+ * and printed nothing.
+ *
+ * So the detector was invisible exactly where it matters most, and its
+ * arming evidence could only be reconstructed by replaying bursts offline.
+ * This prints the latch as it happens. It is pure instrumentation: no
+ * release decision reads it, and the FSM path is untouched.
+ *
+ * Edge-detected against arrival_peak_reset(), which clears ramp_hit_v on
+ * entry to STATE_MOVING -- so this re-arms once per run.
+ */
+void emit_ramp_log()
+{
+    static bool last = false;
+    bool now = ramp_hit();
+
+    if (now && !last) {
+        Serial.print(F("RAMP latched mean="));
+        Serial.print(ramp_mean_get());
+        Serial.print(F(" dir="));
+        Serial.print(ramp_dir_get());
+        Serial.print(F(" st="));
+        Serial.print(ms.get_state());
+        Serial.print(F("\r\n"));
+    }
+    last = now;
 }
 
 /*
