@@ -95,6 +95,20 @@
 #define BURST_POST_ARR  60  /* arrival:   20 pre / 60 post */
 
 /*
+ * ⛔ RAMP DETECTOR NOT ARMED -- protocol §3.1, log-only on first exposure.
+ *
+ * The detector itself (design, thresholds, measured basis) lives in main.cpp
+ * above the RAMP_* constants; this flag is here because the FSM is what acts
+ * on the verdict. Unarmed, a ramp hit prints FSM: Arrival (ramp) once per
+ * run and fires the arrival burst, and the latch releases only on the
+ * existing paths. WHAT ARMS IT: one hoistway session with RAMP lines on
+ * every drive-controlled stop and none during cruise, jogs, or brake-only
+ * stops -- then set 1, and the 350 fpm release stops depending on a 1.009x
+ * peak margin.
+ */
+#define RAMP_ARMED      0
+
+/*
  * ARRIVAL DETECTION -- two independent paths, plus a stillness backstop.
  *
  * Measured on 2026-08-07, three arrivals:
@@ -444,6 +458,7 @@ class MovementService {
     bool     any_motion_pending;   /* departure seen, not yet acted on   */
     bool     arrival_seen;         /* arrival transient seen while MOVING */
     bool     jog_release_pending = false;  /* jog verdict release request */
+    bool     ramp_reported;        /* ramp verdict logged this run        */
     uint32_t stop_confirm_timer;   /* start of the settled-at-1g window   */
     uint32_t monitor_entered_ms;   /* when STATE_MONITORING was entered   */
     uint8_t  arrival_edge_count;   /* any-motion edges inside the window  */

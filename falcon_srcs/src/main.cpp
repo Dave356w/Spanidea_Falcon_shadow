@@ -342,6 +342,78 @@ static volatile bool     arr_hit       = false;
 #define JOG_OPP_RATIO_PCT   33   /* opposite/primary >= this -> jog...      */
 #define JOG_OPP_PEAK_MMSS   900  /* ...AND opposite-side peak >= this       */
 
+/*
+ * RAMP DETECTOR -- sustained one-signed deceleration (2026-08-12).
+ *
+ * The fix of record for the normal-operation boundary. Four 350 fpm automatic
+ * stops all released on the peak detector, but the worst margin was 1.009x
+ * (peak 0.454 vs gate 0.45) with run-to-run spread 18x the margin -- the FSM
+ * peak is a deviation from a rolling average, and a sustained ramp drags the
+ * average with it, so the metric gets structurally weaker exactly as ramps
+ * get longer. "Releases on luck" (falcon_350fpm_automatic_2026-08-11.md §1).
+ *
+ * What the same afternoon measured is that the signature to key on is the
+ * PLATEAU, not the peak:
+ *
+ *   - the drive holds 0.605 +/- 0.008 m/s^2 on every ramp, nine of nine,
+ *     both directions; 115 fpm measured 0.52. Speed buys DURATION, not
+ *     amplitude -- so a FIXED magnitude floor is justified (§2).
+ *   - directionality |Σa|/Σ|a| was 0.888-1.000 on every drive ramp and
+ *     0.42 / 0.02 on brake stops. A ramp is a sustained push; a brake set
+ *     is a ring that cancels itself (falcon_signature §4e). Character, not
+ *     amplitude -- brake stops have the LARGER peaks.
+ *
+ * MECHANISM. Consecutive non-overlapping blocks of RAMP_BLOCK_N samples of
+ * signed (a - zero), integer mmss like the burst. A block QUALIFIES when
+ *
+ *     |Σa|  >=  RAMP_FLOOR_MMSS * RAMP_BLOCK_N     (mean one-signed >= floor)
+ *     |Σa| * 100  >=  RAMP_DIR_PCT * Σ|a|          (directionality)
+ *
+ * and RAMP_BLOCKS consecutive qualifying blocks OF THE SAME SIGN latch
+ * ramp_hit, sticky until arrival_peak_reset() -- same discipline as arr_hit.
+ *
+ * WHY IT CANNOT FIRE ON THE DEPARTURE RAMP: accumulation is gated on
+ * arr_armed, which requires ARRIVAL_ARM_SAMPLES of quiet below
+ * ARRIVAL_QUIET_MSS -- and a departure ramp at ~0.6 m/s^2 is never quiet, so
+ * the detector does not begin counting until the departure transient is over
+ * and cruise has been observed. MIN_TRAVEL_MS gates the FSM side as well.
+ *
+ * WHY CRUISE CANNOT FIRE IT: cruise WINDOWED PEAKS measured 0.07-0.28
+ * (means far lower), against a 0.40 floor on the block MEAN -- and cruise
+ * vibration is symmetric, so the directionality gate starves it from both
+ * sides. Margins vs the measured plateau: 0.605/0.40 = 1.5x amplitude,
+ * measured ramp dir floor 0.888 vs 0.85 gate.
+ *
+ * TIME TO FIRE: 3 blocks x 12 samples = 36 samples =~ 1.44 s of observed
+ * plateau. A 350 fpm stop sustains ~2.9 s of ramp, so the verdict lands
+ * mid-deceleration; a 115 fpm levelled stop sustains ~0.9 s and stays with
+ * the peak detector -- exactly the crossover the architecture table in
+ * falcon_signature §4e.3 describes. The buzzer blanks samples while sounding,
+ * which stretches the 36 samples over more wall clock but does not change
+ * the count; the plateau outlives it at speed.
+ *
+ * ⛔ SHIPS UNARMED (RAMP_ARMED 0), protocol §3.1: every release path runs
+ * log-only on its first hoistway exposure. The FSM prints what it would have
+ * done (FSM: Arrival (ramp) ...) and ALSO uses the hit as the arrival-burst
+ * trigger -- the "own trigger below ARRIVAL_PEAK_VALUE" that §4e.2 said the
+ * slow-stop capture needs. Arm after one session shows RAMP lines on real
+ * drive stops and none anywhere else. RAMP_ARMED lives in movement_service.h
+ * because the FSM is what acts on it.
+ */
+#define RAMP_BLOCK_N      12    /* samples per block, 0.48 s at 25 Hz       */
+#define RAMP_BLOCKS       3     /* consecutive qualifying blocks, same sign */
+#define RAMP_FLOOR_MMSS   400   /* block mean |Σa|/N floor, milli-m/s^2     */
+#define RAMP_DIR_PCT      85    /* directionality floor, percent            */
+
+static volatile int32_t  ramp_sum   = 0;    /* Σa over the open block       */
+static volatile int32_t  ramp_abs   = 0;    /* Σ|a| over the open block     */
+static volatile uint8_t  ramp_n     = 0;    /* samples in the open block    */
+static volatile uint8_t  ramp_run   = 0;    /* consecutive qualifying blocks */
+static volatile int8_t   ramp_sign  = 0;    /* sign of the qualifying run   */
+static volatile bool     ramp_hit_v = false;
+static volatile uint16_t ramp_mean_mmss = 0;   /* last block, for the log   */
+static volatile uint8_t  ramp_dir_pct   = 0;   /* last block, for the log   */
+
 static volatile int16_t  burst[BURST_N];
 static volatile uint8_t  burst_head  = 0;
 static volatile uint8_t  burst_post  = 0xFF;   /* 0xFF = not triggered       */
@@ -408,8 +480,28 @@ void arrival_peak_reset()
     arr_quiet     = 0;
     arr_armed     = false;
     arr_hit       = false;
+
+    ramp_sum   = 0;
+    ramp_abs   = 0;
+    ramp_n     = 0;
+    ramp_run   = 0;
+    ramp_sign  = 0;
+    ramp_hit_v = false;
     interrupts();
 }
+
+/* True once RAMP_BLOCKS consecutive qualifying blocks were seen this run. */
+bool ramp_hit()
+{
+    bool v;
+    noInterrupts();
+    v = ramp_hit_v;
+    interrupts();
+    return v;
+}
+
+uint16_t ramp_mean_get() { return ramp_mean_mmss; }
+uint8_t  ramp_dir_get()  { return ramp_dir_pct;  }
 
 /* True once the windowed peak has crossed ARRIVAL_PEAK_VALUE this run. */
 bool arrival_peak_hit()
@@ -884,29 +976,66 @@ void read_acceleration_mss()
         }
 
         /*
-         * Burst recorder. Writes continuously so the pre-trigger history is
-         * always there; freezes once the post-trigger count runs out, and
-         * stops writing until loop() has dumped it.
+         * Signed sample, shared by the burst recorder and the ramp detector.
          */
-        if (!burst_ready) {
-            {
-                float sdev = accel_value - arr_zero;
-                int16_t sv;
+        {
+            float sdev = accel_value - arr_zero;
+            int16_t sv;
 
-                if (sdev >= 32.0f)       sv =  32000;
-                else if (sdev <= -32.0f) sv = -32000;
-                else                     sv = (int16_t)(sdev * 1000.0f);
+            if (sdev >= 32.0f)       sv =  32000;
+            else if (sdev <= -32.0f) sv = -32000;
+            else                     sv = (int16_t)(sdev * 1000.0f);
 
+            /*
+             * Burst recorder. Writes continuously so the pre-trigger history
+             * is always there; freezes once the post-trigger count runs out,
+             * and stops writing until loop() has dumped it.
+             */
+            if (!burst_ready) {
                 burst[burst_head] = sv;
-            }
-            burst_head = (uint8_t)((burst_head + 1) % BURST_N);
+                burst_head = (uint8_t)((burst_head + 1) % BURST_N);
 
-            if (burst_post != 0xFF) {
-                if (burst_post > 0) {
-                    burst_post--;
-                } else {
-                    burst_post  = 0xFF;
-                    burst_ready = true;
+                if (burst_post != 0xFF) {
+                    if (burst_post > 0) {
+                        burst_post--;
+                    } else {
+                        burst_post  = 0xFF;
+                        burst_ready = true;
+                    }
+                }
+            }
+
+            /*
+             * Ramp detector. Gated on arr_armed for the same reason the peak
+             * is: the departure ramp must not feed it, and arr_armed cannot
+             * become true until the departure transient has been quiet for
+             * ARRIVAL_ARM_SAMPLES. See the RAMP_* block above.
+             */
+            if (arr_armed && !ramp_hit_v) {
+                ramp_sum += sv;
+                ramp_abs += (sv < 0) ? -(int32_t)sv : (int32_t)sv;
+
+                if (++ramp_n >= RAMP_BLOCK_N) {
+                    int32_t mag  = (ramp_sum < 0) ? -ramp_sum : ramp_sum;
+                    int8_t  sign = (ramp_sum < 0) ? -1 : 1;
+                    bool    qual = (mag >= (int32_t)RAMP_FLOOR_MMSS * RAMP_BLOCK_N) &&
+                                   (mag * 100 >= (int32_t)RAMP_DIR_PCT * ramp_abs);
+
+                    if (qual && (ramp_run == 0 || sign == ramp_sign)) {
+                        ramp_sign = sign;
+                        if (++ramp_run >= RAMP_BLOCKS) {
+                            ramp_hit_v     = true;
+                            ramp_mean_mmss = (uint16_t)(mag / RAMP_BLOCK_N);
+                            ramp_dir_pct   = (uint8_t)((mag * 100) / ramp_abs);
+                        }
+                    } else {
+                        ramp_run  = qual ? 1 : 0;
+                        ramp_sign = qual ? sign : 0;
+                    }
+
+                    ramp_sum = 0;
+                    ramp_abs = 0;
+                    ramp_n   = 0;
                 }
             }
         }

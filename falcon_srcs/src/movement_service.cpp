@@ -9,6 +9,11 @@ extern bool  arrival_peak_hit();
 extern void  arrival_zero_set(float z);
 extern void  burst_trigger(uint8_t post, uint8_t kind);
 
+/* Ramp detector, maintained in the sampling ISR. See the RAMP_* block there. */
+extern bool     ramp_hit();
+extern uint16_t ramp_mean_get();
+extern uint8_t  ramp_dir_get();
+
 MovementService::MovementService(RollingAvg<float> *acc_avg)
 {
     acceleration_avg_ref = acc_avg;
@@ -28,6 +33,7 @@ MovementService::MovementService(RollingAvg<float> *acc_avg)
     arrival_edge_first = 0;
     vel_departure      = 0.0f;
     vel_reported       = false;
+    ramp_reported      = false;
     calib_moved        = false;
     calib_attempts     = 0;
 }
@@ -431,10 +437,12 @@ void MovementService::fsm_run()
              */
             lat_monitor.clear_quiet();
             jog_release_pending = false;   /* no verdict from a past run   */
+            ramp_reported       = false;
 
             /*
-             * Start the raw peak detector for this run. It stays disarmed
-             * until the departure transient has died away -- see main.cpp.
+             * Start the raw peak detector and the ramp detector for this
+             * run. Both stay disarmed until the departure transient has
+             * died away -- see main.cpp.
              */
             arrival_peak_reset();
         }
@@ -548,6 +556,38 @@ void MovementService::fsm_run()
                 start_timer = millis();
                 set_state(STATE_DECELERATING);
                 break;
+            }
+
+            /*
+             * 3. RAMP -- sustained one-signed deceleration at the drive's
+             * plateau. The path built for the stop that has no brake
+             * transient: a drive-controlled deceleration to standstill,
+             * where the windowed peak passes on a 1.009x margin or not at
+             * all. Detector and measured basis in main.cpp's RAMP_* block.
+             *
+             * Even unarmed this fires the arrival burst: the ramp verdict
+             * lands mid-deceleration, BEFORE the peak crosses on a slow
+             * drive stop, which is the "own trigger below the arrival
+             * threshold" the slow-stop capture has been missing
+             * (falcon_signature §4e.2).
+             */
+            if (!ramp_reported && ramp_hit()) {
+                ramp_reported = true;
+                Serial.print(F("FSM: Arrival (ramp) mean="));
+                Serial.print(ramp_mean_get());
+                Serial.print(F(" dir="));
+                Serial.print(ramp_dir_get());
+#if RAMP_ARMED
+                Serial.print(F(" (armed)\r\n"));
+                arrival_seen = true;
+                burst_trigger(BURST_POST_ARR, 1);
+                start_timer = millis();
+                set_state(STATE_DECELERATING);
+                break;
+#else
+                Serial.print(F(" (unarmed)\r\n"));
+                burst_trigger(BURST_POST_ARR, 1);
+#endif
             }
 
         }

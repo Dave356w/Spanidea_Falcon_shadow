@@ -54,7 +54,12 @@ accstat_re = re.compile(r"ACC-STAT\s+s=0x([0-9A-Fa-f]+)\s+pin=(\d+)\s+n=(\d+)")
 LATCH_RE = (
     ("departure", re.compile(r"FSM:\s*Departure latched")),
     ("arr_int",   re.compile(r"FSM:\s*Arrival \(any-motion\), edges (\d+)")),
-    ("arr_poll",  re.compile(r"FSM:\s*Arrival \(polled\), delta (-?\d+\.?\d*)")),
+    ("arr_poll",  re.compile(r"FSM:\s*Arrival \(polled\), (?:delta|peak) (-?\d+\.?\d*)")),
+    # Ramp verdict: a release only when armed; unarmed it logs and the run
+    # continues, so it must NOT close a run here -- handled as informational.
+    ("arr_ramp",  re.compile(r"FSM:\s*Arrival \(ramp\) mean=(\d+) dir=(\d+) \(armed\)")),
+    ("ramp_obs",  re.compile(r"FSM:\s*Arrival \(ramp\) mean=(\d+) dir=(\d+) \(unarmed\)")),
+    ("jog_rel",   re.compile(r"FSM:\s*Release \(jog verdict\)")),
     ("stillness", re.compile(r"FSM:\s*Released on stillness")),
     ("xy_rel",    re.compile(r"FSM:\s*Release \(x/y still\) m=(-?\d+\.?\d*)")),
     ("failsafe",  re.compile(r"FSM:\s*FAILSAFE")),
@@ -165,7 +170,7 @@ class Capture(object):
             for kind, rx in LATCH_RE:
                 mm = rx.search(s)
                 if mm:
-                    hit = (kind, mm.group(1) if mm.groups() else None)
+                    hit = (kind, " ".join(mm.groups()) if mm.groups() else None)
                     break
             if hit:
                 # FSM lines carry no timestamp of their own. Anchor to the
@@ -384,9 +389,13 @@ def report_runs(cap):
     for idx, kind, detail in cap.latch:
         t = at(idx)
         if kind == "departure":
-            open_run = {"start": t, "release": None, "detail": None}
-        elif kind in ("arr_int", "arr_poll", "stillness", "xy_rel",
-                      "failsafe") and open_run:
+            open_run = {"start": t, "release": None, "detail": None,
+                        "ramp_obs": []}
+        elif kind == "ramp_obs" and open_run:
+            # Unarmed ramp verdict: informational, does not close the run.
+            open_run["ramp_obs"].append((t, detail))
+        elif kind in ("arr_int", "arr_poll", "arr_ramp", "jog_rel",
+                      "stillness", "xy_rel", "failsafe") and open_run:
             open_run["release"] = t
             open_run["detail"] = (kind, detail)
             runs.append(open_run)
@@ -396,6 +405,7 @@ def report_runs(cap):
         runs.append(open_run)
 
     LABEL = {"arr_int": "any-motion", "arr_poll": "polled",
+             "arr_ramp": "RAMP mean/dir=", "jog_rel": "jog verdict",
              "stillness": "STILLNESS", "xy_rel": "x/y still m=",
              "failsafe": "FAILSAFE"}
 
@@ -409,6 +419,10 @@ def report_runs(cap):
         how = LABEL.get(kind, kind)
         if detail:
             how += " %s" % detail
+        # Unarmed ramp verdicts observed during the run (log-only path).
+        for rt, rd in r.get("ramp_obs", []):
+            ts = ("t=%d " % rt) if rt is not None else ""
+            how += "  [ramp obs %smean/dir=%s]" % (ts, rd)
 
         # Any-motion edges inside the run, split by buzzer state.
         #
