@@ -1,6 +1,12 @@
 # Falcon — product behaviour, detection logic, and reference legend
 
-**As of 2026-08-12, firmware `46d1a5d`, branch `Falcon_Rel_EFT`.**
+**As of 2026-08-12, firmware `9d57c9a`, branch `Falcon_Rel_EFT`.**
+
+⚠️ Two things in this document are now out of date, both covered in
+`falcon_ramp_armed_2026-08-12.md`: the **ramp detector is ARMED**
+(`RAMP_ARMED 1`), and **Wire1 is vendored** into `falcon_srcs/lib/Wire1` with
+bounded TWI waits, which adds a `tw=` field to the sample line (printed only
+when nonzero — a count of wedged transactions caught and recovered).
 
 This is the orientation document: what the device does, how it decides, and
 what every name in the source means. It is written to be read *before* the
@@ -11,7 +17,8 @@ Session notes, chronological:
 `falcon_spec_primary_usecase_2026-08-09.md` → `falcon_zxy_bench_2026-08-10.md`
 → `falcon_25hz_arrival_2026-08-10.md` → `falcon_signature_2026-08-11.md` →
 `falcon_jog_verdict_2026-08-11.md` → `falcon_350fpm_automatic_2026-08-11.md` →
-`falcon_cartop_2026-08-12.md` → `falcon_cab_automatic_2026-08-12.md`.
+`falcon_cartop_2026-08-12.md` → `falcon_cab_automatic_2026-08-12.md` →
+`falcon_ramp_armed_2026-08-12.md`.
 
 ---
 
@@ -308,6 +315,7 @@ t=123456 a=9.750 avg=9.763 st=4 rd=11584 ov=39 tk=1703 im=3
 | `a=` | raw z acceleration, m/s² (≈9.76 at rest) |
 | `avg=` | 32-sample rolling average (1.28 s) |
 | `st=` | FSM state, §4 |
+| `tw=` | TWI wait-guard trips, printed only when nonzero. Wedged transactions the vendored Wire1 caught and recovered by re-initialising the peripheral; each one would previously have frozen the sample ISR until the watchdog fired. See `lib/Wire1/src/utility/twi1.c`. |
 | `rd=` | duration of the I2C read, µs (~11500 — 29% of the sample period) |
 | `ov=` | samples lost to ring overrun |
 | `tk=` | ISR ticks since boot; compare against printed lines to separate "ISR not firing" from "print path losing samples" |
