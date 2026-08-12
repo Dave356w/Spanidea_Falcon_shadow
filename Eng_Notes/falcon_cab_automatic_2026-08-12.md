@@ -571,3 +571,47 @@ It also matches the earlier finding that **cruise vibration measures the
 mounting as much as the machine** (`falcon_signature_2026-08-11.md` §4a, a 3x
 swing between sessions after a remount). Same cause, now with a consequence
 that reaches the release path.
+
+---
+
+# Addendum 5 — promotion flashed, and the path is still unexercised
+
+Firmware `46d1a5d`: the reversal path now gates `arr_armed` itself, so it
+protects the peak collector — the production release path — and not only the
+unarmed ramp detector. `ramp_armed` collapsed into `arr_armed`.
+
+Re-verified at the exact shipping constants before flashing: **zero false peaks
+and zero false ramps across 51 departure bursts**, with and without the union.
+Unchanged from the ramp-only check, because the union only ever ADDS arming and
+the added path was already validated against the departure population.
+
+## 22. Verification runs, same unfavourable mounting
+
+| run | q= | via | peak | ramp |
+|---|---|---|---|---|
+| 4→2 control | **123** | v=1 | 0.525 | 513 |
+| 2→1 | **6** | v=1 | 0.497 | 504 |
+
+The control behaves exactly as the mechanism predicts — a run with real cruise
+arms with 24.6x margin, matching the 119 measured on the previous build, so the
+promotion disturbs nothing about normal runs.
+
+The bottom terminal on this mounting now reads **6, 5, 5, 6** across four
+descents. Tight, reproducible, and consistently one sample above the threshold.
+
+## 23. ⚠️ The path is needed and has never run
+
+`v=2` has still never fired, in ~22 live runs. The reversal path can only
+demonstrate itself when the quiet path FAILS, and quiet keeps clearing by
+exactly one sample. Every run adds confidence to the mounting finding and none
+to the path itself.
+
+**Stopped here deliberately rather than continuing to draw.** The margin data
+already establishes that the path is needed; proving it fires is better done on
+the bench — replay a recorded short-run stream through the arming logic, or
+temporarily raise `ARRIVAL_ARM_SAMPLES` to force the quiet path to fail — than
+by waiting for a coin to land in a live hoistway.
+
+⬜ **First-run watch, whenever it does fire:** `v=2` on a short run with a clean
+release is the path working. `v=2` during a departure is the failure the replay
+says cannot happen — disarm on sight and diagnose from the ARM lines.
