@@ -1,0 +1,335 @@
+# Ramp detector armed, and the lockup that ate a run — 2026-08-12 (late session)
+
+**Firmware `7210dfd` (`RAMP_ARMED 1`, 32214 bytes) for all four car runs.**
+Bench work afterwards landed `b9ee1fd` (linker relaxation) and `9d57c9a`
+(vendored Wire1 with bounded TWI waits, 32056 bytes) — the latter is what the
+device is running now.
+
+Read `falcon_cab_automatic_2026-08-12.md` first; this note continues it and
+assumes the ramp detector's design and the arming-gate problem.
+
+Two results matter. One is the measurement that justifies the ramp detector
+outright, on a single stop. The other is that the TWI lockup stopped being a
+reliability annoyance and became a **missed car run** — a beacon that did not
+sound while a counterweight moved.
+
+---
+
+## 1. Arming the ramp detector cost 2 bytes, and the bma4 swap was never in the way
+
+`RAMP_ARMED` 0 → 1 in `movement_service.h`. The armed and unarmed branches are
+both already compiled; arming swaps which one runs.
+
+    unarmed   32212 bytes
+    armed     32214 bytes      +2
+
+The standing plan had the bma4 driver swap as a prerequisite for flash-hungry
+work. It is not a prerequisite for this: the swap gates `-DWIRE_TIMEOUT`
+(+1554, §5), not a `#define` flip. This was measured, not assumed.
+
+Both comment blocks that claimed the detector ships unarmed were rewritten in
+the same commit — `main.cpp` above the `RAMP_*` constants, and the flag's own
+block. They carried the arming criteria and the rollback, so leaving them
+stale would have been worse than having no comment at all.
+
+Protocol §3.1 was satisfied before arming: 17/17 automatic drive stops latched
+(means 472–513, directionality 100% every time) against zero hits across a
+full inspection session and 51 replayed departure bursts.
+
+---
+
+## 2. 🟢 One stop, two detectors: 1.016× against 2.18×
+
+Run 3 (1→2 up, single floor) is the whole argument for the ramp path in one
+measurement:
+
+| detector | value | gate | margin |
+|---|---|---|---|
+| windowed arrival peak | 0.457 | 0.45 | **1.016×** |
+| ramp block mean | 653 | 300 | **2.18×** |
+
+Same stop, same signal, same 3.9 seconds. The peak cleared its threshold by
+1.6%; the ramp cleared its own by 118%, at 100% directionality. 0.457 is the
+second-worst peak margin ever recorded on this device (lifetime worst 1.009×).
+
+Nothing about this run was unusual. It was a routine single-floor automatic
+move, and the release the product ships with came down to seven thousandths of
+a m/s².
+
+---
+
+## 3. The four runs
+
+All on `7210dfd`. Cab, automatic operation.
+
+| # | move | dur | JOGV opk | arrival path | peak | ARM | ramp | dir |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 4→1 down | 15.7 s | 16 | polled | 0.470 | q=37 a=1 v=1 | 607 | 100 |
+| 2 | 1→2 up | 3.9 s | 36 | any-motion (2 edges) | 0.617 | q=6 a=1 v=1 | 615 | 100 |
+| — | **2→1 down** | — | — | **MISSED — see §4** | — | — | — | — |
+| 3 | 1→2 up | 3.9 s | 21 | any-motion (2 edges) | 0.457 | q=8 a=1 v=1 | 653 | 100 |
+| 4 | 2→1 down | 3.4 s | 124 | polled | 0.713 | q=6 a=1 v=1 | 585 | 100 |
+
+Every run correct end to end: latch, jog verdict `RUN`, arrival, release, back
+to `STATE_MONITORING`. No failsafes. Three different arrival paths fired across
+four runs (polled twice, any-motion twice).
+
+**Jog verdict 4/4 `RUN`**, opk 16–124 — all far below the 900 gate. Lifetime
+29/29.
+
+**Up arrivals are weaker than down, again** (0.457/0.617 up vs 0.470/0.713
+down). Consistent with every pairing measured to date; still a machine
+property, not a defect.
+
+---
+
+## 4. 🔴 The lockup ate a whole run
+
+Between runs 2 and 3, a 2→1 descent happened and the device did not see any
+part of it.
+
+    FSM: Transitioned to STATE_MONITORING     <- end of run 2, clean
+    Device Booted / Reset cause: 0x8          <- lockup #1, watchdog
+    FSM: Performing Self Calibration
+    XY: calib b=10 peak=0.2680 mv=1
+    FSM: NOT READY - recalibrating, attempt 2 <- came up MID-MOTION
+    Device Booted / Reset cause: 0x8          <- lockup #2, watchdog
+    XY: calib b=10 peak=0.0500 mv=0
+    FSM: READY -> STATE_MONITORING            <- car already stopped
+
+The car was unambiguously moving through the first post-reset boot: **26
+printed samples with |w| > 0.1 rad/s**, the rolling average swinging
+10.243 → 9.749, and `x` ranging 0.557–0.664 against a parked 0.61.
+
+Calibration behaved **correctly** — `mv=1` means it detected motion and
+refused to zero itself, which is the right call. The consequence is still that
+the FSM never reached `STATE_MONITORING`, so no departure could be latched and
+**the beacon never sounded for a real car movement**.
+
+**This is a different class of failure from everything else in these notes.**
+Every threshold, margin and gate discussed anywhere in Eng_Notes assumes the
+device is running. Here it was not, and the product's whole premise failed
+outright rather than marginally. Lifetime watchdog catches 2 → 4, and this is
+the first that demonstrably cost a run.
+
+Both catches came within ~20 s of each other, immediately after a run in which
+the buzzer had been sounding — but the second happened during calibration with
+the buzzer silent. That does not fit "alarm activity triggers it". It fits a
+state the device got into and could not leave, which favours the wedged-TWI
+explanation over the rail-sag one. Two events, so not conclusive.
+
+Runs 3 and 4 afterwards had zero resets.
+
+---
+
+## 5. Arming margin: the bottom terminal, and a method error worth recording
+
+| run | move | q= | notes |
+|---|---|---|---|
+| 1 | 4→1 down | **37** | armed near the top of the shaft |
+| 2 | 1→2 up | **6** | single floor |
+| 3 | 1→2 up | **8** | single floor |
+| 4 | 2→1 down | **6** | single floor |
+
+**On this mounting the bottom-terminal margin is 6 down and 8 up** — above the
+5 required, and reproducible. Better than the `6b5b2c3` mounting (down 6,5,5,
+one of which armed on the last possible sample) but not comfortable: a single
+sample lost to buzzer blanking ends it, and losing arming switches off *both*
+the peak collector and the ramp detector. That is the 78 s false-beacon
+mechanism.
+
+The direction asymmetry holds across both mountings: **down is the thin side.**
+
+⚠️ **Method error, corrected mid-session.** Before run 1 I predicted a 4→1
+descent would test the bottom-terminal margin because it *ends* at the bottom.
+It does not. `q=` is the high-water mark of the quiet stretch that armed the
+run, and arming completes early — q=37 near the top against q=6 on a
+single-floor move. **A long run banks its quiet samples before it ever reaches
+the thin end.** The zero-margin case needs a short run *starting* near the
+bottom. Runs 2–4 are the valid test; run 1 is not.
+
+`v=1` on all four runs. **The reversal arming path has now gone ~24 live runs
+without firing**, because the quiet path keeps succeeding — twice by exactly
+one sample. It is promoted (`46d1a5d`) and gating the peak collector, and it
+has still never been seen to work.
+
+---
+
+## 6. ⬜ Cruise peak reached 0.32 against a 0.45 gate
+
+On run 1 — the only run long enough to establish real cruise — the windowed
+peak reached **0.32**. Previous cruise ceilings were 0.02–0.04 in the cab and
+0.07–0.28 on the cartop, so this is the highest ever recorded, by 8× against
+the cab figure.
+
+The same run released on a peak of 0.470. So on one run the peak detector was
+squeezed to a **1.47× separation between cruise content and the arrival that
+released it**, from both ends simultaneously. The ramp detector sat at 2.02×
+on the same data.
+
+Single run, and the short runs 2–4 peaked at 0.02 because they never cruise —
+so this is **neither confirmed nor contradicted**, and by the 08-10/11 method
+lesson it stays a hypothesis until a second long run agrees. It wants one
+multi-floor run, deliberately, to settle.
+
+---
+
+## 7. The armed branch has still never executed
+
+Four ramp latches this session — **607, 615, 653, 585, all at 100%
+directionality**. The two highest means on record. Combined with the prior 17
+automatic stops the range is now 472–653, still with zero false latches
+anywhere.
+
+Not one of them released the latch. Every one landed *after* the peak or
+any-motion path had already fired:
+
+    FSM: Arrival (polled), peak 0.470
+    ARM q=37 a=1 v=1
+    FSM: Transitioned to STATE_DECELERATING
+    RAMP latched mean=607 dir=100          <- ~0.5 s late
+
+The FSM's ramp check lives inside `STATE_MOVING`; by the time the verdict
+latches, the FSM has left. What appears in the log is `emit_ramp_log()` from
+`loop()`, never `FSM: Arrival (ramp) … (armed)`.
+
+**This is correct behaviour, not a defect.** The ramp path is insurance: it can
+only release a stop the other paths miss, and no stop has missed yet. But it
+means arming remains **unexercised** — the same position the reversal path has
+been in for ~24 runs. Two release paths are now armed on the strength of
+replay and negative evidence, and neither has been observed to fire in anger.
+
+Run 3 is the closest it has come: 2% lower on that peak and the FSM would have
+stayed in `STATE_MOVING` and the ramp would have released it.
+
+---
+
+## 8. 🟢 The TWI lockup is fixed, for 124 bytes
+
+§4 made this the priority over any detection question. The flash census and
+the fix:
+
+**`-DWIRE_TIMEOUT` does not fit and never will cheaply.** Re-measured with
+relaxation in place: **+1554 bytes** (not the +1818 on record — relaxation
+shrinks the timeout code too), landing at 33454/32256 = 103.7%. Shortfall
+1198 bytes. RAM cost is trivial (+12).
+
+**Two dead ends, recorded so nobody re-treads them:**
+
+- **No runtime-only escape exists.** `twi_timeout_us` defaults to 0 and looks
+  like a runtime switch, but MiniCore wraps every check in
+  `#if defined(WIRE_TIMEOUT)`. `Wire1.setWireTimeout()` cannot arm bounded
+  waits because the code is not compiled at all.
+- **`-DWIRE_TIMEOUT` also adds three function pointers to the shared `TwoWire`
+  constructor**, so it cannot be defined for one vendored library without an
+  ABI mismatch against the framework's `Wire.cpp`. This is the trap in "just
+  define it for our copy".
+
+`micros()` is already linked (the ISR read timing in `main.cpp`), so the 1554
+is 32-bit compare arithmetic across seven wait sites, not the timebase.
+
+**Flash census:**
+
+| item | bytes |
+|---|---|
+| `bma456_config_file` | **6144** (19% of flash) |
+| `main` (everything inlined) | 9750 |
+| `read_acceleration_mss()` | 2482 |
+| 119 `F()` log strings | ~1834 |
+| `malloc` + `free` | 586 |
+| `Print::print(double,int)` | 422 |
+
+⚠️ **The bma4 swap cannot reclaim that 6144-byte blob.** It is the Bosch
+feature-engine firmware image uploaded to the sensor, and any-motion — the
+primary departure trigger — depends on it. The swap reclaims the driver *code*
+around it, on the order of 1500 bytes. **The "swap frees ~4.9 KB" estimate is
+wrong** and should not be relied on when scheduling it as an unblocker.
+
+**What was done instead of freeing 1198 bytes: made the fix cheaper.**
+
+| approach | cost | fits? |
+|---|---|---|
+| `-DWIRE_TIMEOUT` | 1554 B | no, short by 1198 |
+| `-Wl,--relax` | **−314 B** | free, no source change |
+| vendored Wire1 + spin guards | **124 B** (+32 logging) | yes, 200 B free |
+
+MiniCore's Wire1 is vendored into `falcon_srcs/lib/Wire1` (project libs take
+precedence — verified in the dependency graph, and the *unmodified* copy built
+byte-identical at 31900, which is what proves the vendoring itself is inert).
+Each of the seven wait sites got a 16-bit spin counter. No timebase, no 32-bit
+arithmetic, no change to `TwoWire`. On expiry it calls
+`twi_handleTimeout1(true)` — the identical recovery upstream performs,
+re-initialising the peripheral and reapplying `TWBR1`/`TWAR1`. `twi_init1` sets
+`twi_state = TWI_READY`, so the early return cannot leave the state machine
+wedged.
+
+`-flto` was tried and gained **exactly zero** — PlatformIO does not apply it at
+the link step for this platform. Do not re-try it.
+
+**Verified in the disassembly, not assumed.** All three loops in
+`twi_readFrom1` are independently bounded (`sbiw`/`brne` into the guard at
+`0x2dec`, `0x2e36`, `0x2e54`), with the spin count visible as
+`ldi 0x40 / ldi 0x1F` = 8000. GCC merges the identical failure tails into one
+call per function, which is why only three call sites appear for seven guarded
+loops — that briefly looked like guards had been elided.
+
+⚠️ **`TWI1_GUARD_SPINS` is a spin count, not a time.** 8000 spins is ~50 ms at
+F_CPU 1 MHz against a normal ~11.5 ms transaction, deliberately far below the
+2 s watchdog. It does not track F_CPU or the TWI bit rate — re-check if either
+changes. Rollback is `TWI1_GUARD_SPINS 0`.
+
+Trips log as `tw=`, printed only when nonzero, same discipline as `et=`. **A
+trip is data:** it means a wedge was caught that would previously have become a
+watchdog reset.
+
+**Bench-verified after flashing 32056 bytes:** BMA456 init and configuration
+complete (all I2C writes through the patched driver), self-calibration clean at
+`Zero-Calib 9.771757` / `XY-Still 0.0555`, `READY` → `STATE_MONITORING`,
+sampling normal, `rd=` unchanged at ~11.4 ms — so the guards add no measurable
+read overhead — and **zero `tw=` trips on a healthy bus**, which is exactly
+what a correct guard looks like when nothing is wrong.
+
+**Still unproven:** nothing has tripped the guard, so the recovery path is
+untested against a real wedge. Third armed-but-unexercised path on this device.
+
+---
+
+## 9. Next, in order
+
+1. **A long multi-floor automatic run** — settles §6's 0.32 cruise peak, which
+   is currently a one-run hypothesis about the gate the product actually ships
+   on. Cheap, and it is the only open question that could move a threshold.
+2. **Two or three more bottom-terminal descents** — confirm q=6 is stable on
+   this mounting and watch for `v=2`. The margin is an install-time property
+   and the thin end is where it decides whether the beacon works.
+3. **Watch `tw=`.** If it appears, the wedge is still happening and is no
+   longer fatal; if the lockup recurs *without* `tw=`, the cause is not the
+   TWI waits and the brownout explanation comes back.
+4. **Arming-gate redesign** — key on "the departure ramp has ended" (sign
+   reversal) rather than "the signal went quiet". Still the only fix for the
+   single-floor blind spot, which arming the ramp detector did **not**
+   address, because the detector shares the gate. Wants bench + replay against
+   every burst on file, not one run.
+5. **The ~20% snapshot overrun** (`ov` grew 40→68 across two short runs). Every
+   threshold at 25 Hz still stands on 80% of the data.
+6. Battery settling logic — still `(settling, ignored)` on every read
+   (`2445` this session). Genuinely a bug, not settling.
+7. Brownout electrical work, tabled by Dave; bench current measurement with a
+   meter remains the unblocking step. The lockup fix may or may not have
+   touched it — scope them together.
+
+---
+
+## 10. What this session overturned
+
+- **"The bma4 swap must come first."** False for arming (2 bytes) and false as
+  stated for `-DWIRE_TIMEOUT`, which turned out not to need the swap either —
+  a cheaper fix existed. And the swap's own payoff is ~1500 bytes, not 4.9 KB.
+- **"A 4→1 descent tests the bottom terminal."** My own prediction, wrong
+  within one run. Arming completes near the top.
+- **"`-DWIRE_TIMEOUT` costs 1818 bytes."** 1554 with relaxation.
+- **"Arming the ramp detector improves the product."** Not demonstrably, yet.
+  It is armed, it is correct, and it has changed nothing observable in four
+  runs — because the path it protects has not been needed. The honest claim is
+  that it removes a dependence on a 1.016× margin, and run 3 shows how thin
+  that margin gets.
