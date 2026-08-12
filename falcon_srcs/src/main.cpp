@@ -286,6 +286,7 @@ static volatile uint8_t  arr_quiet     = 0;
  * reversal instead. Two bytes of RAM, no behaviour change.
  */
 static volatile uint8_t  arr_quiet_hi  = 0;
+static volatile bool     arr_q_frozen  = false;
 
 
 /*
@@ -298,15 +299,21 @@ static volatile uint8_t  arr_quiet_hi  = 0;
  * for 78 of them, with BOTH detectors switched off throughout -- pk reported
  * 0.00 across a real +0.64 m/s^2 deceleration.
  *
- * ⚠️ THE ARMING MARGIN IS UNMEASURED, and the q= diagnostic CANNOT measure
- * it. Once arr_armed goes true the counting branch is skipped, so arr_quiet
- * stops at ARRIVAL_ARM_SAMPLES and q_hi is capped there by construction:
- * q=5 means only "it armed", q<5 means "it never armed". An earlier reading
- * of this note claimed the gate "delivers exactly the minimum and never
- * more" across four runs -- that was an artefact of the instrument, not a
- * measurement, and it is withdrawn. Measuring the real margin needs the
- * longest quiet run bounded to the departure-to-deceleration window, which
- * this counter does not provide.
+ * ⚠️ THE FIRST q= DIAGNOSTIC COULD NOT MEASURE THE MARGIN, and a claim built
+ * on it was withdrawn. It stopped counting the moment arr_armed went true, so
+ * q_hi was CAPPED at ARRIVAL_ARM_SAMPLES by construction and q=5 meant only
+ * "it armed". Four runs reading 5/5 were read as "the gate delivers exactly
+ * the minimum" -- an artefact, not a measurement.
+ *
+ * FIXED 2026-08-12: counting now continues past arming and freezes when the
+ * stretch that armed it BREAKS, so q= is the true length of that stretch.
+ *
+ *     q=5  armed on the last possible sample -- no margin
+ *     q=12 the quiet lasted 12 samples where 5 were needed -- 2.4x
+ *     q<5  never armed (the defect), unchanged
+ *
+ * That is the number that says whether short runs are genuinely marginal or
+ * whether the one failure was something rarer.
  *
  * The second path below does not rest on that claim: it exists because a run
  * went COMPLETELY unarmed, which q<5 does report faithfully.
@@ -676,6 +683,7 @@ void arrival_peak_reset()
     arr_bucket_ms = millis();
     arr_quiet       = 0;
     arr_quiet_hi    = 0;
+    arr_q_frozen    = false;
     arr_armed     = false;
     arr_hit       = false;
 
@@ -1189,20 +1197,27 @@ void read_acceleration_mss()
             }
         }
 
-        if (!arr_armed) {
-            if (dev < ARRIVAL_QUIET_MSS) {
-                ++arr_quiet;
-                if (arr_quiet > arr_quiet_hi) {
-                    arr_quiet_hi = arr_quiet;
-                }
-                if (arr_quiet >= ARRIVAL_ARM_SAMPLES) {
-                    arr_armed = true;
-                    arr_bucket_ms = millis();
-                }
-            } else {
-                arr_quiet = 0;
+        /*
+         * Quiet-run tracking. Counting deliberately continues AFTER arming
+         * and stops only when the stretch breaks -- see arr_q_frozen.
+         */
+        if (dev < ARRIVAL_QUIET_MSS) {
+            ++arr_quiet;
+            if (!arr_q_frozen && arr_quiet > arr_quiet_hi) {
+                arr_quiet_hi = arr_quiet;
+            }
+            if (!arr_armed && arr_quiet >= ARRIVAL_ARM_SAMPLES) {
+                arr_armed = true;
+                arr_bucket_ms = millis();
             }
         } else {
+            arr_quiet = 0;
+            if (arr_armed) {
+                arr_q_frozen = true;   /* the arming stretch has ended */
+            }
+        }
+
+        if (arr_armed) {
             uint32_t now = millis();
 
             /* Roll the window: the open bucket becomes the previous one. */

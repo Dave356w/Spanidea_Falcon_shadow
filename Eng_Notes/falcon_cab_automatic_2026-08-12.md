@@ -343,3 +343,81 @@ threshold.
    question.
 5. Brownout + lockup electrical work, and the battery settling-logic bug
    (still "(settling, ignored)" on every read).
+
+---
+
+# Addendum 2 — the arming margin, measured
+
+Firmware `a77f146` + the q= instrument fix. Six automatic single-floor runs in
+one continuous sequence: 4→3→2→1, then 1→2→3→4. Dave waited for each release
+before the next departure, so `MONITOR_REARM_MS` never suppressed a departure.
+
+## 11. The instrument, fixed
+
+The first `q=` counter stopped at `ARRIVAL_ARM_SAMPLES` because counting sat
+inside `if (!arr_armed)`. Counting now continues past arming and freezes when
+the stretch that armed it BREAKS, so `q=` is the true length of that stretch:
+
+    q=5   armed on the last possible sample -- no margin
+    q=12  quiet lasted 12 where 5 were needed -- 2.4x
+    q<5   never armed (the defect), unchanged
+
+## 12. 🟢 Arming is NOT marginal — the second correction
+
+| run | q= | margin | arrival peak | ramp |
+|---|---|---|---|---|
+| 4→3 | **36** | 7.2x | 0.476 | 486 |
+| 3→2 | **18** | 3.6x | 0.544 | 492 |
+| 2→1 | **9**  | 1.8x | 0.488 | 480 |
+| 1→2 | **8**  | 1.6x | 0.504 | 513 |
+| 2→3 | **16** | 3.2x | 0.460 | 498 |
+| 3→4 | **38** | 7.6x | 0.456 | 513 |
+
+Every run cleared the requirement by 1.6x–7.6x. **The "zero margin, coin flip"
+reading recorded earlier in this note was wrong twice over** — the instrument
+was capped AND the real margins are comfortable. On these six runs the gate has
+room, and the 08-12 morning failure is an OUTLIER rather than the normal
+condition. Two successive overstatements of this defect's generality; the
+measured version is above.
+
+## 13. 🔵 Margin tracks POSITION IN THE SHAFT, not direction
+
+```
+top     4→3  36        3→4  38
+        3→2  18        2→3  16
+bottom  2→1   9        1→2   8
+```
+
+Both directions agree almost exactly at each level, and margin falls ~4x from
+top to bottom. **The thin end of the shaft is the bottom — and that is exactly
+where the morning's failure occurred** (2→1, bottom terminal, extended
+slowdown). A mechanism, not bad luck: the extended slowdown compresses the gap
+between departure and deceleration, leaving fewer quiet samples to arm on.
+
+At 8–9 samples the bottom still has margin, but a run losing half its quiet
+samples to buzzer phase lands at ~4 — matching the 4.0–4.9 estimated for the
+failure from its decimated trace. The independent estimates agree.
+
+⬜ n=1 per floor pair. The symmetry across directions is what makes it
+convincing rather than the sample count.
+
+## 14. Where this leaves the two mechanisms
+
+**The reversal path is insurance, not a fix.** It backstops the thin end of the
+shaft; it is not answering a pervasive defect. Still unexercised (`v=2` has
+never appeared in ~10 live runs), still gating the ramp detector only, still
+unpromoted.
+
+**The ramp detector is the finding with weight.** Fifteen automatic stops now:
+
+    ramp mean  472 479 480 481 486 489 490 492 495 496 498 501 508 513 513
+    directionality  100% on every one
+
+against complete negative evidence from inspection operation. Meanwhile
+**seventeen automatic stops put the arrival peak at 0.456–0.544 against a 0.45
+gate** — the release the product ships with is decided by a distribution
+centred on its own threshold.
+
+**Arming the ramp detector is the change that would actually improve the
+product.** The reason it has not been armed is that it shares a gate whose
+behaviour at the thin end of the shaft is the remaining open question.
