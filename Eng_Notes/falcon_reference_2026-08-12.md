@@ -57,12 +57,27 @@ ATmega328PB at **1 MHz** (fuse), PlatformIO/MiniCore. **BMA456** accelerometer
 on **TWI1** (`Wire1`), sampled by a Timer1 CTC interrupt at **25 Hz**. Piezo on
 `PIN_PIEZO`, chase LEDs via a clock line, battery sensed on an internal ADC
 channel. A DPS310 pressure sensor is depopulated — pressure code is gone.
-Serial logging at 9600 baud, which is a hard constraint on how much can be
-printed (§8).
+Serial logging at **62500 baud** (raised from 9600 on 2026-08-13; 115200 is
+unreachable at 1 MHz — see §8a of `falcon_500fpm_ui_2026-08-13.md`).
 
-**Flash is effectively full: 32210 / 32256 bytes.** This blocks the TWI timeout
-fix and any new instrumentation until the vendor bma4 driver is replaced
-(~4.9 KB recoverable).
+**Flash: 30662 / 32256, 1594 free.** No longer the binding constraint. It was
+30 bytes free on 2026-08-12; 1636 bytes were reclaimed by deleting the
+preinstantiated `TwoWire Wire` for **TWI0, a bus with nothing connected to it**
+(the DPS310 is depopulated). Upstream passes the whole TWI0 driver to that
+constructor as function pointers, so `--gc-sections` could never drop it —
+including its 600-byte ISR. `lib/Wire` is vendored for this, with
+`utility/twi.c` deliberately absent.
+
+⚠️ **Two corrections to older guidance in this document's history:** the TWI
+timeout fix did NOT need that space — it was solved for 124 bytes by bounding
+the waits in a vendored `Wire1` (§7, §9). And **the bma4 driver swap recovers
+~1500 bytes, not 4.9 KB**: `bma456_config_file` is 6144 of those bytes and is
+the Bosch feature-engine blob any-motion depends on, so it cannot go, and what
+remains is code actually in use on the primary departure detector. Do not plan
+around 4.9 KB.
+
+**586 bytes remain available** in `RollingAvg.h`, which is the last dynamic
+allocation on the device.
 
 ---
 
