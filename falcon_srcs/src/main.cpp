@@ -1014,6 +1014,11 @@ void emit_arm_log();
 uint16_t read_battery_voltage();
 extern int configure_adc_channel();
 extern uint16_t read_adc_pc2_voltage();
+extern uint16_t read_adc_pc2();
+#if defined(BROWNOUT_TEST)
+/* Bench-only VCC measurement via the 1.1 V bandgap -- see adc.cpp. */
+extern uint16_t read_vcc_mv();
+#endif
 extern bool get_buzzer_status();
 
 /*
@@ -1198,6 +1203,102 @@ void loop()
         vel_window.set_baseline_tracking(
             ms.get_state() == MotionStates::STATE_MONITORING ||
             ms.get_state() == MotionStates::STATE_CALIBERATION);
+
+#if defined(BROWNOUT_TEST)
+        /*
+         * ─── BENCH ONLY: sustained-alarm endurance test ──────────────────────
+         *
+         * ⛔ NEVER SHIP. NEVER PUT IN A CAR. The FSM is bypassed entirely, so
+         * NOTHING can release the beacon -- no arrival path, no jog verdict, no
+         * failsafe. That is the point: this build tests the POWER and TWI
+         * behaviour of a long continuous alarm, and it must not be able to end
+         * the alarm by way of the logic under test. Built only by
+         * [env:brownout_test]; the shipping env cannot define BROWNOUT_TEST.
+         *
+         * WHAT IT DISCRIMINATES. On 2026-08-11 the device stopped 243 s into an
+         * alarm and that was attributed to the rail sagging under piezo load.
+         * Dave proposed 2026-08-13 that it was the TWI wedge instead -- see
+         * Eng_Notes/falcon_500fpm_ui_2026-08-13.md §9. Two independent readouts
+         * separate them:
+         *
+         *   BRN vcc_blast=  VCC sampled WHILE the piezo is driven (peak load)
+         *   BRN vcc_quiet=  VCC sampled in the silent phase
+         *
+         * measured against the 1.1 V bandgap, which unlike the shipping battery
+         * read is NOT ratiometric with AVCC (see read_vcc_mv()).
+         *
+         *   blast markedly below quiet, and both falling  -> rail sag is real
+         *   both flat and equal, then the device hangs     -> TWI wedge
+         *   survives past 243 s with tw= climbing          -> wedge, now caught
+         *   Reset cause: 0x8 mid-alarm                     -> wedge, WDT caught it
+         *
+         * THE SAMPLE ISR KEEPS RUNNING, so TWI exposure is identical to a real
+         * alarm -- that is what makes this a valid test of the wedge. The
+         * watchdog is still kicked, both by loop() above and inside the sampling
+         * spin below.
+         *
+         * ⚠️ Because this branch `break`s, everything after it -- fsm_run() and
+         * all the log emitters -- is unreachable and the linker drops it. Two
+         * consequences:
+         *   - the build is ~9.7 KB smaller than the shipping one, which is
+         *     expected and not a sign the test is doing less;
+         *   - the sample ring is never drained, so ov= climbs monotonically and
+         *     is NOT comparable to a normal run. It is still useful as a
+         *     LIVENESS indicator: if ov= stops advancing, the ISR has died,
+         *     which is the wedge signature.
+         */
+        {
+            static bool     brn_armed   = false;
+            static uint32_t brn_start   = 0;
+            static uint32_t brn_last    = 0;
+
+            if (!brn_armed) {
+                /* Let calibration finish and the pack settle, then latch on. */
+                if (millis() > 15000UL) {
+                    brn_armed = true;
+                    brn_start = millis();
+                    enable_alarm();
+                    enable_chase_leds();
+                    Serial.print(F("BRN: continuous alarm armed, FSM bypassed\r\n"));
+                }
+            } else if ((millis() - brn_last) >= 1000UL) {
+                brn_last = millis();
+
+                /*
+                 * Sample in the blast phase and the quiet phase of the SAME
+                 * second. get_buzzer_status() is true while the piezo is driven
+                 * plus the ringdown, so it identifies the loaded phase.
+                 */
+                uint16_t v_blast = 0, v_quiet = 0;
+                uint32_t spin = millis();
+                while ((millis() - spin) < 900UL && (!v_blast || !v_quiet)) {
+                    if (get_buzzer_status()) {
+                        if (!v_blast) v_blast = read_vcc_mv();
+                    } else {
+                        if (!v_quiet) v_quiet = read_vcc_mv();
+                    }
+                    wdt_reset();
+                }
+
+                Serial.print(F("BRN t="));
+                Serial.print((millis() - brn_start) / 1000UL);
+                Serial.print(F("s vcc_blast="));
+                Serial.print(v_blast);
+                Serial.print(F(" vcc_quiet="));
+                Serial.print(v_quiet);
+                Serial.print(F(" bat="));
+                Serial.print(read_adc_pc2());
+                Serial.print(F(" tw="));
+                Serial.print(twi1_guard_trips1());
+                Serial.print(F(" ov="));
+                Serial.print(sample_overrun);
+                Serial.print(F("\r\n"));
+            }
+
+            /* FSM deliberately not run. */
+            break;
+        }
+#endif /* BROWNOUT_TEST */
 
         ms.fsm_run();
 
