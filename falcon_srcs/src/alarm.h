@@ -90,12 +90,31 @@
  * ⬜ TEST: a deliberate 4+ minute continuous alarm. If endurance now exceeds
  * 242.7 s the diagnosis is confirmed and the lever works.
  */
-#define BUZZER_CYCLE_STEPS        5
-#define BUZZER_ON_STEPS           1
+/*
+ * ⛔ BUZZER_CYCLE_STEPS / BUZZER_ON_STEPS ARE GONE, and everything above
+ * describes a mechanism that NO LONGER RUNS. The whole comment is retained
+ * because its 2026-08-07 revert history is still the authority on WHY the duty
+ * cycle cannot be lowered casually, and because the 2026-08-11 reasoning about
+ * piezo current still applies. But the numbers in it are historical:
+ * the buzzer is now driven by the sequence-aligned block below, at 150 ms on /
+ * 650 ms off.
+ *
+ * 🔴 ONE NUMBER FROM THAT HISTORY NOW MATTERS AGAIN. The 2026-08-07 failure was
+ * caused by raising the QUIET FRACTION to 0.75, which let cruise any-motion
+ * edges pair up and satisfy the arrival cluster -- releasing an alarm 12 s into
+ * a ride. The sequence-aligned timing below puts the quiet fraction at
+ * 600/800 = 0.75. EXACTLY THAT FIGURE.
+ *
+ * It is safe ONLY because both arrival paths now AND in arrival_peak_hit()
+ * (movement_service.cpp), and cruise peaks measure 0.10-0.32 against a 0.45
+ * gate, so no amount of edge pairing can release the beacon. ⚠️ IF THE PEAK
+ * GATE IS EVER WEAKENED OR REMOVED FROM THE ANY-MOTION PATH, this timing
+ * re-arms the 2026-08-07 failure. Check that before touching either.
+ */
 #define BATTERY_FLASH_TIME_MS     600
 
 /*
- * ─── SEQUENCE-ALIGNED ALARM, 2026-08-12 ──────────────────────────────────────
+ * ─── SEQUENCE-ALIGNED ALARM, 2026-08-13 ──────────────────────────────────────
  *
  * WHAT WAS WRONG. The buzzer and the chase ran on INDEPENDENT timers and
  * counters (alarm_timer/counter_b, chase_led_timer/counter_c), both stepping at

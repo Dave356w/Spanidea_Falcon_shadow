@@ -1016,12 +1016,47 @@ extern int configure_adc_channel();
 extern uint16_t read_adc_pc2_voltage();
 extern bool get_buzzer_status();
 
+/*
+ * ─── SERIAL BAUD: 9600 -> 62500, 2026-08-13 ──────────────────────────────────
+ *
+ * THIS IS A DETECTION FIX, NOT A CONVENIENCE. Serial.print blocks loop() once
+ * the 64-byte TX buffer fills, and loop() is what drains the sample ring and
+ * steps the alarm. At alert onset the firmware emits 732 characters -- four FSM
+ * transition lines, a 347-character departure burst dump, and the jog verdict.
+ * At 9600 baud that is ~760 ms of blocked loop(), which is
+ *
+ *   - the visible cause of the chase stutter Dave reported over the first 2-3
+ *     sequences of an alert (2026-08-13), and
+ *   - the same mechanism behind the ~20% snapshot overrun that every threshold
+ *     in Eng_Notes currently stands on 80% of.
+ *
+ * WHY 62500 AND NOT 115200. At F_CPU = 1 MHz the USART in U2X mode can only
+ * produce 1000000 / (8 x (UBRR+1)):
+ *
+ *   UBRR 12 ->  9615   (+0.16%)   <- the old rate
+ *   UBRR  3 -> 31250   (exact)    <- conservative fallback
+ *   UBRR  1 -> 62500   (exact)    <- this
+ *   UBRR  0 -> 125000  (exact, but UBRR=0 is not reliable)
+ *
+ * 115200 IS UNREACHABLE AT THIS CLOCK -- the nearest divisor is 125000, an 8.5%
+ * error, which is exactly why the 2026-07-15 EFT attempt at 115200 produced a
+ * blank terminal. That failure was recorded as unexplained; it was arithmetic.
+ *
+ * 62500 cuts the 760 ms burst to ~117 ms, a 6.5x reduction, for zero flash.
+ *
+ * ⚠️ monitor_speed in platformio.ini MUST match. If a terminal or USB-serial
+ * adapter garbles at 62500, drop to 31250 -- also exact, still 3.25x better.
+ * Both are non-standard rates; pyserial and CP210x handle them, but a different
+ * adapter might not.
+ */
+#define SERIAL_BAUD_RATE    62500L
+
 void setup() {
 
     /*
      * Configure the debug serial port here
     */
-    Serial.begin(9600);
+    Serial.begin(SERIAL_BAUD_RATE);
 
     Serial.print(F("\r\n\nDevice Booted \r\n"));
 

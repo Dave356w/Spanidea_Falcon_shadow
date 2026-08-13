@@ -96,8 +96,27 @@ void MovementService::notify_any_motion(uint32_t edge_ms)
          *   run 3  n=13 bz=0, n=14 bz=1 polled path caught it first
          *
          * Counting quiet edges only leaves run 1 detected and run 2 rejected.
-         * Item 7 leaves ~45% of each beep cycle quiet, so a real arrival still
-         * has ample opportunity to register -- run 1's did, twice over.
+         *
+         * ⚠️ "~45% of each beep cycle quiet" was true when this was written. The
+         * sequence-aligned alarm (2026-08-13, alarm.h) makes it 600/800 = 75%,
+         * so MORE real arrival edges are trusted than this comment assumes --
+         * the sensitivity argument below is now conservative, not optimistic.
+         *
+         * Two second-order effects of that change, neither designed:
+         *
+         * 1. 0.75 is the exact quiet fraction that caused the 2026-08-07 false
+         *    release, when cruise edges paired into an arrival cluster. It is
+         *    safe now ONLY because this path ANDs in arrival_peak_hit() and
+         *    cruise peaks (0.10-0.32) cannot reach the 0.45 gate. Do not remove
+         *    that AND.
+         * 2. The status poll and the beep cycle used to be locked 2:1 (1000 ms
+         *    against 500 ms), so every poll sampled the SAME phase of the beep
+         *    and edge decimation was deterministic. At 800 ms they drift with a
+         *    4 s beat, so decimation is now pseudo-random. The 2026-08-07 notes
+         *    argue that random decimation is what kept consecutive cruise polls
+         *    from pairing, so this is probably favourable -- but it is a
+         *    behaviour change nobody chose, and it is untested over a long
+         *    continuous alarm.
          */
         if (get_buzzer_status()) {
             return;
