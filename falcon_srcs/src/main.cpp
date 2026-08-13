@@ -1252,6 +1252,17 @@ void loop()
             static uint32_t brn_start   = 0;
             static uint32_t brn_last    = 0;
 
+            /*
+             * ⚠️ THIS CALL IS THE WHOLE TEST. check_for_active_alarm() is what
+             * drives PIN_PIEZO and steps the sequence, and in the shipping loop
+             * it lives BELOW fsm_run() -- i.e. below this branch's `break`, so
+             * it is unreachable here. Without it the alarm flag is set and
+             * nothing ever drives the pin: the first flash of this build ran
+             * silently and reported vcc_blast=0 on every line, measuring an
+             * unloaded rail and testing nothing.
+             */
+            check_for_active_alarm();
+
             if (!brn_armed) {
                 /* Let calibration finish and the pack settle, then latch on. */
                 if (millis() > 15000UL) {
@@ -1268,10 +1279,17 @@ void loop()
                  * Sample in the blast phase and the quiet phase of the SAME
                  * second. get_buzzer_status() is true while the piezo is driven
                  * plus the ringdown, so it identifies the loaded phase.
+                 *
+                 * The spin MUST keep stepping the alarm. Sampling blocks for up
+                 * to 900 ms and a 150 ms blast occurs once per 800 ms sequence,
+                 * so without stepping inside the loop the piezo would hold
+                 * whatever state it was in when the spin began and the blast
+                 * phase would never arrive.
                  */
                 uint16_t v_blast = 0, v_quiet = 0;
                 uint32_t spin = millis();
                 while ((millis() - spin) < 900UL && (!v_blast || !v_quiet)) {
+                    check_for_active_alarm();
                     if (get_buzzer_status()) {
                         if (!v_blast) v_blast = read_vcc_mv();
                     } else {
