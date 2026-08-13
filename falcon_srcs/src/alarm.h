@@ -156,8 +156,56 @@
 #define ALARM_SEQ_STEPS           16   /* 16 x 50 ms = 800 ms per sequence     */
 #define ALARM_BUZZ_STEPS          3    /* 3 x 50 ms = 150 ms blast, at step 0  */
 #define ALARM_RED_STEPS           4    /* 4 x 50 ms = 200 ms red LED           */
-#define CHASE_STEPS_PER_LED       2    /* advance every 100 ms                 */
+#define CHASE_STEPS_PER_LED       1    /* advance every 50 ms -- see below     */
 #define CHASE_LED_COUNT           8    /* LEDs fitted on the 4017              */
+
+/*
+ * Steps in one full visual sweep. MR is pulsed at the start of EVERY sweep, not
+ * just at step 0, so the chase can run faster than the buzzer while still
+ * beginning each sweep on LED 1.
+ *
+ * ⚠️ ALARM_SEQ_STEPS MUST BE AN INTEGER MULTIPLE OF THIS, or the last sweep in a
+ * sequence is truncated and the blast stops landing on LED 1.
+ *   16 / (8 x 1) = 2 sweeps per sequence.  ok
+ *   16 / (8 x 2) = 1 sweep  per sequence.  also ok (the 2026-08-13 original)
+ *
+ * ─── CHASE DOUBLED 2026-08-13, PIEZO CADENCE UNTOUCHED ───────────────────────
+ *
+ * CHASE_STEPS_PER_LED 2 -> 1 on Dave's request after seeing the faster cadence
+ * of the bench test build: 8 LEDs in 400 ms rather than 800 ms, so TWO clean
+ * sweeps per sequence with the blast on the first.
+ *
+ * The buzzer is driven off the step index (steps 0..ALARM_BUZZ_STEPS-1 of
+ * ALARM_SEQ_STEPS), so its cadence and duty are completely unaffected. This
+ * changes only what the eye sees.
+ *
+ * IT COSTS NOTHING ON EITHER AXIS THAT MATTERS, which is why it was worth doing:
+ *
+ *  - SENSOR COVERAGE: unchanged. Blanking is set by `buzzer_on`, which follows
+ *    the blast plus BUZZER_RINGDOWN_MS. The chase does not gate the sample read
+ *    at all, so the 25% blanked fraction and the 600 ms contiguous quiet stretch
+ *    are exactly as before.
+ *  - CURRENT: unchanged. The 4017 holds exactly ONE output high at any instant
+ *    regardless of how fast it is clocked, so average LED current is identical.
+ *    Nothing is spent against the alarm-endurance budget.
+ *
+ * ⚠️ WHAT WOULD COST SENSOR COVERAGE is speeding up the BUZZER, because
+ * BUZZER_RINGDOWN_MS is a FIXED 50 ms paid once per blast and does not scale
+ * with cadence. For a sequence of period T with the blast at ALARM_BUZZ_STEPS /
+ * ALARM_SEQ_STEPS = 3/16:
+ *
+ *     blanked %        = 18.75% + 5000/T
+ *     contiguous quiet = 0.8125 x T - 50 ms
+ *
+ *        T = 400 ms   31.3% blanked   275 ms quiet   <- worse than pre-08-13
+ *        T = 600 ms   27.1% blanked   438 ms quiet
+ *        T = 800 ms   25.0% blanked   600 ms quiet   <- current
+ *        T = 1200 ms  22.9% blanked   925 ms quiet
+ *
+ * So halving the SEQUENCE would put the listening window below where it was
+ * before any of this work. Speed the chase, not the buzzer.
+ */
+#define CHASE_SWEEP_STEPS         (CHASE_LED_COUNT * CHASE_STEPS_PER_LED)
 
 /*
  * Persistence-of-vision step for the ready flash. The 74HC4017 is a DECADE

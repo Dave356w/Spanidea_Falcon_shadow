@@ -138,16 +138,19 @@ void check_for_buzzer_alert()
     {
         alarm_timer = millis();
 
-        if (seq_step == 0) {
+        if ((seq_step % CHASE_SWEEP_STEPS) == 0) {
             /*
-             * Sequence start. Pulse MR so the 4017 lands on its first output at
-             * exactly the moment the blast begins -- this is what makes the
-             * alignment independent of whether the part wraps at 8 or 10.
+             * Start of a sweep. Pulse MR so the 4017 lands on its first output
+             * -- this is what makes the alignment independent of whether the
+             * part wraps at 8 or 10. At seq_step 0 this also coincides with the
+             * blast, which is the alignment Dave asked for; later sweeps in the
+             * same sequence get their own reset so a faster chase still starts
+             * each sweep on LED 1.
              */
             digitalWrite(PIN_CHASE_LED, HIGH);
             digitalWrite(PIN_CHASE_LED, LOW);
         } else if (chase_en && (seq_step % CHASE_STEPS_PER_LED) == 0) {
-            /* Steps 2,4,...,14 advance to LEDs 2..CHASE_LED_COUNT. */
+            /* Advance to LEDs 2..CHASE_LED_COUNT within the current sweep. */
             advance_chase_leds();
         }
 
