@@ -2,17 +2,29 @@
 
 **As of 2026-08-13, firmware `0c4f5ab`, branch `Falcon_Rel_EFT`.**
 
-Brought up to date 2026-08-12 evening. Changes folded in, all detailed in
-`falcon_ramp_armed_2026-08-12.md`:
+Brought up to date 2026-08-13. Changes folded in since 2026-08-11:
 
-- **The ramp detector is ARMED** (`RAMP_ARMED 1`) — §9.
+From `falcon_ramp_armed_2026-08-12.md`:
+
+- **The ramp detector is ARMED** (`RAMP_ARMED 1`) — §5.2, §9.
 - **Arming is now TWO SEPARATE GATES, one per detector** — §5.3. This is a
   safety property, not a refactor; read it before touching arming.
 - **Wire1 is vendored** into `falcon_srcs/lib/Wire1` with bounded TWI waits —
-  §7, §9. Adds `tw=` to the sample line.
+  §2, §7, §9. Adds `tw=` to the sample line.
 - **New log fields `g=`, `ro=`, `tw=`** — §8.
-- **§8a is new: the method for tuning a threshold by replaying logged bursts**,
+- **§8a: the method for tuning a threshold by replaying logged bursts**,
   including the two mistakes that make a replay silently wrong.
+
+From `falcon_500fpm_ui_2026-08-13.md`:
+
+- **Flash is no longer the constraint** — 1594 free, and the bma4 swap is worth
+  ~1500 bytes rather than 4.9 KB. §2 corrects both.
+- **Serial is 62500**, not 9600 — §2.
+- **The alarm is sequence-aligned**: one 150 ms blast per 8-LED chase, driven
+  from one master counter with firmware pulsing MR. Quiet fraction is now 0.75,
+  which has history — see `alarm.h` before touching it.
+- **500 fpm tested** (the fastest car so far) and **cruise peak varies ~2×
+  between identical runs**, which retires that question — §6, §9.
 
 This is the orientation document: what the device does, how it decides, and
 what every name in the source means. It is written to be read *before* the
@@ -161,7 +173,7 @@ the signal that matters.
 |---|---|---|---|
 | 1 | clustered any-motion **+** raw peak | ≥2 interrupt edges in 2.5 s, corroborated | live |
 | 2 | raw windowed peak | peak > `ARRIVAL_PEAK_VALUE` | live, **and marginal** — §6 |
-| 3 | **ramp detector** | sustained one-signed deceleration | **built, UNARMED** |
+| 3 | **ramp detector** | sustained one-signed deceleration | **ARMED** (2026-08-12), on its own gate — §5.3. ⚠️ 14 latches and the armed branch has never executed: the FSM's ramp check sits in `STATE_MOVING` and the peak always crosses first |
 | — | jog verdict | a jog's impulse pair | live, releases ~4 s after latch |
 | — | failsafe | `LATCH_FAILSAFE_MS` elapsed | fault, logged as one |
 
