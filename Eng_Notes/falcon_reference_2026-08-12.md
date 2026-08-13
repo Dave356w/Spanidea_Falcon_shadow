@@ -38,6 +38,9 @@ Session notes, chronological:
 `falcon_cartop_2026-08-12.md` → `falcon_cab_automatic_2026-08-12.md` →
 `falcon_ramp_armed_2026-08-12.md` → `falcon_500fpm_ui_2026-08-13.md`.
 
+**Summary of where things stand:** `falcon_state_of_project_2026-08-13.md`
+(supersedes the 2026-08-07 one).
+
 ---
 
 ## 1. What the product is

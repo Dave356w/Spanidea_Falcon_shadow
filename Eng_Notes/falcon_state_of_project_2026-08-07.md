@@ -9,9 +9,11 @@
 > the Z + X/Y approach designed after this note was written has been measured
 > and ruled out on this equipment.
 >
-> **For the current state read `falcon_signature_2026-08-11.md`**, then work
-> backwards through `falcon_25hz_arrival_2026-08-10.md` (which carries its own
-> correction banner) and `falcon_hoistway_protocol.md`.
+> **For the current state read `falcon_state_of_project_2026-08-13.md`**, which
+> supersedes this document, and `falcon_reference_2026-08-12.md`, which is the
+> orientation doc and is kept current. The intervening detail is in
+> `falcon_signature_2026-08-11.md`, `falcon_25hz_arrival_2026-08-10.md` (which
+> carries its own correction banner) and `falcon_hoistway_protocol.md`.
 >
 > Kept because the baseline comparison against `59e945f` and the 2026-08-07
 > hoistway numbers are still the reference for how far things have moved.
