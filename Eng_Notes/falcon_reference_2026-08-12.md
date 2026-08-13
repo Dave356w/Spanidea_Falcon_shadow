@@ -597,7 +597,7 @@ changing one.
 | `ANYMOTION_DURATION` | 5 | 50 Hz samples = 100 ms sustain |
 | `ACC_INT_POLL_MS` / `ACC_INT_STUCK_POLLS` | 1000 / 8 | status poll; re-arm if stuck |
 | `SAMPLE_RING_N` | 8 | sample ring depth |
-| `LOG_DECIMATE_N` | 8 | print 1 line in 8 — 9600 baud is the constraint |
+| `LOG_DECIMATE_N` | 8 | print 1 line in 8. Was set when the port ran at 9600; at 62500 there is headroom to decimate less, but the ISR read (11.4 ms of every 40 ms, 28% of CPU) is now the binding cost, not the port |
 | `BURST_N` / `BURST_POST_DEP` / `BURST_POST_ARR` | 80 / 60 / 60 | burst window and splits. **Single-sourced in `movement_service.h`** — they were duplicated once and the copies diverged |
 | Timer1 | CTC, /64, `OCR1A`=624 | 25.000 Hz |
 
