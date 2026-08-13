@@ -334,10 +334,12 @@ boundary between them.
 
 **Open, in priority order:**
 
-1. **bma4 driver swap** — **30 bytes free**; blocks everything else. ⚠️ It
-   reclaims ~1500 bytes, **not the 4.9 KB previously estimated**:
-   `bma456_config_file` is 6144 bytes of that and is the Bosch feature-engine
-   blob any-motion depends on, so it cannot go.
+1. ~~bma4 driver swap~~ — **DESCOPED 2026-08-13.** It blocks nothing: flash is
+   at 1594 free after 1636 bytes were reclaimed from the unused TWI0 bus (§2),
+   and the swap is worth only ~1500 bytes of code that is **actually in use** on
+   the primary departure detector. `bma456_config_file` is 6144 of those bytes
+   and is the any-motion feature blob, which cannot go. **Do not plan around
+   4.9 KB.** 586 bytes remain cheaply available in `RollingAvg.h`.
 2. **Brownout** — the rail sags under sustained piezo load and the board dies
    ~243 s into an alarm, over 300 ADC counts *above* the low-battery trip.
    Tabled by Dave 2026-08-12; the unblocking step is alarm current vs pack
@@ -574,7 +576,7 @@ changing one.
 
 | constant | value | meaning |
 |---|---|---|
-| `RAMP_ARMED` | **1** | ✅ releases the latch on a ramp verdict. Armed on 17/17 automatic stops with zero false latches. **Gated on `ramp_gate`, not `arr_armed` — §5.3.** ⚠️ 11 latches since arming and the armed branch has **never executed**: every one landed after the peak or any-motion path had already released, because the FSM's ramp check sits inside `STATE_MOVING`. It is insurance with no live proof. Rollback on a false release: set 0 |
+| `RAMP_ARMED` | **1** | ✅ releases the latch on a ramp verdict. Armed on 17/17 automatic stops with zero false latches. **Gated on `ramp_gate`, not `arr_armed` — §5.3.** ⚠️ 14 latches since arming (including 3 at 500 fpm, means 597-602) and the armed branch has **never executed**: every one landed after the peak or any-motion path had already released, because the FSM's ramp check sits inside `STATE_MOVING`. It is insurance with no live proof. Rollback on a false release: set 0 |
 | `TWI1_GUARD_SPINS` | **8000** | *(lib/Wire1)* spin bound per TWI wait site. ⚠️ **A SPIN COUNT, NOT A TIME** — does not track F_CPU or the TWI rate. ~50 ms at 1 MHz against an ~11.5 ms transaction, deliberately far below the 2 s watchdog. 3 trips caught in one session, zero resets. Rollback: 0 |
 | `RAMP_BLOCK_N` | 12 | samples per block (0.48 s) |
 | `RAMP_BLOCKS` | 3 | consecutive qualifying blocks (~1.44 s) |
