@@ -1,6 +1,6 @@
 # Falcon — product behaviour, detection logic, and reference legend
 
-**As of 2026-08-12, firmware `9d57c9a`, branch `Falcon_Rel_EFT`.**
+**As of 2026-08-13, firmware `0c4f5ab`, branch `Falcon_Rel_EFT`.**
 
 Brought up to date 2026-08-12 evening. Changes folded in, all detailed in
 `falcon_ramp_armed_2026-08-12.md`:
@@ -24,7 +24,7 @@ Session notes, chronological:
 → `falcon_25hz_arrival_2026-08-10.md` → `falcon_signature_2026-08-11.md` →
 `falcon_jog_verdict_2026-08-11.md` → `falcon_350fpm_automatic_2026-08-11.md` →
 `falcon_cartop_2026-08-12.md` → `falcon_cab_automatic_2026-08-12.md` →
-`falcon_ramp_armed_2026-08-12.md`.
+`falcon_ramp_armed_2026-08-12.md` → `falcon_500fpm_ui_2026-08-13.md`.
 
 ---
 
