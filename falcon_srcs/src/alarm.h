@@ -94,6 +94,62 @@
 #define BUZZER_ON_STEPS           1
 #define BATTERY_FLASH_TIME_MS     600
 
+/*
+ * ─── SEQUENCE-ALIGNED ALARM, 2026-08-12 ──────────────────────────────────────
+ *
+ * WHAT WAS WRONG. The buzzer and the chase ran on INDEPENDENT timers and
+ * counters (alarm_timer/counter_b, chase_led_timer/counter_c), both stepping at
+ * 100 ms. The buzzer cycled every 500 ms; the 74HC4017 advanced every 100 ms and
+ * free-ran, so a visual sequence took 800 ms (or 1000 ms if the part runs its
+ * full decade -- the firmware never knew, because nothing tracked position and
+ * only disable_chase_leds() ever pulsed MR). 500 against 800/1000 is
+ * incommensurate, so the blast drifted through the sequence and Dave observed
+ * it landing near both the start and the end of each chase. That was a beat
+ * pattern, not a design.
+ *
+ * WHAT THIS DOES. One master step counter drives both, and MR is pulsed by
+ * FIRMWARE at step 0. That makes the sequence length whatever we define --
+ * exactly CHASE_LED_COUNT LEDs -- regardless of the 4017's natural modulus, so
+ * the 8-vs-10 question stops mattering. One blast per sequence, at its start.
+ *
+ * THE NUMBERS, and why the duty cycle is the constraint. A naive "one 200 ms
+ * blast per 800 ms" is 25% duty against the old 20% -- MORE average piezo
+ * current, which runs straight into the 243 s brownout that 2026-08-11's
+ * 2/5 -> 1/5 change was made to attack. So the step is halved to 50 ms to buy
+ * the resolution for a 150 ms blast instead:
+ *
+ *                          old              new
+ *   blast length           100 ms           150 ms      (50% longer)
+ *   cadence                500 ms, drifting 800 ms, aligned
+ *   piezo duty             20%              18.75%      (slightly LESS current)
+ *   blanked fraction       30%              25%
+ *   longest quiet stretch  350 ms           600 ms      (+71%)
+ *
+ * So the beacon is audibly longer per blast, the monitoring window is 71%
+ * wider, and average current goes DOWN rather than up. The rhythm the mechanic
+ * ranges by slows from 2 Hz to 1.25 Hz -- that is the real UX cost, and it is
+ * the reason this is a judgement call rather than a free win.
+ *
+ * ⚠️ Keep ALARM_SEQ_STEPS = CHASE_LED_COUNT * CHASE_STEPS_PER_LED, or the MR
+ * pulse stops landing on the first LED and the alignment silently breaks.
+ */
+#define ALARM_STEP_MS             50   /* master step for buzzer + chase       */
+#define ALARM_SEQ_STEPS           16   /* 16 x 50 ms = 800 ms per sequence     */
+#define ALARM_BUZZ_STEPS          3    /* 3 x 50 ms = 150 ms blast, at step 0  */
+#define ALARM_RED_STEPS           4    /* 4 x 50 ms = 200 ms red LED           */
+#define CHASE_STEPS_PER_LED       2    /* advance every 100 ms                 */
+#define CHASE_LED_COUNT           8    /* LEDs fitted on the 4017              */
+
+/*
+ * Persistence-of-vision step for the ready flash. The 74HC4017 is a DECADE
+ * COUNTER -- exactly one output is high at a time, so there is no state in which
+ * all eight LEDs are on and no firmware change can create one. Clocking through
+ * every position faster than the eye integrates gives the APPEARANCE of all of
+ * them lit, at 1/8 brightness. 2 ms per position is ~50-62 Hz for a full pass
+ * depending on whether the part wraps at 8 or 10, which is above flicker.
+ */
+#define CHASE_POV_STEP_MS         2
+
 /* Length of one ready-signal chirp, and of the gap between chirps. */
 #define READY_CHIRP_MS            200
 

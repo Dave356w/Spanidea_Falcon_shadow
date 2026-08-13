@@ -10,14 +10,19 @@
 
 #include "alarm.h"
 
-static uint32_t alarm_timer;
-static uint32_t chase_led_timer;
+static uint32_t alarm_timer;          /* master step timer, buzzer + chase   */
 static uint32_t battery_alarm_timer;
 static bool beep, beep_a, led_on;
-static uint8_t counter_a = 0;
-static uint8_t counter_b = 0;
-static uint8_t counter_c = 0;
+static uint8_t counter_a = 0;         /* battery alarm only                  */
 static bool buzzer_on = false;
+
+/*
+ * chase_led_timer, counter_b and counter_c are gone. They belonged to the two
+ * independent timers that made the blast drift against the visual sequence --
+ * one master step counter replaces them, in check_for_buzzer_alert(). counter_b
+ * is still referenced inside the #if 0 block below, which is why that block now
+ * declares its own.
+ */
 
 inline void advance_chase_leds();
 
@@ -46,6 +51,8 @@ void setup_alarm()
 }
 
 #if 0
+
+static uint8_t counter_b = 0;   /* dead code below kept its own counter */
 
 void check_for_active_alarm()
 {
@@ -94,35 +101,80 @@ void check_for_active_alarm()
 }
 #endif
 
+/*
+ * One master-stepped sequence driving the buzzer, the chase and the red LED
+ * together. Replaces check_for_buzzer_alert() and check_for_chase_led_alert(),
+ * which ran on independent timers and drifted against each other -- see the
+ * SEQUENCE-ALIGNED ALARM block in alarm.h for the measurements and the reason.
+ *
+ * The buzzer and the chase are still enabled independently (alarm_status_g and
+ * chase_led_status_g), and in practice the FSM turns them on and off together
+ * at STATE_MOVING entry and at release. The step counter runs whenever EITHER
+ * is active, so the sequence phase stays coherent if that ever changes.
+ */
 void check_for_buzzer_alert()
 {
     static bool     ringdown_active = false;
     static uint32_t ringdown_start  = 0;
+    static uint8_t  seq_step        = 0;
 
-    /*
-     * Check if the alarm flag is enabled. If not, then bail out
-     */
-    if (alarm_status_g == 0) {
+    bool buzz_on  = (alarm_status_g != 0);
+    bool chase_en = (chase_led_status_g != 0);
+
+    if (!buzz_on && !chase_en) {
         /*
-         * Clear the ringdown state so a stale timestamp from the previous alarm
-         * cannot make the next one skip its blanking window.
+         * Reset the phase so the next alarm starts at step 0 with a fresh MR
+         * pulse, and clear the ringdown state so a stale timestamp from the
+         * previous alarm cannot make the next one skip its blanking window.
          */
+        seq_step        = 0;
         ringdown_active = false;
+        beep            = 0;
+        buzzer_on       = false;
         return ;
     }
 
-    if (millis() - alarm_timer > BEEP_FLASH_TIME_MS)
+    if (millis() - alarm_timer >= ALARM_STEP_MS)
     {
         alarm_timer = millis();
-        counter_b = (counter_b % BUZZER_CYCLE_STEPS) + 1;
 
-        /* 200 ms on, 800 ms off -- see BUZZER_CYCLE_STEPS in alarm.h */
-        if (counter_b <= BUZZER_ON_STEPS) {
-            beep = 1;
-        } else {
-            beep = 0;
+        if (seq_step == 0) {
+            /*
+             * Sequence start. Pulse MR so the 4017 lands on its first output at
+             * exactly the moment the blast begins -- this is what makes the
+             * alignment independent of whether the part wraps at 8 or 10.
+             */
+            digitalWrite(PIN_CHASE_LED, HIGH);
+            digitalWrite(PIN_CHASE_LED, LOW);
+        } else if (chase_en && (seq_step % CHASE_STEPS_PER_LED) == 0) {
+            /* Steps 2,4,...,14 advance to LEDs 2..CHASE_LED_COUNT. */
+            advance_chase_leds();
         }
 
+        beep   = (seq_step < ALARM_BUZZ_STEPS) ? 1 : 0;
+        led_on = (seq_step < ALARM_RED_STEPS)  ? 1 : 0;
+
+        seq_step = (uint8_t)((seq_step + 1) % ALARM_SEQ_STEPS);
+    }
+
+    /*
+     * Red LED follows the blast rather than keeping its own cadence, so the
+     * audible and visual cues coincide. Its duty drops from 40% to 25%, which
+     * is a small additional current saving.
+     */
+    if (chase_en && led_on) {
+        digitalWrite(PIN_RED_LED_PWM, HIGH);
+        digitalWrite(PIN_RED_LED_EN, HIGH);
+    } else {
+        digitalWrite(PIN_RED_LED_PWM, LOW);
+        digitalWrite(PIN_RED_LED_EN, LOW);
+    }
+
+    if (!buzz_on) {
+        /* Chase only: keep the piezo silent and the sensor unblanked. */
+        digitalWrite(PIN_PIEZO, LOW);
+        buzzer_on = false;
+        return ;
     }
 
     /*
@@ -168,50 +220,18 @@ void check_for_buzzer_alert()
 
 }
 
-void check_for_chase_led_alert()
-{
-    /*
-     * Check if the CHASE-LED flag is enabled. If not, then bail out
-     */
-    if (chase_led_status_g == 0) {
-        return ;
-    }
-
-    if (millis() - chase_led_timer > BEEP_FLASH_TIME_MS)
-    {
-        chase_led_timer = millis();
-        counter_c = (counter_c % 5) + 1;
-
-        if (counter_c < 3) {
-            led_on = 1;
-        } else {
-            led_on = 0;
-        }
-
-        // Toggle the chase LED pin, 100ms once it advance the chase LED
-        advance_chase_leds();
-
-    }
-
-    if (led_on)
-    {
-        digitalWrite(PIN_RED_LED_PWM, HIGH);
-        digitalWrite(PIN_RED_LED_EN, HIGH);
-    }
-    else
-    {
-        digitalWrite(PIN_RED_LED_PWM, LOW);
-        digitalWrite(PIN_RED_LED_EN, LOW);
-    }
-
-}
+/*
+ * The chase and the red LED are driven from the master sequence in
+ * check_for_buzzer_alert() now, so this no longer exists as a separate path.
+ * It had its own timer and its own mod-5 counter, which is precisely why the
+ * blast drifted against the visual sequence.
+ */
 
 void check_for_active_alarm()
 {
     check_for_buzzer_alert();
-    check_for_chase_led_alert();
 
-    return; 
+    return;
 
 }
 
@@ -345,14 +365,65 @@ bool get_buzzer_status()
  * delay. It is deliberately NOT built out of enable_alarm(), whose duty cycle
  * is a sensing parameter that must not be repurposed for UX.
  */
+/*
+ * Hold every chase LED apparently lit for duration_ms, then leave the counter
+ * reset.
+ *
+ * The 74HC4017 is a decade counter -- exactly one output is high at a time, so
+ * "all LEDs on" is not a state the hardware has. Clocking through the positions
+ * faster than the eye integrates produces the appearance of all of them lit at
+ * 1/8 brightness. See CHASE_POV_STEP_MS in alarm.h.
+ *
+ * Blocking, and deliberately so: this runs once at boot from the calibration
+ * path, where nothing else needs the CPU.
+ */
+static void chase_pov_all_on(uint16_t duration_ms)
+{
+    uint32_t start = millis();
+
+    /* MR pulse: begin from a known position. */
+    digitalWrite(PIN_CHASE_LED, HIGH);
+    digitalWrite(PIN_CHASE_LED, LOW);
+
+    while ((millis() - start) < duration_ms) {
+        advance_chase_leds();
+        delay(CHASE_POV_STEP_MS);
+    }
+
+    /* Leave the counter reset so the first alarm sequence starts clean. */
+    digitalWrite(PIN_CHASE_LED, HIGH);
+    digitalWrite(PIN_CHASE_LED, LOW);
+}
+
+/*
+ * Ready / calibration-complete signal.
+ *
+ * Previously this held PIN_CHASE_LED (which is MR, not a data line) HIGH for the
+ * whole chirp, pinning the 4017 in reset so exactly ONE LED lit -- a weak
+ * visual for "the device is armed and you can walk away". Now the chirp is
+ * accompanied by an apparent all-LED flash plus the red LED, so readiness is
+ * unmistakable across a machine room.
+ *
+ * Timing is unchanged: chase_pov_all_on() runs for READY_CHIRP_MS and replaces
+ * the delay() that used to sit there, so 1 chirp still means "good" and 3 still
+ * mean "calibrated while moving, or noisy".
+ *
+ * NOTE: this drives the piezo directly and deliberately does NOT set
+ * buzzer_on -- see the comment at its call site in movement_service.cpp.
+ */
 void ready_signal(uint8_t chirps)
 {
     while (chirps--) {
         digitalWrite(PIN_PIEZO, HIGH);
-        digitalWrite(PIN_CHASE_LED, HIGH);
-        delay(READY_CHIRP_MS);
+        digitalWrite(PIN_RED_LED_PWM, HIGH);
+        digitalWrite(PIN_RED_LED_EN, HIGH);
+
+        chase_pov_all_on(READY_CHIRP_MS);
+
         digitalWrite(PIN_PIEZO, LOW);
-        digitalWrite(PIN_CHASE_LED, LOW);
+        digitalWrite(PIN_RED_LED_PWM, LOW);
+        digitalWrite(PIN_RED_LED_EN, LOW);
+
         if (chirps) {
             delay(READY_CHIRP_MS);
         }
