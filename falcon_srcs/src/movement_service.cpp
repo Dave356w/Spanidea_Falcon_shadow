@@ -199,6 +199,14 @@ void MovementService::fsm_run()
              */
             lat_monitor.calib_begin(millis());
             calib_moved = false;
+
+            /*
+             * Nothing is armed yet, so the heartbeat must not claim otherwise.
+             * This also covers re-entry via STATE_ERROR_RESET: a device that
+             * has rebooted into a fresh calibration should stop asserting the
+             * verdict from the deployment before it.
+             */
+            heartbeat_set(HEARTBEAT_OFF);
         }
 
         if ((millis() - start_timer) > CALIB_TIMEOUT_MS) {
@@ -274,7 +282,21 @@ void MovementService::fsm_run()
              * Now make the noise, and re-anchor afterwards so the first
              * monitored metric is not a difference across the chirp.
              */
-            ready_signal((!ok || calib_moved || lat_monitor.noisy()) ? 3 : 1);
+            {
+                bool degraded = (!ok || calib_moved || lat_monitor.noisy());
+
+                ready_signal(degraded ? 3 : 1);
+
+                /*
+                 * Arm the idle heartbeat with the same verdict the chirp just
+                 * announced. The chirp is heard once and only by someone still
+                 * standing there; the heartbeat keeps "armed" -- and "armed but
+                 * the site could not be measured" -- visible for the whole
+                 * deployment. See the IDLE HEARTBEAT block in alarm.h.
+                 */
+                heartbeat_set(degraded ? HEARTBEAT_DEGRADED : HEARTBEAT_OK);
+            }
+
             lat_monitor.drop_anchor();
 
             /*

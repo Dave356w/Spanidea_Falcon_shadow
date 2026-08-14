@@ -64,7 +64,7 @@ void wdt_early_disable(void)
 uint8_t alarm_status_g = 0;
 uint8_t chase_led_status_g = 0;
 uint8_t battery_alarm_status_g = 0;
-uint32_t temp_timer = 0;
+/* temp_timer went with the MCP3208 feed removed from initialization(). */
 uint32_t init_time_g = 0;
 SystemStates state = SystemStates::SYSTEM_STATE_INITIALIZING;
 static boolean in_isr = false;
@@ -889,12 +889,29 @@ static volatile bool         accel_avg_primed = false;
 #define LOG_DECIMATE_N  8
 
 /*
- * Battery thresholds, in raw ADC counts.
+ * Battery thresholds.
  *
- * NOT millivolts. Release.txt describes a 3.2 V trip point but the code has
- * always compared against a raw count, and the scale factor between the two has
- * never been established -- see the open question in Eng_Notes §8. Do not
- * convert these to volts without measuring the divider first.
+ * ⚠️ THE UNITS ARE UNRESOLVED, and the previous comment here ("raw ADC counts,
+ * NOT millivolts") was itself wrong. The value compared against these comes from
+ * read_adc_pc2_voltage(), which converts the count to MILLIVOLTS against an
+ * assumed 3100 mV reference -- and does NOT apply VBATT_CONST, the 5.1k/1.5k
+ * divider ratio of 4.4 declared in main.h. So the comparison is against a
+ * divider-tap voltage, Release.txt claims a 3.2 V trip point, and 1600 x 4.4 is
+ * 7.04 V, which is not a plausible pack. Three descriptions, no measurement.
+ *
+ * Three further reasons the reading cannot be trusted in absolute terms:
+ *   - the ADC prescaler is /128 under a comment reading "for 8MHz clock" while
+ *     F_CPU is 1 MHz, so the ADC clock is 7.8 kHz against a 50 kHz datasheet
+ *     minimum for full 10-bit accuracy (Eng_Notes §5.8);
+ *   - the read is ratiometric against AVCC (see adc.cpp), so it is partly blind
+ *     to the rail by construction;
+ *   - the divider has never been measured.
+ *
+ * ⛔ DO NOT convert these to volts, and do not present the chirp to a customer
+ * as a calibrated warning, until the divider is characterised on the bench.
+ * The 2026-08-14 work made the ANNOUNCEMENT usable (see alarm.h); it did not
+ * touch the MEASUREMENT, and the trip point is unchanged from the historical
+ * value precisely so that this change alters nothing about WHEN it fires.
  *
  * LOW is left at the historical 1600 so this change does not alter when a
  * genuinely flat battery trips. CLEAR sits above it to give hysteresis: with a
@@ -910,6 +927,37 @@ static volatile bool         accel_avg_primed = false;
  * top of the averaging. See the comment in check_for_battery_voltage().
  */
 #define BATTERY_SETTLE_SAMPLES    2
+
+/*
+ * ─── BATTERY SAMPLE CADENCE, 2026-08-14 ──────────────────────────────────────
+ *
+ * WHAT WAS THERE. `adc_loop_counter == 30000` to enable the divider and
+ * `== 30100` to read it -- LOOP PASSES, not milliseconds. Nobody knew the
+ * period, because it depended on how long loop() happened to take, and loop()
+ * at 1 MHz is dominated by an 11.4 ms sensor read. Measured effect: battery
+ * telemetry took ~23 MINUTES of uptime to converge (§6.1 of the product
+ * document, which documents it as a bench workaround: "discard the first
+ * Voltage value after boot").
+ *
+ * WHY THAT KILLED THE FEATURE. A maintenance visit is minutes long. An alert
+ * that cannot arm inside ~20 minutes will never fire during the job it exists
+ * to protect -- so the low-battery warning was, in practice, dead code on a
+ * device whose worst failure is silence while moving. This is the single
+ * highest-value part of the 2026-08-14 battery work; the chirp pattern is
+ * cosmetic next to it.
+ *
+ * NOW. A wall-clock period. 30 s x 8-deep RollingAvg = a 4-minute window, and
+ * with BATTERY_SETTLE_SAMPLES the alarm can arm ~90 s after boot instead of
+ * ~23 minutes.
+ *
+ * SETTLE is the gap between enabling the divider and reading it. The old code
+ * gave it 100 loop passes, which was never measured either. 10 ms is
+ * comfortably more than that and still nothing against a 30 s period; it is a
+ * guess, but a guess in the generous direction, and it costs nothing to be
+ * wrong high. UNMEASURED -- if the reading looks low, suspect this first.
+ */
+#define BATTERY_SAMPLE_PERIOD_MS  30000
+#define BATTERY_SETTLE_MS         10
 
 /*
  * Any-motion interrupt test (Eng_Notes §11).
@@ -1140,12 +1188,21 @@ void initialization()
      * some time.
      */
 
-    if (millis() - temp_timer > INIT_TIMER_MS) {
-
-        temp_timer = millis();
-//        read_battery_voltage();
-        battery_avg.add(read_battery_voltage());
-    }
+    /*
+     * ⛔ REMOVED 2026-08-14: battery_avg.add(read_battery_voltage()).
+     *
+     * TWO DIFFERENT ADCs WERE WRITING THE SAME AVERAGE. read_battery_voltage()
+     * reads the EXTERNAL MCP3208 over SPI, whose adc.begin() is commented out
+     * in configure_adc_channel() -- so it was sampling an uninitialised part and
+     * pushing the result into the same battery_avg that check_for_battery_voltage()
+     * fills from the INTERNAL ADC on PC2.
+     *
+     * It was harmless only by accident: INIT_TIME_MS is 80 ms so it contributed
+     * about four samples, and the settle path later calls battery_avg.fill(),
+     * which overwrites all of them. Leaving two ADC paths feeding one average
+     * while the trip point is being characterised is how a measurement bug
+     * survives a bench session, so it goes now.
+     */
 
     if (millis() - init_time_g > INIT_TIME_MS) {
 
@@ -1331,6 +1388,15 @@ void loop()
 
         check_for_active_alarm();
         check_for_battery_alarm();
+
+        /*
+         * LAST, and after both alarms deliberately. It reads alarm_status_g and
+         * chase_led_status_g to decide whether the 4017 is spoken for, so it has
+         * to run once those are settled for this pass -- otherwise a beat could
+         * clock the counter in the same pass that the alarm sequence pulsed MR,
+         * and the blast would stop landing on LED 1.
+         */
+        heartbeat_service();
         break;
 
     default:
@@ -2284,85 +2350,105 @@ inline uint16_t read_battery_voltage()
  */
 void check_for_battery_voltage()
 {
-    static unsigned int adc_loop_counter = 0;
-    static uint8_t      settled_samples  = 0;
+    static uint32_t bat_timer       = 0;
+    static bool     bat_settling    = false;
+    static uint8_t  settled_samples = 0;
     uint16_t  battery_v = 0;
+    uint32_t  now       = millis();
 
-    adc_loop_counter++;
-
-    if (adc_loop_counter == 30000) {
-        digitalWrite(BAT_ADC_ENABLE, HIGH);
-    }
-
-    if (adc_loop_counter == 30100) {
-        adc_loop_counter = 0;
-        battery_v = read_adc_pc2_voltage();
-
-        Serial.print(F("  Voltage value : "));
-        Serial.print(battery_v);
-
-        digitalWrite(BAT_ADC_ENABLE, LOW);
-
-        /*
-         * Discard the opening samples entirely.
-         *
-         * The 30000/30100 counters are loop passes, not milliseconds, so the
-         * divider gets a very short settle at F_CPU = 1 MHz. The first read
-         * also lands during the startup transient, with the boot buzzer pulse
-         * and the chase LEDs loading the rail. On 2026-08-06 that produced a
-         * single 1545 on a healthy battery that read 2324-2390 for the rest of
-         * the session -- and because the alarm had no recovery path, that one
-         * sample latched it permanently. See Eng_Notes §10.3.
-         */
-        if (settled_samples < BATTERY_SETTLE_SAMPLES) {
-            settled_samples++;
-            Serial.print(F("  (settling, ignored)\r\n"));
+    /*
+     * Two-phase and non-blocking: enable the divider, come back once it has had
+     * BATTERY_SETTLE_MS to settle, read, disable. Nothing here spins, so the
+     * 2 s watchdog is untouched. See the BATTERY SAMPLE CADENCE block above for
+     * what this replaced.
+     */
+    if (!bat_settling) {
+        if ((now - bat_timer) < BATTERY_SAMPLE_PERIOD_MS) {
             return;
         }
+        digitalWrite(BAT_ADC_ENABLE, HIGH);
+        bat_settling = true;
+        bat_timer    = now;
+        return;
+    }
 
-        /*
-         * Prime the whole window from the first sample we trust.
-         *
-         * RollingAvg fills its array with init_val (0 here), so a freshly
-         * constructed battery_avg reads 0 and climbs one eighth of a sample at
-         * a time. Calling add() on an unprimed window would put avg() near 300
-         * for the first reading and trip the low-battery test on a perfectly
-         * good battery -- reintroducing the bug this change exists to fix.
-         */
-        if (settled_samples == BATTERY_SETTLE_SAMPLES) {
-            settled_samples++;
-            battery_avg.fill(battery_v);
-        } else {
-            battery_avg.add(battery_v);
+    if ((now - bat_timer) < BATTERY_SETTLE_MS) {
+        return;
+    }
+
+    bat_settling = false;
+    /* Period is measured from the read, so a slow settle cannot compound. */
+    bat_timer    = now;
+
+    battery_v = read_adc_pc2_voltage();
+
+    Serial.print(F("  Voltage value : "));
+    Serial.print(battery_v);
+
+    digitalWrite(BAT_ADC_ENABLE, LOW);
+
+    /*
+     * Discard the opening samples entirely.
+     *
+     * On 2026-08-06 the first read landed in the startup transient -- boot
+     * buzzer pulse and chase LEDs loading the rail -- and produced a single 1545
+     * on a healthy battery that read 2324-2390 for the rest of the session.
+     * Because the alarm had no recovery path, that one sample latched it
+     * permanently. See Eng_Notes §10.3.
+     *
+     * The wall-clock period now puts the first read 30 s after boot, well clear
+     * of both the transient and the ready chirp at the end of calibration, so
+     * these discards are belt-and-braces rather than the load-bearing defence
+     * they were. Kept at 2: 60 s of extra arming delay against a permanently
+     * latched false alarm is not a close trade.
+     */
+    if (settled_samples < BATTERY_SETTLE_SAMPLES) {
+        settled_samples++;
+        Serial.print(F("  (settling, ignored)\r\n"));
+        return;
+    }
+
+    /*
+     * Prime the whole window from the first sample we trust.
+     *
+     * RollingAvg fills its array with init_val (0 here), so a freshly
+     * constructed battery_avg reads 0 and climbs one eighth of a sample at a
+     * time. Calling add() on an unprimed window would put avg() near 300 for
+     * the first reading and trip the low-battery test on a perfectly good
+     * battery -- reintroducing the bug this change exists to fix.
+     */
+    if (settled_samples == BATTERY_SETTLE_SAMPLES) {
+        settled_samples++;
+        battery_avg.fill(battery_v);
+    } else {
+        battery_avg.add(battery_v);
+    }
+
+    Serial.print(F("  avg : "));
+    Serial.print(battery_avg.avg());
+    Serial.print(F("\r\n"));
+
+    /*
+     * Decide on the rolling average, never on a single sample, and use separate
+     * trip and clear thresholds so a reading hovering at the boundary cannot
+     * chatter the alarm on and off.
+     */
+    if (battery_avg.avg() < BATTERY_LOW_THRESHOLD) {
+        if (battery_alarm_status_g == 0) {
+            Serial.print(F("  LOW Battery detected \r\n"));
         }
+        enable_battery_alarm();
 
-        Serial.print(F("  avg : "));
-        Serial.print(battery_avg.avg());
-        Serial.print(F("\r\n"));
-
+    } else if (battery_avg.avg() > BATTERY_CLEAR_THRESHOLD) {
         /*
-         * Decide on the rolling average, never on a single sample, and use
-         * separate trip and clear thresholds so a reading hovering at the
-         * boundary cannot chatter the alarm on and off.
+         * The recovery path that did not exist before. disable_battery_alarm()
+         * was defined in alarm.cpp and never called from anywhere in the tree,
+         * so a latched alarm survived until a true cold boot -- which, given
+         * the serial back-feed in §10.1, is harder to achieve than it sounds.
          */
-        if (battery_avg.avg() < BATTERY_LOW_THRESHOLD) {
-            if (battery_alarm_status_g == 0) {
-                Serial.print(F("  LOW Battery detected \r\n"));
-            }
-            enable_battery_alarm();
-
-        } else if (battery_avg.avg() > BATTERY_CLEAR_THRESHOLD) {
-            /*
-             * The recovery path that did not exist before. disable_battery_alarm()
-             * was defined in alarm.cpp and never called from anywhere in the
-             * tree, so a latched alarm survived until a true cold boot -- which,
-             * given the serial back-feed in §10.1, is harder to achieve than it
-             * sounds.
-             */
-            if (battery_alarm_status_g) {
-                Serial.print(F("  Battery recovered, alarm cleared \r\n"));
-            }
-            disable_battery_alarm();
+        if (battery_alarm_status_g) {
+            Serial.print(F("  Battery recovered, alarm cleared \r\n"));
         }
+        disable_battery_alarm();
     }
 }

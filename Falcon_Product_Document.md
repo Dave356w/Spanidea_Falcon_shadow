@@ -98,18 +98,29 @@ than AND'd, where a hit is made sticky, where a gate errs generous — this is w
 | MCU | ATmega328PB, **1 MHz** (internal 8 MHz RC ÷ 8, `lfuse 0x62`) |
 | Accelerometer | **BMA456** on **TWI1** (`Wire1`), sampled at **25 Hz** by Timer1 CTC |
 | Audible | piezo on `PIN_PIEZO` |
-| Visual | 8 chase LEDs via **74HC4017 decade counter**; separate red LED |
-| Battery sense | internal ADC on PC2, plus an MCP3208 path over SPI |
+| Visual | **D3–D10**, 8 ring LEDs on a **74HC4017 decade counter** (outputs Q1–Q8; Q0/Q9 unpopulated); **D2**, a 200 mA centre LED behind a TPS92201 driver |
+| Battery sense | internal ADC on PC2 (`BAT_ADC`); the MCP3208 path is no longer used |
 | Pressure | DPS310 **depopulated** — pressure code removed; **TWI0 carries nothing** |
-| Flash / RAM | 30660 / 32256 · 1369 / 2048 |
+| Flash / RAM | 31210 / 32256 · 1373 / 2048 |
 
-## 2.1 Two hardware facts that constrain the firmware
+## 2.1 Three hardware facts that constrain the firmware
 
 **The 74HC4017 is a decade counter — exactly one output is high at any instant.**
 There is no state in which all eight LEDs are on, and no firmware change can
 create one. `PIN_CHASE_LED` is the **master reset (MR)**, not a data line;
 `PIN_CHASE_CLK` advances. An apparent all-on flash is achieved by
 persistence-of-vision multiplexing (§4.8).
+
+**Q0 is unpopulated, and D3 is Q1.** Ten outputs, eight LEDs. Parking MR on a
+dead output is what gives the ring an off state the part does not natively have,
+so the ring costs nothing at rest. It also means **the reset step lights
+nothing** — until 2026-08-14 the alarm sweep spent one of its eight steps there
+and D10 never lit during an alert. See `falcon_ui_battery_2026-08-14.md`.
+
+**D2 — the centre LED — is a 200 mA part behind a constant-current driver.**
+Unlike the ring, where the 4017 lights exactly one output regardless, anything
+that drives D2 on a duty cycle costs real charge. `LED_PWM` is PD6 = OC0A, so
+brightness is dimmable in hardware, and the idle heartbeat uses that.
 
 **The sensor read costs 11.4 ms of every 40 ms period — 28% of CPU.** This, not
 the serial port, is the dominant cost in the sample-loss budget.
@@ -476,9 +487,11 @@ RX ESD clamp — it will run with no batteries fitted.
 2. Connect serial **second**.
 3. Disconnect serial **before** any battery swap. Pulling cells with the cable
    attached is **not** a power cycle.
-4. **Discard the first `Voltage value` after boot.** Battery telemetry needs
-   ~23 minutes of uptime to converge; before that it reports
-   `(settling, ignored)`. This is slow, not broken.
+4. **The first two `Voltage value` lines report `(settling, ignored)`.** Battery
+   telemetry is sampled every 30 s on a wall clock, so the low-battery alarm can
+   arm about 90 s after boot. ⛔ The ~23-minute convergence this step used to
+   warn about was a defect, not a property: the cadence was counted in loop
+   passes. Fixed 2026-08-14.
 
 Roles: the engineer drives the car and reports run start/end; flashing, capture
 and analysis are driven from the development machine.
