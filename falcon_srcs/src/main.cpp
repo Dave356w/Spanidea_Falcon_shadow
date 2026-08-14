@@ -1063,9 +1063,13 @@ uint16_t read_battery_voltage();
 extern int configure_adc_channel();
 extern uint16_t read_adc_pc2_voltage();
 extern uint16_t read_adc_pc2();
-#if defined(BROWNOUT_TEST)
+#if defined(BROWNOUT_TEST) || defined(BATTERY_BENCH)
 /* Bench-only VCC measurement via the 1.1 V bandgap -- see adc.cpp. */
 extern uint16_t read_vcc_mv();
+#endif
+#if defined(BATTERY_BENCH)
+/* Bench-only battery characterisation -- defined below loop(). */
+static void bench_battery_service();
 #endif
 extern bool get_buzzer_status();
 
@@ -1384,7 +1388,17 @@ void loop()
         emit_acc_int_log();
         poll_acc_int_status();
 
+        /*
+         * The bench build replaces the threshold logic outright rather than
+         * running alongside it: check_for_battery_voltage() would see a healthy
+         * pack and immediately call disable_battery_alarm(), cancelling the
+         * forced chirp before it could be heard.
+         */
+#if defined(BATTERY_BENCH)
+        bench_battery_service();
+#else
         check_for_battery_voltage();
+#endif
 
         check_for_active_alarm();
         check_for_battery_alarm();
@@ -2344,6 +2358,150 @@ inline uint16_t read_battery_voltage()
 
     return (uint16_t)vol_temp;
 }
+
+#if defined(BATTERY_BENCH)
+/*
+ * ─── BENCH ONLY: battery characterisation (Session A of the test plan) ───────
+ *
+ * ⛔ NEVER SHIP. Built only by [env:bench_battery]. It replaces the threshold
+ * logic with raw instrumentation and FORCES the low-battery alarm on a timer,
+ * so it cannot report a real battery state and must never be in a car.
+ *
+ * ⭐ BUT UNLIKE brownout_test, IT IS A SUPERSET OF SHIPPING, NOT A BYPASS. The
+ * FSM, calibration, the beacon and the heartbeat all run exactly as shipped.
+ * That is deliberate: the one recorded failure of a test build on this project
+ * was brownout_test's first flash measuring an UNLOADED RAIL because the call
+ * that drives the piezo sat past a `break` and was unreachable. A build that
+ * looks like it is working while testing nothing is the failure mode to design
+ * against, and the cheapest defence is to remove as little as possible.
+ *
+ * ⚠️ IT SHARES configure_adc_channel() BYTE FOR BYTE WITH SHIPPING, and must
+ * keep doing so. The whole point is to derive a volts-per-count figure that the
+ * SHIPPING build can use; characterising under a different ADC clock would
+ * re-create precisely the defect being fixed. If the prescaler is changed, it
+ * changes for both, and every number taken here is re-taken afterwards.
+ *
+ * WHAT IT ANSWERS:
+ *
+ *   A1  the divider ratio -- put a meter on the pack and on the ADC node while
+ *       `raw` is printing, and the volts-per-count falls straight out. The
+ *       divider is held on across the whole sweep rather than the shipping
+ *       10 ms, because metering a node that exists 0.03% of the time is
+ *       impractical.
+ *
+ *   ⬜  IS BATTERY_SETTLE_MS ENOUGH? Unanswered since the day it was written --
+ *       10 ms was a generous guess, never a measurement. The sweep reads at
+ *       several delays after the divider is enabled; if the counts have stopped
+ *       moving by the 10 ms tap, the shipping value is sound. This is nearly
+ *       free while the meter is already out.
+ *
+ *   A4  the chirp. Forced on at BB_CHIRP_ON_MS and off again at
+ *       BB_CHIRP_OFF_MS, which exercises enable_battery_alarm(),
+ *       disable_battery_alarm() and the buzzer_on-latch fix, WITHOUT editing
+ *       BATTERY_LOW_THRESHOLD -- an edit that could too easily be committed.
+ *       Shake the unit during the chirp window to confirm the beacon suppresses
+ *       it. A7 (a rejected calibration -> double heartbeat wink) also works in
+ *       this build, because the FSM is untouched.
+ *
+ * ⚠️ NOT FOR A5, quiescent current. Measure that on the SHIPPING build, with the
+ * serial cable DISCONNECTED -- the cable back-powers the board through the RX
+ * ESD clamp (§6.1 of the product document), so a reading taken with it attached
+ * is of a partly externally powered board. This build's once-per-second print
+ * would inflate the figure it is trying to establish, too.
+ *
+ * VERIFY THE RIGHT IMAGE IS ON THE DEVICE BY SIZE. Shipping is ~31416,
+ * bench_battery is larger than shipping, brownout_test is ~21086.
+ */
+#define BB_START_MS       15000UL  /* after calibration completes (~13.3 s)   */
+#define BB_CHIRP_ON_MS    30000UL
+#define BB_CHIRP_OFF_MS   90000UL
+#define BB_PERIOD_MS       1000UL
+
+/* Delays after enabling the divider, milliseconds. */
+static const uint8_t bb_taps[] = { 1, 3, 6, 10, 20, 50 };
+#define BB_TAPS  (sizeof(bb_taps) / sizeof(bb_taps[0]))
+
+static void bench_battery_service()
+{
+    static uint32_t bb_last  = 0;
+    static bool     bb_on    = false;
+    static bool     bb_off   = false;
+    uint16_t        c[BB_TAPS];
+    uint32_t        now = millis();
+
+    /*
+     * Stay out of the calibration window entirely. The sweep busy-waits for up
+     * to 50 ms, and loop() is what drains the sample ring -- doing that inside
+     * the 6 s window would cost samples from the very measurement the lateral
+     * floor is learned from, and a lost sample INFLATES the metric.
+     */
+    if (now < BB_START_MS) {
+        return;
+    }
+
+    if (!bb_on && now >= BB_CHIRP_ON_MS) {
+        bb_on = true;
+        Serial.print(F("BB: forcing low-battery alarm ON\r\n"));
+        enable_battery_alarm();
+    }
+
+    if (!bb_off && now >= BB_CHIRP_OFF_MS) {
+        bb_off = true;
+        Serial.print(F("BB: clearing low-battery alarm\r\n"));
+        disable_battery_alarm();
+    }
+
+    if ((now - bb_last) < BB_PERIOD_MS) {
+        return;
+    }
+    bb_last = now;
+
+    /*
+     * micros(), not millis(). At F_CPU = 1 MHz Timer0 overflows every
+     * 256 x 64 = 16384 us, so millis() advances in ~16 ms STEPS and cannot
+     * resolve any of the taps below 20 ms. micros() carries 64 us resolution
+     * from the same timer, which is ample.
+     */
+    digitalWrite(BAT_ADC_ENABLE, HIGH);
+    {
+        uint32_t t0 = micros();
+        for (uint8_t i = 0; i < BB_TAPS; i++) {
+            while ((micros() - t0) < ((uint32_t)bb_taps[i] * 1000UL)) {
+                /* spin */
+            }
+            c[i] = read_adc_pc2();
+        }
+    }
+    digitalWrite(BAT_ADC_ENABLE, LOW);
+
+    Serial.print(F("BB t="));
+    Serial.print(now / 1000UL);
+    Serial.print(F("s raw"));
+    for (uint8_t i = 0; i < BB_TAPS; i++) {
+        Serial.print(F(" "));
+        Serial.print(bb_taps[i]);
+        Serial.print(F("ms="));
+        Serial.print(c[i]);
+    }
+
+    /*
+     * The 10 ms tap is the shipping delay, so this mv= is what the shipping
+     * build would have recorded -- the number to correlate with the meter.
+     *
+     * ⚠️ The conversion itself takes ~1.7 ms at the /128 prescaler, so a tap is
+     * "delay before the conversion STARTS", and taps closer together than that
+     * cannot be fully independent. Good enough to see whether the node has
+     * settled by 10 ms; not a substitute for a scope if it has not.
+     */
+    Serial.print(F(" mv10="));
+    Serial.print((uint16_t)(((uint32_t)c[3] * 3100UL) / 1023UL));
+    Serial.print(F(" vcc="));
+    Serial.print(read_vcc_mv());
+    Serial.print(F(" bat="));
+    Serial.print(battery_alarm_status_g);
+    Serial.print(F("\r\n"));
+}
+#endif /* BATTERY_BENCH */
 
 /*
  * This function will check for battery-voltage level and notify the user

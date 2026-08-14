@@ -41,7 +41,7 @@ int configure_adc_channel()
 
 }
 
-#if defined(BROWNOUT_TEST)
+#if defined(BROWNOUT_TEST) || defined(BATTERY_BENCH)
 /*
  * ─── BENCH ONLY: measure VCC itself, via the 1.1 V bandgap ───────────────────
  *
@@ -98,7 +98,7 @@ uint16_t read_vcc_mv()
     }
     return (uint16_t)((1100UL * 1024UL) / adc);
 }
-#endif /* BROWNOUT_TEST */
+#endif /* BROWNOUT_TEST || BATTERY_BENCH */
 
 /*
  * Read ADC value from PC2 (ADC2 channel)

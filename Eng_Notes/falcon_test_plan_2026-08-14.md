@@ -82,6 +82,63 @@ setting a threshold first wastes the work.
 
 **Unblocks:** items 7, 8, 9, 10, 11, 12.
 
+#### A0 — build it with `bench_battery`
+
+```bash
+cd falcon_srcs && pio run -e bench_battery -t upload
+```
+
+⛔ **Never in a car** — it replaces the threshold logic with raw instrumentation
+and forces the alarm on a timer. But unlike `brownout_test` it is a **superset**
+of shipping, not a bypass: FSM, calibration, beacon and heartbeat all run as
+shipped, so **A7 happens in the same build**. Sizes: shipping 31416,
+`bench_battery` 31546, `brownout_test` 21086 — a mis-flash is visible by
+inspection. **Re-flash shipping when done.**
+
+#### ✅ Already answered by the first bench_battery flash (2026-08-14)
+
+**`BATTERY_SETTLE_MS` = 10 ms is confirmed adequate.** It was a generous guess,
+never a measurement. The settle sweep across 87 samples:
+
+```
+BB t=17s raw 1ms=785 3ms=833 6ms=833 10ms=837 20ms=834 50ms=837  mv10=2536 vcc=3120
+```
+
+The 1 ms tap reads ~785 against a settled ~833 — about 6% low. **Everything from
+the 3 ms tap onward is flat.** The node settles between 1 and 3 ms, so 10 ms has
+3× margin. No change needed; the question is closed.
+
+Cross-check: `mv10` 2521–2536 against the shipping build's 2533–2551 on the same
+pack. The bench build agrees with shipping, which is the assurance that the
+characterisation transfers.
+
+Also visible: `vcc` drops 3120 → 3103 on the sample where the forced chirp
+starts — the piezo load appearing on the rail, via the bandgap read.
+
+#### 🔎 A1 has a strong prior now — check this first with the meter
+
+`main.h` declares `BATT_R1 5100` / `BATT_R2 1500`, ratio 4.4, which is what made
+`BATTERY_LOW_THRESHOLD 1600` look like an implausible 7.04 V pack. **But sheet 3
+of `RTC1273R2_SCH.pdf` shows the BATTERY MONITORING block built from 499k
+resistors** — and a 499k/499k divider is **2:1**, not 4.4:1.
+
+If it is 2:1, everything reconciles at once:
+
+```
+node 2540 mV  x 2  =  5.08 V pack     (3 fresh cells in BT1 -- plausible)
+trip 1600 mV  x 2  =  3.20 V          (EXACTLY Release.txt's stated 3.2 V)
+```
+
+**1600 → 3.2 V matching `Release.txt` to two significant figures is not a
+coincidence.** The likely story is that the trip point has been correct all
+along, and `VBATT_CONST` is a V1 leftover — the same failure mode as
+`PIN_GREEN_LED` and the `BATT_SENSE` MCP3208 path.
+
+⚠️ **Do not act on this without the meter.** It is schematic reading plus
+arithmetic, and schematic reading already produced one confidently wrong claim
+this session (D3 on Q0). A1 becomes a 30-second confirmation rather than a
+characterisation — measure pack and node, and see whether the ratio is 2.
+
 ---
 
 ### SESSION B — endurance in a moving car (~30 min in car)
