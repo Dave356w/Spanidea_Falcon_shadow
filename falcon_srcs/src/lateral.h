@@ -85,6 +85,28 @@
  * lands on the safe side. The one thing that pushes it the dangerous way is a
  * loud event inside the window, which is what the robust statistic below
  * defends against.
+ *
+ * ⛔ THE PARAGRAPH ABOVE DOES NOT SURVIVE MEASUREMENT, 2026-08-14. It reasons
+ * about a PEAK, but the statistic actually used is a MEDIAN of per-second
+ * maxima, and a median over fewer buckets is not biased low -- it is merely
+ * noisier, in BOTH directions. Six bench calibrations replayed through
+ * graph/calib_replay.py put a 3 s window up to +23.6% ABOVE the 10 s answer,
+ * which is squarely the dangerous direction. Kept because the error-direction
+ * table above it is correct and load-bearing; do not lean on the "short is
+ * automatically safe" conclusion.
+ *
+ * ⭐ WHAT DOES PROTECT A SHORT WINDOW IS PARITY, and it was not designed to.
+ * calib_finish() indexes the sorted buckets at (n_buckets-1)/2, which on an
+ * EVEN count is the LOWER-middle -- chosen deliberately as the smaller, safer
+ * threshold. An even-length window inherits that cushion; an odd-length one
+ * takes the true median and has none. 4 s and 6 s never exceeded the 10 s
+ * threshold across those six runs; 3 s and 5 s did. IF THIS WINDOW IS EVER
+ * SHORTENED, SHORTEN IT TO AN EVEN NUMBER OF BUCKETS.
+ *
+ * ⛔ AND MOVE XY_CALIB_MIN_BUCKETS WITH IT. At 6, any window shorter than 6 s
+ * is rejected by the quorum check and falls back to XY_STILL_FALLBACK on every
+ * install. Shortening CALIB_TIMEOUT_MS alone does not shorten calibration --
+ * it disables it.
  */
 
 /* Bucket width and count. 10 x 1 s covers the 10 s calibration window. */
@@ -199,6 +221,17 @@ class LateralMonitor
     uint8_t  quiet_run()  { return quiet; }
     uint8_t  buckets()    { return n_buckets; }
     float    calib_peak() { return peak; }
+
+    /*
+     * One per-second maximum, IN TIME ORDER, index 0 = first second of the
+     * window. This is the sequence the median is taken over, and it is what
+     * makes the calibration window length answerable offline: the threshold a
+     * 5 s window would have produced is median(bucket(0..4)) x XY_STILL_MARGIN,
+     * and an early-exit rule is any predicate over the same sequence.
+     *
+     * calib_finish() sorts a COPY precisely so this stays in time order.
+     */
+    float    bucket(uint8_t i) { return (i < n_buckets) ? bmax[i] : 0.0f; }
 
   private:
     float    last_ax, last_ay;

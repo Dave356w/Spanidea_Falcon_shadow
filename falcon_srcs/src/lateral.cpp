@@ -128,6 +128,7 @@ bool LateralMonitor::calib_finish()
 {
     uint8_t i, j;
     float   v;
+    float   srt[XY_CALIB_BUCKETS];
 
     calibrating = false;
 
@@ -140,13 +141,29 @@ bool LateralMonitor::calib_finish()
         return false;
     }
 
+    /*
+     * ⚠️ SORT A COPY. bmax[] used to be sorted IN PLACE, which destroyed the
+     * time order of the per-second maxima -- and time order is the whole point
+     * of the log dump added 2026-08-14 (§XY-BMAX in movement_service.cpp).
+     * Deciding whether a 5 s window is safe means asking what the FIRST five
+     * buckets would have produced, and a sorted array cannot answer that.
+     *
+     * Costs XY_CALIB_BUCKETS floats of stack, transiently, in loop() context
+     * with no ISR below it. The alternative was printing from inside this
+     * class, which would put Serial in a file that is otherwise pure
+     * arithmetic.
+     */
+    for (i = 0; i < n_buckets; i++) {
+        srt[i] = bmax[i];
+    }
+
     /* Insertion sort; n <= XY_CALIB_BUCKETS. */
     for (i = 1; i < n_buckets; i++) {
-        v = bmax[i];
-        for (j = i; j > 0 && bmax[j - 1] > v; j--) {
-            bmax[j] = bmax[j - 1];
+        v = srt[i];
+        for (j = i; j > 0 && srt[j - 1] > v; j--) {
+            srt[j] = srt[j - 1];
         }
-        bmax[j] = v;
+        srt[j] = v;
     }
 
     /*
@@ -154,7 +171,7 @@ bool LateralMonitor::calib_finish()
      * number in the log. A rejection that prints peak=0.0000 looks like a
      * dead sensor and would send the next hour in the wrong direction.
      */
-    peak = bmax[n_buckets - 1];
+    peak = srt[n_buckets - 1];
 
     if (n_buckets < XY_CALIB_MIN_BUCKETS) {
         return false;
@@ -169,7 +186,7 @@ bool LateralMonitor::calib_finish()
      * Lower-middle element on an even count. The lower of the two is the
      * smaller threshold, which is the safe direction.
      */
-    v = bmax[(n_buckets - 1) / 2] * XY_STILL_MARGIN;
+    v = srt[(n_buckets - 1) / 2] * XY_STILL_MARGIN;
 
     if (v < XY_STILL_MIN) {
         v = XY_STILL_MIN;

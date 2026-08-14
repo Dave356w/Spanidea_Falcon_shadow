@@ -261,7 +261,9 @@ sessions, and it is the reason §8 of the state-of-project note says what it say
 | `alarm.cpp` | chirp replaces continuous sounder; `buzzer_on` cleared on disable; heartbeat on D2; sweep advances onto Q1 |
 | `alarm.h` | chirp and heartbeat constants and rationale; `CHASE_LED_COUNT` semantics |
 | `common.h` | silkscreen map D1/D2/D3–D10 |
-| `movement_service.cpp` | heartbeat armed with the calibration verdict |
+| `movement_service.cpp` | heartbeat armed with the calibration verdict; `XY: bmax` dump |
+| `lateral.cpp` / `.h` | sort a copy so `bmax[]` keeps time order; `bucket()` accessor |
+| `graph/calib_replay.py` | new — replays the window length from `XY: bmax` lines |
 | `Falcon_Product_Document.md` | §2.1 third hardware fact; §6.1 23-minute step corrected |
 
 Flash 30660 → **31210** (1046 free). RAM 1369 → **1373**.
@@ -295,13 +297,92 @@ which would reject every window).
 The larger UX win is elsewhere: **`CALIB_RETRIES 2` means a contaminated
 calibration costs 30 s today, not 10.** At 5 s that worst case becomes 15 s.
 
-⛔ **It cannot be validated from existing data.** The burst recorder stores Z
-magnitude only (`burst[BURST_N]`, int16), and X/Y are fed to `lat_monitor` but
-**never printed** — `main.cpp` has exactly one use of `s.ax`, and it is not a log
-line. None of the 186 bursts on file can replay a 5 s calibration. It needs a
-fresh hoistway capture with X/Y logged. `XY_STILL_MIN`/`MAX` are also flagged
-UNMEASURED in `lateral.h` — the clamps this rides on have never been checked
-against a real counterweight.
+`XY_STILL_MIN`/`MAX` are flagged UNMEASURED in `lateral.h` — the clamps this
+rides on have never been checked against a real counterweight.
+
+### 6.1 ⛔ Correction: X/Y were already logged
+
+An earlier draft of this note, and the advice given during the session, claimed
+X/Y are fed to `lat_monitor` and **never printed**. **That was wrong.**
+`main.cpp:1984` prints `x=` and `y=` from `s.ax`/`s.ay` — the raw per-sample
+values — and `m=` is `lat_monitor.m()`, the calibration metric itself. It was in
+every log on file, including ones read earlier the same session.
+
+The real obstacle is different and smaller: `LOG_DECIMATE_N 8`. The logged `m`
+values are individually correct, but only one sample in eight appears, so a
+bucket maximum rebuilt from the log is a max over ~3 samples instead of ~25 and
+systematically under-reads.
+
+### 6.2 ⚠️ Why the fix was NOT to log at full rate
+
+Un-thinning the sample log during calibration is the obvious move and it is
+**dangerous**. `Serial.print` blocks `loop()`, `loop()` drains the sample ring,
+and ~20% of samples are already lost to overrun. The metric is |Δax| + |Δay|
+between **consecutive** samples, so a lost sample widens `dt` and **inflates m** —
+which inflates the learned threshold, which is the direction that makes travel
+read as still. Adding serial load inside the measurement window would bias the
+very number being measured, the wrong way.
+
+### 6.3 What was done instead, and what it says
+
+The device already computes per-second bucket maxima; they were simply never
+emitted. `calib_finish()` now sorts a **copy**, so `bmax[]` keeps time order, and
+`movement_service.cpp` dumps the sequence after the window has closed — costing
+nothing inside it:
+
+```
+XY: calib b=10 peak=0.0730 mv=0
+XY: bmax 0.0680 0.0690 0.0550 0.0540 0.0580 0.0530 0.0580 0.0510 0.0730 0.0520
+```
+
+That one line makes every window length answerable offline, because a shorter
+window is the same arithmetic over a prefix. `graph/calib_replay.py` does it.
+
+**Six bench calibrations, same mounting, unit at rest on a desk:**
+
+| window | worst deviation in the DANGEROUS direction |
+|---|---|
+| 3 s | **+23.6%** — rejected |
+| 4 s | +0.0% |
+| 5 s | +5.5% |
+| 6 s | +0.0% |
+| 8 s | +0.0% |
+
+⭐ **PARITY IS DOING REAL WORK, and it was not designed for this.**
+`calib_finish()` indexes the sorted buckets at `(n-1)/2`, which on an **even**
+count is the **lower-middle** — `lateral.h` chose that deliberately because the
+lower of the two is the smaller threshold, i.e. the safe direction. An
+even-length window inherits that cushion; an odd-length window takes the true
+median and has none. That is why 4 s and 6 s never exceeded the 10 s threshold in
+any of the six runs while 3 s and 5 s did. **If the window is shortened, shorten
+it to an even number of buckets.**
+
+⛔ **`XY_CALIB_MIN_BUCKETS` IS 6.** Any window shorter than 6 s is rejected
+outright by the quorum check and falls back to `XY_STILL_MIN` — an over-eager
+device on every install. **The quorum must move with the window or nothing else
+matters.** This is the trap in the whole exercise: a 5 s `CALIB_TIMEOUT_MS` alone
+would not shorten calibration, it would disable it.
+
+☠️ **A single-run pattern died on contact with five more runs.** Run 1 put its two
+highest buckets first, which read as "the start of the window is noisiest —
+the device was just set down". Across six runs the first two buckets average
+0.0585 against 0.0579 for the rest. **No such effect.** Recorded because it is
+the tenth interpretive claim in four sessions to be overturned by the next
+measurement, and it was caught only because the numbers were checked before
+being written down.
+
+### 6.4 What is still needed
+
+**Bench captures on a desk are not a counterweight in a hoistway.** What
+transfers is the SHAPE of the comparison, not the numbers; a site with a wider
+bucket-to-bucket spread makes every short window noisier than it looks here.
+`XY: bmax` now appears on every calibration attempt, including retried ones, so
+**the next hoistway session collects this for free** — no protocol change, no
+extra capture. Run `calib_replay.py` over those logs and the decision is made on
+site data.
+
+Current recommendation on bench evidence alone: **6 s, not 5 s** — even parity,
+zero observed excursions, and it lands exactly on the existing quorum of 6.
 
 ---
 
@@ -311,7 +392,9 @@ against a real counterweight.
    what stands between the chirp and shipping it to a customer.
 2. **Put a meter on quiescent current**, so §3.2 can be stated in runtime rather
    than in milliamps of arithmetic.
-3. **Log X/Y**, then shorten the calibration window (§6).
+3. **Collect `XY: bmax` on the next hoistway session** and run
+   `graph/calib_replay.py` over it — then shorten the window, to an EVEN bucket
+   count, moving `XY_CALIB_MIN_BUCKETS` with it (§6.3).
 4. Everything in §7 of `falcon_state_of_project_2026-08-13.md` still stands —
    none of this session touched the release path, the 1.009× arrival margin, or
    the vibration hypothesis.

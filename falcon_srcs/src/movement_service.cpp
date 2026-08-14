@@ -223,6 +223,41 @@ void MovementService::fsm_run()
             Serial.print(F("\r\n"));
 
             /*
+             * ─── §XY-BMAX: the per-second maxima, in time order ──────────────
+             *
+             * WHAT THIS IS FOR. The customer asked whether the 10 s calibration
+             * can be 5 s, or can end when the device judges itself stable. That
+             * is answerable offline and ONLY from this sequence: the threshold a
+             * 5 s window would have produced is
+             *
+             *     median(b0..b4) x XY_STILL_MARGIN, clamped
+             *
+             * and an early-exit rule is any predicate over the same numbers. The
+             * device already computes them; they were simply never emitted.
+             *
+             * ⚠️ WHY NOT JUST LOG THE METRIC AT FULL RATE INSTEAD. Tempting --
+             * `m=` is already in the sample line -- but LOG_DECIMATE_N thins it
+             * 8:1, and un-thinning it during calibration would be actively
+             * DANGEROUS. Serial.print blocks loop(), loop() drains the sample
+             * ring, and ~20% of samples are already lost to overrun. The metric
+             * is |Δax|+|Δay| between CONSECUTIVE samples, so a lost sample
+             * widens dt and INFLATES m -- which inflates the learned threshold,
+             * which is the direction that makes travel read as still. Adding
+             * serial load inside the measurement window would bias the very
+             * number being measured, the wrong way. This line costs nothing
+             * because it is emitted AFTER the window has closed.
+             *
+             * Printed on EVERY attempt, including the ones that get retried --
+             * a rejected window is exactly the case worth studying.
+             */
+            Serial.print(F("XY: bmax"));
+            for (uint8_t i = 0; i < lat_monitor.buckets(); i++) {
+                Serial.print(F(" "));
+                Serial.print(lat_monitor.bucket(i), 4);
+            }
+            Serial.print(F("\r\n"));
+
+            /*
              * Retry rather than trust a window that saw movement or came back
              * short of samples. The z zero is recomputed with it -- a window
              * that cannot be trusted for x/y cannot be trusted for z either.
