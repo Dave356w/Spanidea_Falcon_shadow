@@ -186,6 +186,15 @@ The prescaler fix did real work, not just datasheet compliance: at `/128` the
 same chain read 4860 against a 4900 meter, **0.8% low**, exactly the direction an
 unfinished sample-and-hold charge errs from a 250 kOhm source.
 
+**Trip point set to 3.6 V pack** (`VBATT_LOW_MV` 3200 → 3600, `VBATT_CLEAR_MV`
+3500 → 3900), Dave's call. At 3.2 V the warning fired essentially at buck
+dropout — no runway. 3.6 V leaves ~400 mV, and at 1.2 V/cell it is deep in the
+AAA discharge curve rather than a nuisance threshold (fresh is 1.67 V/cell).
+
+⬜ **How much runtime 400 mV buys is unmeasured.** Alkaline discharge is steep at
+the end. The honest claim is "some warning instead of none"; measuring it needs
+a pack run down under a representative duty cycle, which nobody has done.
+
 **Remaining in Session A:** A5 quiescent current (shipping build, **cable
 disconnected**), A6 efuse read, A4 hear the chirp, A7 double wink.
 

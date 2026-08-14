@@ -942,25 +942,40 @@ static volatile bool         accel_avg_primed = false;
  * and a 2.2 V pack are indistinguishable. Do not build anything that needs to
  * measure how flat a flat battery is.
  *
- * ⬜ WARNING LEAD TIME IS THE REAL OPEN QUESTION. U1 is a TPS628438 buck
- * holding 3.1 V from the pack, and it cannot hold that once the pack approaches
- * ~3.2 V. The pack is 3 x AAA, 4.9 V fresh, and MEASURED STABLE AT 4.9 V
- * THROUGH AN ALERT -- there is no meaningful load sag, so the quiet reading and
- * the in-alert reading are the same number.
+ * ─── ✅ WARNING LEAD TIME: 3.2 V -> 3.6 V, Dave's call, 2026-08-14 ───────────
  *
- * That makes the arithmetic simple and the conclusion unattractive: a trip at
- * 3.2 V fires essentially AT dropout, so the mechanic's first warning arrives
- * as the device is about to stop working. Raising VBATT_LOW_MV to ~3600 would
- * warn while there is still runway, at the cost of earlier battery changes.
- * A product decision, not an arithmetic one -- left at the historical 3.2 V
- * pending Dave's call.
+ * U1 is a TPS628438 buck holding 3.1 V from the pack, and it cannot hold that
+ * once the pack approaches ~3.2 V. The pack is 3 x AAA -- 5.01 V fresh, metered
+ * -- and MEASURED STABLE THROUGH AN ALERT, so there is no load sag and the
+ * quiet reading and the in-alert reading are the same number.
+ *
+ * That made the old value indefensible once it could be read in volts: a trip
+ * at 3.2 V fires essentially AT dropout, so the mechanic's first warning would
+ * arrive as the device was about to stop working. A warning with no runway is
+ * not a warning.
+ *
+ * 3.6 V leaves ~400 mV above dropout. CLEAR moves with it, keeping the original
+ * 300 mV of hysteresis -- with a single threshold a pack sitting on the
+ * boundary would chatter the alarm on and off every measurement cycle.
+ *
+ * ⚠️ RAISING LOW WITHOUT RAISING CLEAR INVERTS THE HYSTERESIS, which is a silent
+ * and nasty failure. The static_assert below catches it, and it was confirmed
+ * firing on exactly that mistake before this change was committed.
+ *
+ * ⬜ HOW MUCH RUNTIME 400 mV BUYS IS UNMEASURED. Alkaline discharge is steep at
+ * the end, so 3.6 -> 3.2 V could be a short stretch. The honest claim is "some
+ * warning instead of none". Measuring it needs a pack run down under a
+ * representative duty cycle, which nobody has done.
+ *
+ * ⬜ NOT A NUISANCE THRESHOLD, at least: 3.6 V is 1.2 V/cell, deep into the
+ * discharge curve for AAA alkaline, against 1.67 V/cell fresh.
  *
  * ✅ THE PRESCALER IS FIXED (/128 -> /16, 62.5 kHz, in spec) and these numbers
  * were re-taken afterwards against the meter, which is the reading quoted at
  * the top of this block. Nothing here is left standing on the old setting.
  */
-#define VBATT_LOW_MV              3200    /* pack millivolts -- Release.txt    */
-#define VBATT_CLEAR_MV            3500    /* pack millivolts -- hysteresis     */
+#define VBATT_LOW_MV              3600    /* pack millivolts -- warn with runway */
+#define VBATT_CLEAR_MV            3900    /* pack millivolts -- hysteresis       */
 
 #define BATTERY_LOW_THRESHOLD     (VBATT_LOW_MV   / VBATT_DIVIDER)   /* 1600 */
 #define BATTERY_CLEAR_THRESHOLD   (VBATT_CLEAR_MV / VBATT_DIVIDER)   /* 1750 */
