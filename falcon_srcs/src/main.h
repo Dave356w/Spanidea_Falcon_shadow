@@ -45,10 +45,30 @@
 
 #define HEALTH_CHECK_INTERVAL_MS  100
 
-#define BATT_R1                           5100.0
-#define BATT_R2                           1500.0
-#define VBATT_CONST  ((BATT_R1 + BATT_R2)/BATT_R2)
+/*
+ * ─── BATTERY DIVIDER, measured 2026-08-14 ────────────────────────────────────
+ *
+ * ⛔ BATT_R1 5100 / BATT_R2 1500 WERE WRONG -- a V1 leftover, ratio 4.4, and the
+ * single reason BATTERY_LOW_THRESHOLD looked like a 7.04 V pack for the whole
+ * project. Sheet 3 of RTC1273R2_SCH.pdf builds the BATTERY MONITORING block
+ * from 499k parts, and a meter on the pack and on the ADC node CONFIRMED 2:1.
+ *
+ * Same failure mode as PIN_GREEN_LED and the BATT_SENSE MCP3208 path: a V1
+ * constant that was never revisited for V2 and quietly misdescribed the board.
+ *
+ * So the node carries HALF the pack, and the threshold in raw units is simply
+ * the pack figure halved. The old VBATT_CONST is gone rather than corrected --
+ * its only caller was read_battery_voltage(), the dead MCP3208 path.
+ */
+#define VBATT_DIVIDER                     2       /* 499k / 499k, metered      */
 #define VBATT_DIODE_DROP                  0
+
+/*
+ * ⚠️ UNUSED, and left only because they are referenced from older notes.
+ * VOLTAGE_THRESHOLD / VOLTAGE_LOW have never been read by any code on this
+ * branch. Do not treat them as the trip point -- that is
+ * BATTERY_LOW_THRESHOLD in main.cpp.
+ */
 #define VOLTAGE_THRESHOLD                 3700
 #define VOLTAGE_LOW                       3400
 

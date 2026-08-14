@@ -889,38 +889,59 @@ static volatile bool         accel_avg_primed = false;
 #define LOG_DECIMATE_N  8
 
 /*
- * Battery thresholds.
+ * ─── BATTERY THRESHOLDS, DERIVED 2026-08-14 ──────────────────────────────────
  *
- * ⚠️ THE UNITS ARE UNRESOLVED, and the previous comment here ("raw ADC counts,
- * NOT millivolts") was itself wrong. The value compared against these comes from
- * read_adc_pc2_voltage(), which converts the count to MILLIVOLTS against an
- * assumed 3100 mV reference -- and does NOT apply VBATT_CONST, the 5.1k/1.5k
- * divider ratio of 4.4 declared in main.h. So the comparison is against a
- * divider-tap voltage, Release.txt claims a 3.2 V trip point, and 1600 x 4.4 is
- * 7.04 V, which is not a plausible pack. Three descriptions, no measurement.
+ * ✅ RESOLVED. The divider is 2:1, metered on the bench (499k/499k, sheet 3).
+ * read_adc_pc2_voltage() returns the NODE voltage in millivolts against the
+ * 3100 mV rail, so a pack figure divides by two to become a threshold. Stated
+ * in PACK millivolts below and halved at compile time, so the next reader
+ * cannot repeat the mistake this replaces.
  *
- * Three further reasons the reading cannot be trusted in absolute terms:
- *   - the ADC prescaler is /128 under a comment reading "for 8MHz clock" while
- *     F_CPU is 1 MHz, so the ADC clock is 7.8 kHz against a 50 kHz datasheet
- *     minimum for full 10-bit accuracy (Eng_Notes §5.8);
- *   - the read is ratiometric against AVCC (see adc.cpp), so it is partly blind
- *     to the rail by construction;
- *   - the divider has never been measured.
+ * ⭐ THE HISTORICAL NUMBERS WERE RIGHT ALL ALONG. 1600 and 1750 at 2:1 are
+ * exactly 3.2 V and 3.5 V, and Release.txt has claimed a 3.2 V trip since V1.2.
+ * What was wrong was BATT_R1/BATT_R2 in main.h -- a V1 leftover giving 4.4,
+ * which made 1600 look like an implausible 7.04 V and sent three separate
+ * investigations looking for a defect that was not there. **This change moves
+ * no threshold.** It only makes the derivation explicit.
  *
- * ⛔ DO NOT convert these to volts, and do not present the chirp to a customer
- * as a calibrated warning, until the divider is characterised on the bench.
- * The 2026-08-14 work made the ANNOUNCEMENT usable (see alarm.h); it did not
- * touch the MEASUREMENT, and the trip point is unchanged from the historical
- * value precisely so that this change alters nothing about WHEN it fires.
+ * CLEAR sits above LOW for hysteresis: with a single threshold a pack near the
+ * boundary would chatter the alarm on and off every measurement cycle. 300 mV
+ * of pack is comfortably wider than the sample-to-sample spread on the bench
+ * (833 counts +/- 4, about 25 mV of pack).
  *
- * LOW is left at the historical 1600 so this change does not alter when a
- * genuinely flat battery trips. CLEAR sits above it to give hysteresis: with a
- * single threshold, a pack sitting near the boundary would chatter the alarm on
- * and off every measurement cycle. The gap is deliberately wider than the
- * sample-to-sample spread observed on the bench (2324-2390, about 66 counts).
+ * ⚠️ THE READ IS RATIOMETRIC AGAINST AVCC, AND THAT HAS A CONSEQUENCE NOBODY
+ * HAS WRITTEN DOWN. The reference is the 3.1 V rail, the input is pack/2. Above
+ * the regulator's dropout the rail is fixed and the reading tracks the pack
+ * honestly. BELOW dropout the rail follows the pack down, input and reference
+ * fall together, and the count PINS at about 511 -- roughly 1548 mV in these
+ * units -- no matter how flat the pack gets.
+ *
+ * That happens to be just under BATTERY_LOW_THRESHOLD, so the alarm does trip
+ * and does stay tripped. But the reading SATURATES: below dropout a 3.2 V pack
+ * and a 2.2 V pack are indistinguishable. Do not build anything that needs to
+ * measure how flat a flat battery is.
+ *
+ * ⬜ AND SEE THE WARNING-LEAD-TIME NOTE. U1 is a TPS628438 buck holding 3.1 V
+ * from the pack; it cannot hold that once the pack approaches 3.2 V. So a trip
+ * at 3.2 V fires essentially AT dropout and gives the mechanic no runway. That
+ * is a product decision, not an arithmetic one -- raising VBATT_LOW_MV to
+ * ~3600 would warn before the rail is in trouble, at the cost of earlier
+ * battery changes. Left at the historical 3.2 V pending Dave's call.
+ *
+ * ⚠️ STILL OUTSTANDING: the ADC prescaler is /128 under a comment reading "for
+ * 8MHz clock" while F_CPU is 1 MHz, so the ADC clock is 7.8 kHz against a
+ * 50 kHz datasheet minimum (Eng_Notes §5.8). These thresholds were characterised
+ * at that setting. If the prescaler is fixed, RE-TAKE the bench numbers.
  */
-#define BATTERY_LOW_THRESHOLD     1600
-#define BATTERY_CLEAR_THRESHOLD   1750
+#define VBATT_LOW_MV              3200    /* pack millivolts -- Release.txt    */
+#define VBATT_CLEAR_MV            3500    /* pack millivolts -- hysteresis     */
+
+#define BATTERY_LOW_THRESHOLD     (VBATT_LOW_MV   / VBATT_DIVIDER)   /* 1600 */
+#define BATTERY_CLEAR_THRESHOLD   (VBATT_CLEAR_MV / VBATT_DIVIDER)   /* 1750 */
+
+static_assert(BATTERY_CLEAR_THRESHOLD > BATTERY_LOW_THRESHOLD,
+              "battery clear threshold must sit above the trip, or the alarm "
+              "chatters on every measurement cycle");
 
 /*
  * Battery readings to discard after boot before the alarm logic is armed, on
@@ -1059,7 +1080,13 @@ void emit_burst_log();
 void emit_ramp_log();
 void emit_arm_log();
 
-uint16_t read_battery_voltage();
+/*
+ * read_battery_voltage() is gone (2026-08-14). It read the EXTERNAL MCP3208 --
+ * whose adc.begin() is commented out in configure_adc_channel(), so it was
+ * sampling an uninitialised part -- and it was the only user of VBATT_CONST,
+ * the V1 divider constant that turned out to describe the wrong board. Its last
+ * caller went with the initialization() cleanup earlier the same day.
+ */
 extern int configure_adc_channel();
 extern uint16_t read_adc_pc2_voltage();
 extern uint16_t read_adc_pc2();
@@ -2352,13 +2379,6 @@ void poll_acc_int_status()
     }
 }
 
-inline uint16_t read_battery_voltage()
-{
-    float vol_temp = (((float) adc.read(BATT_SENSE) / 4096.0) * 3300) * (VBATT_CONST) * (1.06);
-
-    return (uint16_t)vol_temp;
-}
-
 #if defined(BATTERY_BENCH)
 /*
  * ─── BENCH ONLY: battery characterisation (Session A of the test plan) ───────
@@ -2515,6 +2535,40 @@ void check_for_battery_voltage()
     uint32_t  now       = millis();
 
     /*
+     * ⛔ NEVER MEASURE THE PACK WHILE THE BEACON IS SOUNDING, 2026-08-14.
+     *
+     * MEASURED AT THE BENCH: a pack reading 4.9 V at rest falls to 3.3 V during
+     * an alert. That 1.6 V is the piezo and the 200 mA D2 driver pulling the
+     * cells down through their own internal resistance -- it is SAG, not state
+     * of charge, and averaging it into battery_avg measures the load rather
+     * than the battery.
+     *
+     * WHY THIS IS NOT COSMETIC. The trip point is 3.2 V. Fresh cells sag to
+     * 3.3 V under alert load -- 100 mV above it. So a sample landing inside a
+     * beacon would report a nearly-flat pack on a healthy one, and as cells age
+     * even slightly it would cross: EVERY LONG BEACON WOULD END WITH A
+     * LOW-BATTERY ALARM on good batteries. The 150 ms blast is 19% of each
+     * 800 ms sequence, so roughly one sample in five would have been
+     * contaminated even without the LED.
+     *
+     * Skipping is safe in the direction that matters: the pack is not sampled
+     * for at most LATCH_FAILSAFE_MS, and a battery reading delayed by a few
+     * minutes costs nothing, whereas a false low-battery alarm during a real
+     * ride is noise on top of the one signal the mechanic is listening to.
+     *
+     * The interval restarts rather than resuming, so the first reading after a
+     * ride is taken on a rail that has had time to recover.
+     */
+    if (alarm_status_g != 0 || chase_led_status_g != 0) {
+        if (bat_settling) {
+            digitalWrite(BAT_ADC_ENABLE, LOW);
+            bat_settling = false;
+        }
+        bat_timer = now;
+        return;
+    }
+
+    /*
      * Two-phase and non-blocking: enable the divider, come back once it has had
      * BATTERY_SETTLE_MS to settle, read, disable. Nothing here spins, so the
      * 2 s watchdog is untouched. See the BATTERY SAMPLE CADENCE block above for
@@ -2582,8 +2636,16 @@ void check_for_battery_voltage()
         battery_avg.add(battery_v);
     }
 
+    /*
+     * Print the PACK voltage alongside the node reading. The whole 2026-08-14
+     * battery investigation existed because three documents disagreed about
+     * what the logged number meant; a log that states the pack figure directly
+     * cannot start that argument again.
+     */
     Serial.print(F("  avg : "));
     Serial.print(battery_avg.avg());
+    Serial.print(F("  pack_mv : "));
+    Serial.print((uint16_t)(battery_avg.avg() * VBATT_DIVIDER));
     Serial.print(F("\r\n"));
 
     /*

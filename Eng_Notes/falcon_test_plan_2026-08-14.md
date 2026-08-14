@@ -141,6 +141,64 @@ characterisation — measure pack and node, and see whether the ratio is 2.
 
 ---
 
+## 🔴 A1 RESULT, and it reframes Session B
+
+**Divider confirmed 2:1** (metered, and cross-checked: firmware `pack_mv` 4860
+against 4.9 V at the test points — 0.8%, or 0.2% once the bandgap-measured
+3120 mV rail replaces the assumed 3100). Pack is **3 × AAA**, 4.9 V fresh.
+
+**⚠️ THE PACK FALLS FROM 4.9 V TO 3.3 V DURING AN ALERT.** Measured at the test
+points. That 1.6 V is sag through the cells' own internal resistance under the
+piezo plus the 200 mA D2 driver.
+
+### It explains the brownout signature exactly
+
+U1 is a **TPS628438 buck** holding VCC_3V1 from the pack. A buck regulates its
+output flat right up to dropout and then collapses. So:
+
+- `read_vcc_mv()` measures **VCC**, the regulated side. It cannot see the pack
+  sagging toward dropout — it reads 3.115 V until the instant there is not
+  enough input left, then the device dies.
+- That is precisely the recorded signature: **"sudden death, no reboot, healthy
+  readings to the last sample."** No vibration hypothesis is needed to produce
+  it. The 588 s bench endurance test passing simply means that pack stayed the
+  right side of dropout on that occasion.
+
+### And the headroom is ~100 mV on FRESH cells
+
+A buck needs roughly its output plus dropout at the input, so ~3.2 V for a 3.1 V
+rail. **In-alert pack on fresh AAAs is 3.3 V.** Anything that adds series
+resistance — cell ageing, cold, a marginal contact, vibration — closes that gap.
+
+⭐ **The vibration hypothesis and the rail hypothesis are not competing any more.
+They are the same failure**: the device runs ~100 mV from dropout during every
+alarm, and vibration is one of several things that can spend that 100 mV.
+
+### What this does to the trip point
+
+**A low-battery warning cannot give useful lead time at 3.2 V.** By the time the
+*quiet* pack reads 3.2 V, the in-alert pack would be far below dropout — the
+device would already have been dying during alerts for a long time. Warning
+before the first failed alarm would need a quiet-phase trip near **4.9 V**,
+which is fresh. That is not a threshold that can be chosen; it says the pack is
+undersized for the load.
+
+### Levers, cheapest first
+
+| lever | effect | cost |
+|---|---|---|
+| **Stagger D2 against the piezo blast** | both currently fire at step 0 — `beep` steps 0–2, `led_on` steps 0–3. Moving the LED to the back half of the sequence roughly **halves peak current** | audible and visual cues stop coinciding |
+| **AA instead of AAA** | AAA internal resistance is roughly 2–3× AA; would cut sag substantially | mechanical |
+| **Bulk capacitance across the pack** | supplies the 150 ms blast from the cap rather than the cells | hardware spin |
+| Lower D2 alarm brightness via PWM | the heartbeat already does this; the alarm drives it flat out | dimmer beacon |
+
+⬜ **Session B is still worth running**, but its question has changed. It is no
+longer "vibration or rail?" — it is **"how much of the 100 mV does motion
+spend?"** Run it with a meter on the pack, not only the bandgap read, because
+the bandgap cannot see the thing that kills it.
+
+---
+
 ### SESSION B — endurance in a moving car (~30 min in car)
 
 **This is item 1, and it is still the cheapest test with the largest
