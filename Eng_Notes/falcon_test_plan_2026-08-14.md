@@ -99,7 +99,7 @@ replay against the arrival bursts on file before anything is flown.
 |---|---|---|
 | 7 | ~~Battery trip point uncharacterised~~ — **✅ CLOSED.** Divider metered 2:1; thresholds derived in pack mV; chain validated against a meter to within 1 LSB | ✅ closed |
 | 8 | ~~ADC prescaler `/128`~~ — **✅ CLOSED.** `/16` = 62.5 kHz, the slowest in-spec option (a faster one would be worse: 250 kOhm source). Removed a measured 0.8% low bias | ✅ closed |
-| 9 | **BOD disabled** — confirmed, `efuse 0xF7` (BODLEVEL 111). Enabling costs 0.8% of idle, so clearly worth it: `efuse:w:0xF5:m` = 2.7 V | read ✅, write pending |
+| 9 | ~~BOD disabled~~ — **✅ CLOSED. `efuse 0xF7` → `0xF5` written and verified: BODLEVEL 101 = 2.7 V, CFDEN preserved.** Device confirmed running afterwards | ✅ closed |
 | 10 | ~~Quiescent current never measured~~ — **✅ CLOSED.** 3.2 mA idle, 2.1 mA without logging; heartbeat 4 µA; D2 full 38.8 mA not 200 mA | ✅ closed |
 | 11 | **Low-battery chirp never heard** — pack reads 2535 against a 1600 trip | untested path |
 | 12 | **Degraded double-heartbeat never seen** — needs a rejected calibration | untested path |
@@ -234,9 +234,30 @@ prints a decimated sample line at 62500 baud forever, listener or not:
 ✅ **BOD is now clearly worth enabling** — ~25 µA is 0.8% of baseline. The cost
 argument that made it a judgement call is gone.
 
-**Remaining in Session A:** A4 hear the chirp, A6 write the efuse (read done:
-`efuse 0xF7`, BOD disabled), A7 double wink, and confirm the heartbeat is
-visible.
+#### ✅ A6 CLOSED — BOD enabled at 2.7 V
+
+```
+efuse  0xF7 -> 0xF5     BODLEVEL 111 (off) -> 101 (2.7 V), CFDEN preserved
+```
+
+Fuse bytes for the record: `lfuse 0x62` (int. 8 MHz RC ÷ 8 = 1 MHz, matching
+the documented F_CPU), `hfuse 0xD9` (SPIEN on, WDTON not forced, **BOOTRST = 1
+so there is no bootloader** — which independently explains why opening the
+serial port never resets the board), `lock 0xFF`.
+
+⚠️ **Verified by BOOTING IT, not by avrdude.** ISP asserts reset regardless, so
+a bricking-level BOD (`0xF4` = 4.3 V against a 3.1 V rail) would still program
+and verify cleanly. The only real check is that the device runs: it calibrates
+(`b=6`, `READY`, `XY-Still 0.0930`) and reaches `STATE_MONITORING`. **Any future
+fuse write needs the same check — a clean avrdude verify proves nothing here.**
+
+Why it was worth taking: below buck dropout the rail decays slowly, and an AVR
+run under spec executes garbage rather than failing cleanly. On a beacon whose
+worst outcome is silence while moving, "undefined execution that looks alive" is
+strictly worse than "held in reset". Cost is ~0.8% of the 3.2 mA baseline.
+
+**Remaining in Session A:** A4 hear the chirp, A7 double wink, and confirm the
+heartbeat is visible at all.
 
 #### Historical: the prior that A1 confirmed
 
