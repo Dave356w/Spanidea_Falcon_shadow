@@ -6,10 +6,10 @@
 **Fuses:** `lfuse 0x62` · `hfuse 0xD9` · `efuse 0xF5` (BOD 2.7 V) · `lock 0xFF`
 **Supersedes:** `falcon_state_of_project_2026-08-13.md`
 
-**Evidence base — unchanged on the hoistway side.** ~50 instrumented runs across
-four configurations, 17–500 fpm, two buildings, 186 full-rate bursts on file.
-**No car runs happened on 2026-08-14.** Everything added today is bench work,
-schematic work, or measurement with a meter.
+**Evidence base.** ~50 instrumented runs across four configurations, 17–500 fpm,
+two buildings, 186 full-rate bursts on file. Most of 2026-08-14 was bench,
+schematic and meter work; **a cab session late in the day put the build in a car
+for the first time** — see §4.4.
 
 Read `falcon_reference_2026-08-12.md` first — it remains the orientation
 document. Session detail for today is in `falcon_ui_battery_2026-08-14.md`; the
@@ -17,20 +17,22 @@ live open-items list is `falcon_test_plan_2026-08-14.md`.
 
 ---
 
-## 0. ⚠️ READ THIS BEFORE THE NEXT CAR RUN
+## 0. ⚠️ REGRESSION STATUS OF THIS BUILD
 
-**Nothing in this build has been in an elevator.** Two of today's changes are in
-paths that matter, and one of them is a safety threshold:
+Written before the build had ever run in a car; **the first cab session happened
+the same evening and cleared the top three rows** (§4.4). Kept because the risk
+framing is what the session was designed around.
 
 | change | risk |
 |---|---|
-| **Calibration 10 s → 6 s**, quorum 6 → 4 | 🔴 **safety path.** Sets `XY_STILL`, the lateral floor. Validated against **six desk calibrations only** |
-| **`LATCH_FAILSAFE_MS` 240 s → 600 s** | 🟡 a stuck beacon now sounds for ten minutes, not four |
-| **Chase sweep advances onto Q1** | 🟡 changes the beacon visual; no timing change, does not gate sampling |
-| Heartbeat on D2, low-battery chirp | 🟢 idle only; both suppressed while the beacon runs |
+| **Calibration 10 s → 6 s**, quorum 6 → 4 | 🔴 safety path → ✅ **3 in-situ calibrations, all clean** (§4.4). Still one mounting |
+| **`LATCH_FAILSAFE_MS` 240 s → 600 s** | 🟡 unchanged risk. A 500 fpm run beaconed 25.7 s, nowhere near it |
+| **Chase sweep advances onto Q1** | ✅ **all eight LEDs confirmed in a live alert**, D10 lit |
+| Heartbeat on D2 | ✅ **wink confirmed visible at rest in the hoistway** |
+| Low-battery chirp | 🟢 idle only, suppressed while the beacon runs. Still never heard |
 
-The next hoistway session is therefore a **regression run**, not a data-gathering
-trip that happens to include one. §7 is the checklist.
+**Still outstanding:** the single-floor bottom-terminal case (§5.2), a second
+mounting for the calibration window, and the low-battery chirp.
 
 ---
 
@@ -115,7 +117,7 @@ MCP3208 while the real path used the internal ADC.
 - **Departure detection.** Caught at 17, 18, 20, 25, 27 fpm and every speed to
   500. Never missed in a hoistway on current firmware. This is the catastrophic
   direction and it remains the best-evidenced part of the device.
-- **The jog verdict.** 29/29 lifetime, opk ≤ 440 for real departures against
+- **The jog verdict.** **30/30 lifetime**, opk ≤ 440 for real departures against
   jogs ≥ 1366, gate at 900 — no overlap.
 - **The ramp discriminator.** 28+ automatic stops, block means 470–653,
   directionality 100% on every one, zero false latches across 89 replayed
@@ -147,6 +149,35 @@ worst margin of 1.08× against 1.009× at 350 fpm. Three runs, so not an overtur
 Standby life, first time it can be stated: **~13 days** at 1000 mAh, **~20 days**
 with logging compiled out.
 
+### 4.4 The first car run on this build — 500 fpm, cab, 8→1
+
+```
+FSM: Departure latched (any-motion)
+JOGV pos=0 neg=36741 ratio=0 opk=6 verdict=RUN (armed)
+FSM: Arrival (polled), peak 0.611
+ARM q=53 a=1 v=1 g=1 ro=8
+RAMP latched mean=588 dir=100
+```
+
+| | |
+|---|---|
+| travel, departure → arrival | 14.9 s |
+| beacon total | 25.7 s (failsafe 600 s) |
+| **arrival peak** | **0.611 vs 0.45 = 1.358×** |
+| max cruise `pk` in travel | 0.42 — under the gate |
+| arming margin | `q=53` |
+| ramp | mean 588, dir 100% |
+
+**The best 500 fpm arrival margin on record** — 1.358× against the 1.08× worst
+from 2026-08-13 and the 1.009× lifetime worst. Ramp mean 588 sits on the
+597/600/602 cluster.
+
+⚠️ **`ro=8` — the reversal gate at exactly its minimum**, on a long run from the
+TOP of the shaft where `q=53` was healthy. The note's model had the top of the
+shaft as the comfortable case. **The quiet-run margin and the reversal margin are
+not measuring the same thing**, and this is the fourth sighting of a gate at zero
+margin (§5.3).
+
 ---
 
 ## 5. What is not proven
@@ -156,7 +187,7 @@ with logging compiled out.
 | path | status |
 |---|---|
 | jog verdict | armed, **proven** 29/29 live |
-| ramp detector | armed, **never executed** — 14 latches, all after another path released |
+| ramp detector | armed, **never executed** — **15** latches, all after another path released |
 | reversal arming (`v=2`) | armed, **never fired** in ~32 runs |
 
 The latter two are armed on replay plus negative evidence alone, and they carry
