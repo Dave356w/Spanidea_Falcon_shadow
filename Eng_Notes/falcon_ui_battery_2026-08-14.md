@@ -2,7 +2,8 @@
 
 **Date:** 2026-08-14
 **Head:** `Falcon_Rel_EFT` on `Dave356w/Spanidea_Falcon_shadow`
-**Firmware on the device:** `31210` — Flash 31210/32256, RAM 1373/2048
+**Firmware on the device:** `31464` — Flash 31464/32256 (792 free), RAM 1357/2048
+**Session A execution (battery, BOD, failsafe) continues in** `falcon_test_plan_2026-08-14.md`
 **Session type:** bench, one unit, no hoistway runs
 **Trigger:** three questions from the customer
 
@@ -96,29 +97,40 @@ fills from the **internal ADC on PC2**. Harmless only by accident: `INIT_TIME_MS
 is 80 ms so it contributed ~4 samples, all overwritten by the later `fill()`.
 Removed, along with the now-dead `temp_timer`.
 
-### 2.4 ⚠️ The announcement is usable; the measurement is not
+### 2.4 ✅ The measurement is now trustworthy too
 
-**The trip point was deliberately not touched**, so this change alters nothing
-about *when* the alarm fires.
+**Written when it was not**, and resolved later the same day. Recorded in both
+states because the intermediate reasoning is what found the defect.
 
 `BATTERY_LOW_THRESHOLD 1600` is compared against `read_adc_pc2_voltage()`, which
-returns **millivolts** against an assumed 3100 mV reference and does **not** apply
-`VBATT_CONST`, the 5.1k/1.5k divider ratio of 4.4. The comment above it claimed
-these were raw ADC counts and *not* millivolts — that comment was itself wrong and
-has been corrected in place. 1600 × 4.4 = 7.04 V is not a plausible pack;
-`Release.txt` claims a 3.2 V trip. Three descriptions, no measurement.
+returns **millivolts** and does **not** apply `VBATT_CONST`. That constant —
+5.1k/1.5k, ratio 4.4 — was a **V1 leftover describing the wrong board**, and it
+is the single reason 1600 looked like an implausible 7.04 V pack while
+`Release.txt` claimed 3.2 V. Same failure mode as `PIN_GREEN_LED` and the
+`BATT_SENSE` MCP3208 path.
 
-Three further reasons the reading is not trustworthy in absolute terms:
+**Metered: the divider is 2:1** (499k/499k, sheet 3). So 1600 was always exactly
+3.2 V and the historical thresholds were right all along. They are now stated in
+PACK millivolts and halved at compile time; the shipping flash size was
+byte-identical across that change, which is the proof it moved nothing.
 
-- the ADC prescaler is `/128` under a comment reading "for 8MHz clock" while
-  F_CPU is 1 MHz, so the ADC clock is 7.8 kHz against a 50 kHz datasheet minimum
-  (§5.8 of the state-of-project note);
-- the read is ratiometric against AVCC, so it is partly blind to the rail by
-  construction;
-- the divider has never been measured.
+**The ADC was then brought into spec** — `/128` → `/16`, 62.5 kHz — and the whole
+chain validated:
 
-⛔ **Do not present the chirp to a customer as a calibrated warning until the
-divider is characterised.** A low-battery alert nobody trusts is worse than none.
+```
+meter at the pack   5.010 V
+firmware pack_mv    5012        2 mV apart, inside one LSB (6.06 mV of pack)
+```
+
+One comparison validates the divider, the 3100 mV reference assumption and the
+ADC configuration at once. At `/128` the same chain read 4860 against a 4900
+meter — **0.8% low**, exactly the direction an unfinished sample-and-hold charge
+errs from a 250 kΩ source.
+
+⭐ **So the chirp can be presented as a calibrated warning.** The prohibition
+this section originally carried is discharged. The trip was subsequently raised
+3.2 V → **3.6 V**, because at 3.2 V it fired essentially at buck dropout and a
+warning with no runway is not a warning. Full detail: test plan §A1–A3.
 
 ---
 
@@ -151,13 +163,26 @@ behind U2, a TPS92201 constant-current driver with EN and PWM control. On the
 ring a beat cost nothing, because the 4017 lights exactly one output regardless
 of which. Here it costs real charge:
 
-| | duty | average |
-|---|---|---|
-| full brightness, 20 ms / 4 s | 0.5% | ~1 mA (~3× the idle MCU) |
-| `HEARTBEAT_PWM_DUTY` 16/255, 80 ms / 4 s | 0.13% effective | ~0.25 mA |
+⛔ **AND THE 200 mA IS THE DRIVER'S CAPABILITY, NOT ITS SETTING** — measured
+later the same day at **38.8 mA**. Every figure this section originally carried
+was arithmetic off the larger number and wrong:
 
-⬜ **Both figures are arithmetic, not measurements.** Quiescent current has never
-been put on a meter, so none of this can yet be stated in hours of runtime.
+| | claimed | MEASURED |
+|---|---|---|
+| D2 at full | 200 mA | **38.8 mA** |
+| D2 at `HEARTBEAT_PWM_DUTY` | ~12 mA | **0.20 mA** |
+| heartbeat average | ~250 µA | **4.0 µA** |
+
+⭐ **The dimming turned out to be worth far more than the arithmetic suggested.**
+Idle baseline is 3.2 mA, so a full-brightness beat would cost 0.78 mA — **24% of
+idle** — against 4 µA dimmed. The decision was right; the reasoning behind it was
+off by 60×.
+
+⬜ **The dim is 12× dimmer than its duty implies** (0.52% of full against a 6.3%
+PWM duty), most likely the TPS92201's soft-start losing most of a ~1 ms on-time
+at Timer0's 61 Hz. Brightness is **not** linear in `HEARTBEAT_PWM_DUTY` here.
+⚠️ **Nobody has confirmed the wink is visible** — that is the open question on
+this feature. Test plan §A5.
 
 **The flash is 80 ms and not 20 for a hardware reason.** `LED_PWM` is PD6 = OC0A,
 and at F_CPU = 1 MHz the Arduino core's Timer0 PWM runs at 1e6/(64 × 256) =
@@ -264,13 +289,24 @@ sessions, and it is the reason §8 of the state-of-project note says what it say
 | `movement_service.cpp` | heartbeat armed with the calibration verdict; `XY: bmax` dump |
 | `lateral.cpp` / `.h` | sort a copy so `bmax[]` keeps time order; `bucket()` accessor |
 | `graph/calib_replay.py` | new — replays the window length from `XY: bmax` lines |
-| `Falcon_Product_Document.md` | §2.1 third hardware fact; §6.1 23-minute step corrected |
+| `movement_service.h` | `CALIB_TIMEOUT_MS` 10 s → 6 s + static_asserts; `LATCH_FAILSAFE_MS` 240 s → 600 s |
+| `adc.cpp` | ADC prescaler `/128` → `/16`; discarded conversion for the 250 kΩ source |
+| `main.h` | `BATT_R1`/`R2`/`VBATT_CONST` removed — V1 leftovers describing the wrong board |
+| `platformio.ini` | new `bench_battery` and `idle_current` bench envs |
+| `Falcon_Product_Document.md` | §2.1 third hardware fact; §6.1 23-minute step corrected; calibration 10 s → 6 s |
 
-Flash 30660 → **31210** (1046 free). RAM 1369 → **1373**.
+Flash 30660 → **31464** (792 free). RAM 1369 → **1357**.
+
+**Fuses changed:** `efuse 0xF7` → `0xF5`, enabling BOD at 2.7 V.
 
 ---
 
-## 6. Item 1 — calibration window, assessed and deferred
+## 6. Item 1 — calibration window: assessed, then SHIPPED at 6 s
+
+⚠️ **This section was written while the answer was still 'deferred'.** It is
+kept in order because the reasoning is what produced the measurement; the
+outcome is §6.5, and it is **6 s with quorum 4**, not the 5 s recommended
+below.
 
 **Shortening to 5 s is defensible and the argument is stronger than it was**, but
 it touches a safety threshold and is the one request of the three that can move
@@ -429,16 +465,19 @@ the bench's, `calib_replay.py` over those logs is what says so.
 
 ## 7. Next
 
-1. **Characterise the battery divider and fix the ADC prescaler** (§2.4). This is
-   what stands between the chirp and shipping it to a customer.
-2. **Put a meter on quiescent current**, so §3.2 can be stated in runtime rather
-   than in milliamps of arithmetic.
-3. **Collect `XY: bmax` on the next hoistway session** and run
-   `graph/calib_replay.py` over it — then shorten the window, to an EVEN bucket
-   count, moving `XY_CALIB_MIN_BUCKETS` with it (§6.3).
-4. Everything in §7 of `falcon_state_of_project_2026-08-13.md` still stands —
-   none of this session touched the release path, the 1.009× arrival margin, or
-   the vibration hypothesis.
+Superseded by `falcon_test_plan_2026-08-14.md`, which consolidates every open
+item and is the live document. In short, as of end of day:
+
+- **Closed today:** items 1 (brownout was the COM link), 7 (trip point), 8 (ADC
+  prescaler), 9 (BOD), 10 (quiescent current).
+- **Open, bench, no code needed:** hear the chirp; see the degraded double wink;
+  confirm the heartbeat is visible at all.
+- **Open, biggest remaining bench win:** a production build with logging
+  compiled out — measured at 1.10 mA, **34% of idle**, worth ~50% more standby.
+- **Open, in the release path and untouched by any of this:** §4.2, §5.1, §5.2,
+  §5.3, §5.6.
+
+---
 
 ## 8. Bench notes
 
