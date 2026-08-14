@@ -141,61 +141,58 @@ characterisation — measure pack and node, and see whether the ratio is 2.
 
 ---
 
-## 🔴 A1 RESULT, and it reframes Session B
+## A1 RESULT — divider confirmed, and a retraction
 
-**Divider confirmed 2:1** (metered, and cross-checked: firmware `pack_mv` 4860
-against 4.9 V at the test points — 0.8%, or 0.2% once the bandgap-measured
-3120 mV rail replaces the assumed 3100). Pack is **3 × AAA**, 4.9 V fresh.
+**Divider is 2:1**, metered and cross-checked: firmware `pack_mv` 4860 against
+4.9 V at the test points — 0.8% apart, or 0.2% once the bandgap-measured 3120 mV
+rail replaces the assumed 3100. Pack is **3 × AAA, 4.9 V fresh**.
 
-**⚠️ THE PACK FALLS FROM 4.9 V TO 3.3 V DURING AN ALERT.** Measured at the test
-points. That 1.6 V is sag through the cells' own internal resistance under the
-piezo plus the 200 mA D2 driver.
+So the historical thresholds were right all along: 1600 and 1750 at 2:1 are
+exactly 3.2 V and 3.5 V, which is what `Release.txt` has claimed since V1.2.
+`BATT_R1`/`BATT_R2` were the V1 leftover that made 1600 look like a 7 V pack.
+**Item 7 closes.**
 
-### It explains the brownout signature exactly
+### ☠️ RETRACTED WITHIN THE HOUR: "the pack sags to 3.3 V under alert load"
 
-U1 is a **TPS628438 buck** holding VCC_3V1 from the pack. A buck regulates its
-output flat right up to dropout and then collapses. So:
+One reading of 3.3 V "in alert" was written up as a 1.6 V sag, and a whole
+causal story was built on it — that the sag explained the brownout, that the
+buck was riding 100 mV from dropout on fresh cells, that the vibration and rail
+hypotheses had merged, and that battery sampling had to be suppressed during
+alerts to stop false alarms. A code change went in on that basis.
 
-- `read_vcc_mv()` measures **VCC**, the regulated side. It cannot see the pack
-  sagging toward dropout — it reads 3.115 V until the instant there is not
-  enough input left, then the device dies.
-- That is precisely the recorded signature: **"sudden death, no reboot, healthy
-  readings to the last sample."** No vibration hypothesis is needed to produce
-  it. The 588 s bench endurance test passing simply means that pack stayed the
-  right side of dropout on that occasion.
+**The next measurement — PCB rails during an alert — showed a stable 4.9 V.**
+There is no sag. Every conclusion above is withdrawn and the code change is
+reverted.
 
-### And the headroom is ~100 mV on FRESH cells
+What makes this one worth recording is that the contradicting evidence was
+**already on file and went unchecked**: the 588 s endurance test compared VCC in
+the blast phase against the quiet phase across 583 samples and found a mean
+difference of **+0.6 mV**. A rail that does not move under alarm load is
+incompatible with a pack sagging 1.6 V. The story should not have survived
+first contact with the existing data, let alone reached a commit.
 
-A buck needs roughly its output plus dropout at the input, so ~3.2 V for a 3.1 V
-rail. **In-alert pack on fresh AAAs is 3.3 V.** Anything that adds series
-resistance — cell ageing, cold, a marginal contact, vibration — closes that gap.
+That is the eleventh interpretive claim overturned by the next measurement in
+four sessions, and it took under an hour end to end. The 3.3 V reading itself
+remains unexplained — most likely a different test point, plausibly the
+regulated rail — but it is no longer load-bearing, so it is not worth chasing.
 
-⭐ **The vibration hypothesis and the rail hypothesis are not competing any more.
-They are the same failure**: the device runs ~100 mV from dropout during every
-alarm, and vibration is one of several things that can spend that 100 mV.
+### What survives
 
-### What this does to the trip point
+- The divider, the derived trip point, and item 7 closing.
+- **The lead-time problem, now cleaner.** With no sag, quiet and in-alert
+  readings are the same number, so a 3.2 V trip fires essentially at dropout and
+  the mechanic's first warning arrives as the device stops working. Raising
+  `VBATT_LOW_MV` to ~3600 buys real runway. Still Dave's call.
 
-**A low-battery warning cannot give useful lead time at 3.2 V.** By the time the
-*quiet* pack reads 3.2 V, the in-alert pack would be far below dropout — the
-device would already have been dying during alerts for a long time. Warning
-before the first failed alarm would need a quiet-phase trip near **4.9 V**,
-which is fresh. That is not a threshold that can be chosen; it says the pack is
-undersized for the load.
+### What goes back to how it was
 
-### Levers, cheapest first
-
-| lever | effect | cost |
-|---|---|---|
-| **Stagger D2 against the piezo blast** | both currently fire at step 0 — `beep` steps 0–2, `led_on` steps 0–3. Moving the LED to the back half of the sequence roughly **halves peak current** | audible and visual cues stop coinciding |
-| **AA instead of AAA** | AAA internal resistance is roughly 2–3× AA; would cut sag substantially | mechanical |
-| **Bulk capacitance across the pack** | supplies the 150 ms blast from the cap rather than the cells | hardware spin |
-| Lower D2 alarm brightness via PWM | the heartbeat already does this; the alarm drives it flat out | dimmer beacon |
-
-⬜ **Session B is still worth running**, but its question has changed. It is no
-longer "vibration or rail?" — it is **"how much of the 100 mV does motion
-spend?"** Run it with a meter on the pack, not only the bandgap read, because
-the bandgap cannot see the thing that kills it.
+🔴 **The brownout is unexplained again, and §5.7 is restored in full.** The
+588 s test remains stationary-only, every historical death was in a moving car,
+and the intermittent-contact-under-vibration hypothesis is once more the leading
+candidate. **Session B is unchanged from its original form** — its question is
+"vibration or not?", exactly as written below. Take a meter to the pack while
+you are there anyway; it costs nothing and this session showed how far a single
+unconfirmed reading can travel.
 
 ---
 

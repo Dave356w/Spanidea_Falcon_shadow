@@ -921,12 +921,18 @@ static volatile bool         accel_avg_primed = false;
  * and a 2.2 V pack are indistinguishable. Do not build anything that needs to
  * measure how flat a flat battery is.
  *
- * ⬜ AND SEE THE WARNING-LEAD-TIME NOTE. U1 is a TPS628438 buck holding 3.1 V
- * from the pack; it cannot hold that once the pack approaches 3.2 V. So a trip
- * at 3.2 V fires essentially AT dropout and gives the mechanic no runway. That
- * is a product decision, not an arithmetic one -- raising VBATT_LOW_MV to
- * ~3600 would warn before the rail is in trouble, at the cost of earlier
- * battery changes. Left at the historical 3.2 V pending Dave's call.
+ * ⬜ WARNING LEAD TIME IS THE REAL OPEN QUESTION. U1 is a TPS628438 buck
+ * holding 3.1 V from the pack, and it cannot hold that once the pack approaches
+ * ~3.2 V. The pack is 3 x AAA, 4.9 V fresh, and MEASURED STABLE AT 4.9 V
+ * THROUGH AN ALERT -- there is no meaningful load sag, so the quiet reading and
+ * the in-alert reading are the same number.
+ *
+ * That makes the arithmetic simple and the conclusion unattractive: a trip at
+ * 3.2 V fires essentially AT dropout, so the mechanic's first warning arrives
+ * as the device is about to stop working. Raising VBATT_LOW_MV to ~3600 would
+ * warn while there is still runway, at the cost of earlier battery changes.
+ * A product decision, not an arithmetic one -- left at the historical 3.2 V
+ * pending Dave's call.
  *
  * ⚠️ STILL OUTSTANDING: the ADC prescaler is /128 under a comment reading "for
  * 8MHz clock" while F_CPU is 1 MHz, so the ADC clock is 7.8 kHz against a
@@ -2535,38 +2541,25 @@ void check_for_battery_voltage()
     uint32_t  now       = millis();
 
     /*
-     * ⛔ NEVER MEASURE THE PACK WHILE THE BEACON IS SOUNDING, 2026-08-14.
+     * ⛔ TRIED AND WITHDRAWN, 2026-08-14: skipping the sample while the beacon
+     * sounds. Recorded so nobody re-derives it.
      *
-     * MEASURED AT THE BENCH: a pack reading 4.9 V at rest falls to 3.3 V during
-     * an alert. That 1.6 V is the piezo and the 200 mA D2 driver pulling the
-     * cells down through their own internal resistance -- it is SAG, not state
-     * of charge, and averaging it into battery_avg measures the load rather
-     * than the battery.
+     * The reasoning was that a pack measured under piezo + 200 mA D2 load reads
+     * sag rather than state of charge, and that with the trip at 3.2 V a
+     * contaminated sample would false-alarm on healthy cells. It rested on one
+     * reading of 3.3 V "in alert" -- and the very next measurement, of the PCB
+     * rails during an alert, showed a STABLE 4.9 V. There is no sag to exclude.
      *
-     * WHY THIS IS NOT COSMETIC. The trip point is 3.2 V. Fresh cells sag to
-     * 3.3 V under alert load -- 100 mV above it. So a sample landing inside a
-     * beacon would report a nearly-flat pack on a healthy one, and as cells age
-     * even slightly it would cross: EVERY LONG BEACON WOULD END WITH A
-     * LOW-BATTERY ALARM on good batteries. The 150 ms blast is 19% of each
-     * 800 ms sequence, so roughly one sample in five would have been
-     * contaminated even without the LED.
+     * Corroborated by data that was already on file: the 588 s endurance test
+     * compared VCC in the blast phase against the quiet phase over 583 samples
+     * and found a mean difference of +0.6 mV. The rail does not move under
+     * alarm load, so neither the pack reading nor its AVCC reference is
+     * disturbed by sampling during one.
      *
-     * Skipping is safe in the direction that matters: the pack is not sampled
-     * for at most LATCH_FAILSAFE_MS, and a battery reading delayed by a few
-     * minutes costs nothing, whereas a false low-battery alarm during a real
-     * ride is noise on top of the one signal the mechanic is listening to.
-     *
-     * The interval restarts rather than resuming, so the first reading after a
-     * ride is taken on a rail that has had time to recover.
+     * The behaviour is therefore back to sampling on the plain 30 s cadence
+     * regardless of beacon state, because a special case with no measurement
+     * behind it is worse than none.
      */
-    if (alarm_status_g != 0 || chase_led_status_g != 0) {
-        if (bat_settling) {
-            digitalWrite(BAT_ADC_ENABLE, LOW);
-            bat_settling = false;
-        }
-        bat_timer = now;
-        return;
-    }
 
     /*
      * Two-phase and non-blocking: enable the divider, come back once it has had
