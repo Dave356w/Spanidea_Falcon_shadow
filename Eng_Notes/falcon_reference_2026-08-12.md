@@ -604,7 +604,7 @@ changing one.
 | `STOP_BAND_VALUE` | 0.10 | what "stopped" means to the confirm timer |
 | `MONITOR_REARM_MS` | 6000 | deafness after a release, so arrival ringing cannot re-latch |
 | `MOVEMENT_DETECTION_TIMEOUT_MS` | 200 | dwell before the beacon sounds. ⚠️ **A CEILING, NOT A FLOOR** — `STATE_MOVEMENT_DETECTED` exits early whenever `\|w\| > \|vel_departure\|`, and `vel_departure` logs as `0.000` on every run, so the real dwell is usually much shorter. Until `74e2f1c` the ramp detector's safety silently depended on this being ≥200 ms; §5.3. Do not treat it as a guaranteed delay |
-| `CALIB_TIMEOUT_MS` / `CALIB_RETRIES` | 10000 / 2 | calibration window and retries |
+| `CALIB_TIMEOUT_MS` / `CALIB_RETRIES` | **6000** / 2 | calibration window and retries (10000 -> 6000 on 2026-08-14; `XY_CALIB_BUCKETS` 10 -> 6 and `XY_CALIB_MIN_BUCKETS` 6 -> 4 with it) |
 
 ### Sensor and sampling
 

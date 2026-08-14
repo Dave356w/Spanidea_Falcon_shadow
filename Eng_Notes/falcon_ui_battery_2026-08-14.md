@@ -17,8 +17,8 @@
 3. What is the low-battery behaviour? Could it be a smoke-alarm-style chirp — a
    quick chirp with a single LED?
 
-Items 2 and 3 were implemented and are on the device. Item 1 was assessed and
-deferred, for a reason worth recording (§6).
+**All three were implemented and are on the device.** Item 1 shipped as 6 s
+rather than the 5 s asked for, and the reason is the interesting part (§6).
 
 **The session also found and fixed a defect nobody was looking for: the beacon
 had been lighting seven of its eight ring LEDs for the entire project.** That is
@@ -381,8 +381,49 @@ bucket-to-bucket spread makes every short window noisier than it looks here.
 extra capture. Run `calib_replay.py` over those logs and the decision is made on
 site data.
 
-Current recommendation on bench evidence alone: **6 s, not 5 s** — even parity,
-zero observed excursions, and it lands exactly on the existing quorum of 6.
+### 6.5 ✅ SHIPPED: 6 s, quorum 4
+
+Dave's call, same session. `CALIB_TIMEOUT_MS` 10000 → **6000**,
+`XY_CALIB_BUCKETS` 10 → **6**, `XY_CALIB_MIN_BUCKETS` 6 → **4**.
+
+**The quorum had to move or the change would have been actively harmful.** At 6
+of 6, every bucket would have had to report or the calibration would be rejected
+and the device would arm on `XY_STILL_FALLBACK` — over-eager, on every install,
+from what looks like a pure timing edit. 4 of 6 preserves the original 60% ratio
+rather than the absolute count. It is not 3 because a median over three
+tolerates only one contaminated bucket.
+
+**Two `static_assert`s now tie the constants together**, because they live in
+different headers and nothing else related them:
+
+```
+CALIB_TIMEOUT_MS / XY_CALIB_BUCKET_MS == XY_CALIB_BUCKETS
+XY_CALIB_MIN_BUCKETS                  <= XY_CALIB_BUCKETS
+```
+
+Verified by deliberately setting the window to 7000 and confirming the build
+**fails** with the intended message — a guard that has never been seen to fire
+is not yet a guard.
+
+**Verified on the device, four fresh calibrations:**
+
+```
+XY: bmax 0.0620 0.0600 0.0570 0.0530 0.0530 0.0580   ->  0.0855
+XY: bmax 0.0590 0.0580 0.0620 0.0450 0.0510 0.0530   ->  0.0795
+XY: bmax 0.0460 0.0620 0.0560 0.0710 0.0550 0.0680   ->  0.0840
+XY: bmax 0.0460 0.0500 0.0460 0.0840 0.0540 0.0580   ->  0.0750
+```
+
+All `b=6`, all `FSM: READY`, thresholds 0.0750–0.0855 — inside the 0.0750–0.0915
+band the 10 s window produced on the same mounting, with no upward drift.
+Calibration completes at t≈13.3 s against t≈17.5 s before: the full 4 s.
+
+Worst case with `CALIB_RETRIES 2` goes 30 s → **18 s**.
+
+⬜ **Still bench evidence only.** The window is now short on the strength of six
+desk calibrations. `XY: bmax` prints on every attempt, so the next hoistway
+session validates it for free — and if the site's bucket spread is wider than
+the bench's, `calib_replay.py` over those logs is what says so.
 
 ---
 

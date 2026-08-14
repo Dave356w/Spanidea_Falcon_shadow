@@ -68,7 +68,7 @@
 
 /*
  * The deployment sequence is: place the device on the counterweight, THEN
- * power it on. So the existing 10 s calibration always runs at rest, on the
+ * power it on. So the calibration window always runs at rest, on the
  * actual machine, in the actual building -- which is precisely the
  * measurement the threshold needs and the reason it can be learned rather
  * than shipped as a constant. A bench-derived number would be far too low for
@@ -109,19 +109,40 @@
  * it disables it.
  */
 
-/* Bucket width and count. 10 x 1 s covers the 10 s calibration window. */
+/*
+ * Bucket width and count. 6 x 1 s covers the 6 s calibration window.
+ *
+ * ⚠️ XY_CALIB_BUCKETS MUST EQUAL CALIB_TIMEOUT_MS / XY_CALIB_BUCKET_MS. The two
+ * live in different headers; movement_service.h carries a static_assert tying
+ * them together, and the rationale for 6 s.
+ */
 #define XY_CALIB_BUCKET_MS        1000
-#define XY_CALIB_BUCKETS          10
+#define XY_CALIB_BUCKETS          6
 
 /*
  * Buckets that must contain data before a learned threshold is trusted.
  *
- * At 3.13 Hz a 1 s bucket holds ~3 samples, so a bucket with none means the
- * timer stalled or the sensor was not answering. 6 of 10 is a thin but real
- * quorum; below it the median is being taken over too few numbers to be the
- * robust statistic it is supposed to be.
+ * A 1 s bucket holds ~25 samples at 25 Hz, so a bucket with none means the
+ * timer stalled or the sensor was not answering. Below the quorum the median is
+ * being taken over too few numbers to be the robust statistic it is supposed
+ * to be.
+ *
+ * 6 of 10 -> 4 of 6 on 2026-08-14, alongside the window shortening. The RATIO
+ * is what was preserved -- 60% either way -- not the absolute count.
+ *
+ * ⛔ THIS HAD TO MOVE WITH THE WINDOW AND IS THE TRAP IN THE WHOLE EXERCISE. At
+ * 6, a 6 s window would still pass, but anything shorter is rejected outright
+ * and the device arms on XY_STILL_FALLBACK on EVERY install -- an over-eager
+ * beacon everywhere, from a one-constant change that looks like it only affects
+ * timing. If this window is ever shortened again, move this with it.
+ *
+ * ⚠️ A run yielding exactly 5 buckets loses the even-count cushion described
+ * above -- (5-1)/2 = 2 is the true median, not the lower-middle. That is the
+ * same exposure the old 10-bucket window had at n=7 or n=9, and it is why the
+ * quorum is 4 rather than 3: a median over 3 tolerates only one contaminated
+ * bucket.
  */
-#define XY_CALIB_MIN_BUCKETS      6
+#define XY_CALIB_MIN_BUCKETS      4
 
 /*
  * STATISTIC: median of per-second maxima, NOT the global maximum.

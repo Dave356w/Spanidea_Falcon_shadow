@@ -38,7 +38,7 @@ import sys
 XY_STILL_MARGIN = 1.50
 XY_STILL_MIN    = 0.02
 XY_STILL_MAX    = 0.40
-XY_CALIB_MIN_BUCKETS = 6
+XY_CALIB_MIN_BUCKETS = 4
 
 BMAX_RE = re.compile(r"XY:\s*bmax\s+([0-9.\s]+)")
 
@@ -76,7 +76,7 @@ def main(argv):
         print("no 'XY: bmax' lines found -- firmware older than 2026-08-14?")
         return 1
 
-    windows = [3, 4, 5, 6, 8]
+    windows = [3, 4, 5, 6, 8, 10]
     print(f"{len(runs)} calibration(s)\n")
     print("run  n   full      " + "".join(f"{w}s%      " for w in windows))
 

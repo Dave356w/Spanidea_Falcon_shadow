@@ -4,7 +4,38 @@
 #include "velocity.h"
 #include "lateral.h"
 
-#define CALIB_TIMEOUT_MS               10000
+/*
+ * Calibration window. 10000 -> 6000 on 2026-08-14, on Dave's instruction, after
+ * the customer asked for 5 s. 6 and not 5 for two reasons, both measured -- see
+ * lateral.h and Eng_Notes/falcon_ui_battery_2026-08-14.md §6.3:
+ *
+ *   PARITY. calib_finish() indexes the sorted buckets at (n-1)/2, the LOWER of
+ *   the two middles on an EVEN count, chosen deliberately as the safer
+ *   threshold. Across six replayed calibrations, 4 s and 6 s never exceeded the
+ *   10 s answer; the ODD windows 3 s and 5 s did, by up to +23.6% and +5.5%.
+ *   Above the 10 s answer is the direction that makes travel read as still.
+ *
+ *   QUORUM. XY_CALIB_MIN_BUCKETS was 6, so a 5 s window would have been
+ *   REJECTED outright on every install and the device would have armed on
+ *   XY_STILL_FALLBACK every time -- shortening this alone would have disabled
+ *   calibration, not shortened it. The quorum moved to 4 with this change.
+ *
+ * ⚠️ THIS MUST STAY CONSISTENT WITH lateral.h. The static_assert below is the
+ * guard; the two constants live in different headers and nothing else ties
+ * them together.
+ *
+ * ⬜ Still bench-only evidence: six calibrations, one mounting, unit at rest on
+ * a desk. `XY: bmax` now prints on every attempt, so the next hoistway session
+ * collects site data for free -- re-run graph/calib_replay.py against it.
+ */
+#define CALIB_TIMEOUT_MS               6000
+
+static_assert(CALIB_TIMEOUT_MS / XY_CALIB_BUCKET_MS == XY_CALIB_BUCKETS,
+              "CALIB_TIMEOUT_MS and XY_CALIB_BUCKETS have drifted apart: the "
+              "window no longer holds exactly XY_CALIB_BUCKETS buckets");
+static_assert(XY_CALIB_MIN_BUCKETS <= XY_CALIB_BUCKETS,
+              "XY_CALIB_MIN_BUCKETS exceeds the number of buckets the window "
+              "can produce -- every calibration would be rejected");
 
 /*
  * How many times a rejected calibration window is repeated before the device

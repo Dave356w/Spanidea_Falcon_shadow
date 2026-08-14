@@ -101,7 +101,7 @@ than AND'd, where a hit is made sticky, where a gate errs generous — this is w
 | Visual | **D3–D10**, 8 ring LEDs on a **74HC4017 decade counter** (outputs Q1–Q8; Q0/Q9 unpopulated); **D2**, a 200 mA centre LED behind a TPS92201 driver |
 | Battery sense | internal ADC on PC2 (`BAT_ADC`); the MCP3208 path is no longer used |
 | Pressure | DPS310 **depopulated** — pressure code removed; **TWI0 carries nothing** |
-| Flash / RAM | 31210 / 32256 · 1373 / 2048 |
+| Flash / RAM | 31416 / 32256 · 1357 / 2048 |
 
 ## 2.1 Three hardware facts that constrain the firmware
 
@@ -155,7 +155,7 @@ the serial port, is the dominant cost in the sample-loss budget.
 |---|---|---|
 | Turn-on after departure | 1–2 s (customer decision 2026-08-09) | ~200 ms dwell + latch |
 | Reset after arrival | originally 1–3 s; **amended to ~8 s by the customer** | ~5 s confirm + transitions |
-| Calibration at power-on | ~10 s | 10 s, retried up to 2× if movement is seen |
+| Calibration at power-on | ~10 s | **6 s**, retried up to 2× if movement is seen (10 s → 6 s on 2026-08-14) |
 
 ## 3.3 Failsafe
 
@@ -187,7 +187,7 @@ Current values and the arithmetic linking them are in §4.8.
 ```
 power on (device already placed on the counterweight)
    │
-   ├─ STATE_CALIBERATION ── 10 s: learn the z zero and the lateral floor
+   ├─ STATE_CALIBERATION ── 6 s: learn the z zero and the lateral floor
    │        rejected and retried if movement is seen
    │        1 chirp = good · 3 chirps = fell back
    │                      + apparent all-LED flash
@@ -212,7 +212,7 @@ power on (device already placed on the counterweight)
 
 | `st=` | state | meaning |
 |---|---|---|
-| 1 | `STATE_CALIBERATION` | 10 s learning window at power-on |
+| 1 | `STATE_CALIBERATION` | 6 s learning window at power-on |
 | 2 | `STATE_MONITORING` | parked, watching for a departure |
 | 3 | `STATE_MOVEMENT_DETECTED` | departure seen, dwelling before the beacon |
 | 4 | `STATE_MOVING` | beacon latched, hunting the arrival |
