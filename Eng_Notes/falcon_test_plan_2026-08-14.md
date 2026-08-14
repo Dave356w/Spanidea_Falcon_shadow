@@ -103,10 +103,10 @@ replay against the arrival bursts on file before anything is flown.
 | 8 | ~~ADC prescaler `/128`~~ — **✅ CLOSED.** `/16` = 62.5 kHz, the slowest in-spec option (a faster one would be worse: 250 kOhm source). Removed a measured 0.8% low bias | ✅ closed |
 | 9 | ~~BOD disabled~~ — **✅ CLOSED. `efuse 0xF7` → `0xF5` written and verified: BODLEVEL 101 = 2.7 V, CFDEN preserved.** Device confirmed running afterwards | ✅ closed |
 | 10 | ~~Quiescent current never measured~~ — **✅ CLOSED.** 3.2 mA idle, 2.1 mA without logging; heartbeat 4 µA; D2 full 38.8 mA not 200 mA | ✅ closed |
-| 11 | **Low-battery chirp never heard** — pack reads 2535 against a 1600 trip | untested path |
+| 11 | **Low-battery chirp never heard** — `bench_battery` forces it at 30 s | untested path |
 | 12 | **Degraded double-heartbeat never seen** — needs a rejected calibration | untested path |
-| 13 | **6 s calibration is bench-only** | needs hoistway `XY: bmax` |
-| 14 | **D10 fix unseen in a real alert** | needs a car run |
+| 13 | **6 s calibration** — ✅ **3 in-situ calibrations, one mounting, all `b=6` `mv=0` READY; threshold 0.0525/0.0525/0.0555.** One run spiked to 0.1080 in bucket 2 and the median absorbed it entirely. Still one mounting | mostly closed |
+| 14 | ~~D10 fix unseen in a real alert~~ — **✅ CLOSED. All eight ring LEDs confirmed sweeping in a live 500 fpm alert, D10 lit.** | ✅ closed |
 
 ---
 
@@ -258,8 +258,9 @@ run under spec executes garbage rather than failing cleanly. On a beacon whose
 worst outcome is silence while moving, "undefined execution that looks alive" is
 strictly worse than "held in reset". Cost is ~0.8% of the 3.2 mA baseline.
 
-**Remaining in Session A:** A4 hear the chirp, A7 double wink, and confirm the
-heartbeat is visible at all.
+**Remaining in Session A:** A4 hear the chirp, A7 double wink. ✅ **The D2 wink
+IS visible at rest — confirmed in the car, so the 0.52%-of-full brightness is
+enough and `HEARTBEAT_PWM_DUTY` needs no change.**
 
 #### Historical: the prior that A1 confirmed
 

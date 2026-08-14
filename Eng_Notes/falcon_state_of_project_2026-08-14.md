@@ -224,15 +224,27 @@ measured 0.8% low bias. ⚠️ Note `/8` would have been **worse** — the divid
 presents ~250 kΩ, 25× the recommended source impedance, so the two datasheet
 limits pull in opposite directions.
 
-### 5.9 New, and unverified
+### 5.9 New — mostly resolved in the car, same day
 
-- **Nobody has confirmed the D2 heartbeat wink is visible.** It measures 0.52%
-  of full brightness — 12× dimmer than its 6.3% PWM duty implies, probably the
-  driver's soft-start at Timer0's 61 Hz. If it cannot be seen, the feature is
-  decoration.
-- **The low-battery chirp has never been heard.**
-- **The degraded double-wink has never been seen.**
-- **6 s calibration is bench-only.**
+- ✅ **The D2 heartbeat wink IS visible at rest**, confirmed in the hoistway. So
+  0.52% of full brightness is sufficient and `HEARTBEAT_PWM_DUTY` needs no
+  change — which also means the heartbeat stays at its measured 4 µA.
+- ✅ **All eight ring LEDs confirmed sweeping in a live 500 fpm alert**, D10
+  included. The 7/8 defect is closed on real evidence, not just on the bench.
+- ✅ **6 s calibration validated in situ** — three calibrations at one mounting,
+  all `b=6 mv=0 READY`, thresholds 0.0525 / 0.0525 / 0.0555. One window spiked
+  to 0.1080 in bucket 2, 3× its neighbours, and the median absorbed it
+  completely — the robust statistic doing exactly the job it was chosen for. A
+  3 s window would have come out +102.9% and 4/5 s +22.9%, both the dangerous
+  direction, so the even-parity 6 s choice is validated on site data.
+  ⬜ Still ONE mounting.
+- ⬜ **The low-battery chirp has never been heard**; the degraded double-wink has
+  never been seen.
+
+⚠️ **Correction:** the in-situ floor came back at 0.0525 against the bench's
+0.0930 — the parked counterweight is QUIETER than a desk. The prediction that a
+hoistway would be noisier, and that a bench calibration would therefore stop the
+quiet run advancing, was backwards.
 
 ---
 
