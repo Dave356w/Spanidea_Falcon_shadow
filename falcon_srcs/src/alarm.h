@@ -89,6 +89,31 @@
  *
  * ⬜ TEST: a deliberate 4+ minute continuous alarm. If endurance now exceeds
  * 242.7 s the diagnosis is confirmed and the lever works.
+ *
+ * ─── ⛔ 2026-08-14: THERE WAS NO BROWNOUT. IT WAS THE COM LINK ───────────────
+ *
+ * Established at the bench by Dave. The ~243 s "deaths" were a serial-link
+ * lockup, not the device: "dead" had only ever been inferred from the LOG
+ * STOPPING -- no reset flag, no LED state, no measured rail -- while the bench
+ * procedure already recorded that the USB-serial cable back-powers this board
+ * through the RX ESD clamp.
+ *
+ * ⭐ SO THE BEACON WAS MADE QUIETER TO DEFEND AGAINST A PHANTOM. The 2/5 -> 1/5
+ * cut above, and the duty ceiling the sequence-aligned block below reasons
+ * within, were both bought with audible beacon length on a device the mechanic
+ * ranges BY EAR. That constraint is void and audibility can be re-opened.
+ *
+ * ⚠️ BUT NOT BY REVERTING. The real trade was never the battery -- and the
+ * pack measurements confirm it: the rails hold a stable 4.9 V through an alert,
+ * and D2 at full is 38.8 mA against a 3.2 mA idle. Piezo duty trades against
+ * SENSOR COVERAGE, because the FSM must hear the arrival transient while the
+ * beacon is sounding. 🔴 And the 2026-08-07 quiet-fraction-0.75 false release
+ * still binds: the present timing sits at exactly 0.75 and is safe only because
+ * both arrival paths also require arrival_peak_hit().
+ *
+ * The question to answer is "how much blast can be bought before the listening
+ * window costs an arrival?", and it is answerable by replay against the arrival
+ * bursts on file BEFORE anything is flown.
  */
 /*
  * ⛔ BUZZER_CYCLE_STEPS / BUZZER_ON_STEPS ARE GONE, and everything above
@@ -137,12 +162,11 @@
  * "it must not speak for the movement alarm" hazard (see check_for_battery_alarm)
  * go away by construction rather than by careful ordering.
  *
- * ⚠️ THE PATTERN IS NOW SOUND; THE TRIP POINT IS STILL NOT. BATTERY_LOW_THRESHOLD
- * has never been tied to a pack voltage -- see the block above it in main.cpp --
- * and the ADC prescaler is out of datasheet spec (Eng_Notes §5.8). This change
- * makes the ANNOUNCEMENT usable. It does not make the MEASUREMENT trustworthy,
- * and a low-battery alert nobody trusts is worse than none. Characterise the
- * divider before shipping this to a customer.
+ * ✅ AND THE TRIP POINT IS NOW SOUND TOO, later the same day: the divider was
+ * metered at 2:1, the ADC prescaler brought into spec, and the whole chain
+ * validated against a meter to within one LSB. The trip sits at 3.6 V of pack.
+ * See the threshold block in main.cpp. The earlier "do not ship this to a
+ * customer until the divider is characterised" warning is discharged.
  */
 #define BATTERY_CHIRP_PERIOD_MS   45000  /* silence between chirps            */
 #define BATTERY_CHIRP_MS          80     /* piezo + red LED, per chirp        */
@@ -309,19 +333,34 @@
  *     is also what established D3 = Q1 -- see the silkscreen map in common.h.)
  * D2 is directly driven, so both problems disappear rather than being managed.
  *
- * ⚠️ D2 IS A 200 mA PART AND THE BEAT IS NOT FREE. Sheet 3 is titled "LED DRIVER
+ * ⚠️ D2 COSTS REAL CHARGE, SO THE BEAT IS DIMMED. Sheet 3 is titled "LED DRIVER
  * RED LED 200mA": D2 is an LXM2-PD01-0050 behind U2, a TPS92201 constant-current
- * driver with EN and PWM control. On the ring a beat cost nothing, because the
- * 4017 lights exactly one output regardless of which. Here it costs real charge,
- * so the beat is DIMMED rather than run at full brightness:
+ * driver with EN and PWM control. On the chase ring a beat cost nothing, because
+ * the 4017 lights exactly one output regardless of which. Here it does not.
  *
- *     full brightness, 20 ms / 4 s  ->  ~1 mA average   (~3x the idle MCU)
- *     HEARTBEAT_PWM_DUTY, 80 ms / 4 s -> ~0.25 mA average
+ * ⛔ THE "200 mA" IS THE DRIVER'S CAPABILITY, NOT ITS SETTING. Measured at the
+ * pack 2026-08-14, and every earlier figure in this file was arithmetic off that
+ * 200 mA and wrong:
  *
- * A constant-current driver dims linearly with PWM duty, so average LED current
- * is duty x flash-fraction x 200 mA. ⬜ Both figures are ARITHMETIC, not
- * measurements -- quiescent current has never been put on a meter, so none of
- * this can yet be stated in hours of runtime.
+ *                            claimed      MEASURED
+ *     D2 at full             200 mA       38.8 mA
+ *     D2 at HEARTBEAT_PWM_DUTY  ~12 mA     0.20 mA
+ *     heartbeat average        ~250 uA     4.0 uA
+ *
+ * ⭐ THE DIMMING IS WORTH FAR MORE THAN THE ARITHMETIC SUGGESTED. Idle baseline
+ * is 3.2 mA, so a FULL-brightness beat would cost 0.78 mA -- 24% of idle. The
+ * dimmed beat costs 4 uA, or 0.1%. Dimming buys back very nearly the whole cost
+ * of having a heartbeat at all.
+ *
+ * ⬜ AND THE DIM IS FAR DIMMER THAN ITS DUTY CYCLE, which is worth understanding
+ * before anyone tunes it. HEARTBEAT_PWM_DUTY 16/255 is 6.3%, but the measured
+ * current is 0.52% of full -- a factor of 12 low. The likely cause is the
+ * TPS92201's soft-start: at Timer0's 61 Hz the on-time is only ~1 ms, and the
+ * converter spends much of that ramping rather than regulating. So brightness is
+ * NOT linear in HEARTBEAT_PWM_DUTY at this frequency, and raising the duty will
+ * buy visibility more cheaply than the duty number implies. ⚠️ If the wink turns
+ * out to be too faint to serve its purpose, raise the duty and RE-MEASURE rather
+ * than scaling from 6.3%.
  *
  * WHY THE FLASH IS 80 ms AND NOT 20. LED_PWM is PD6 = OC0A, and at F_CPU = 1 MHz
  * the Arduino core's Timer0 PWM runs at 1e6/(64 x 256) = 61 Hz. A 20 ms window

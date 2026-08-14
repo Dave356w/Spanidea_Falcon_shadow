@@ -33,8 +33,12 @@
  *             by PIN_RED_LED_PWM (PD6, = OC0A, hardware PWM capable) and
  *             PIN_RED_LED_EN (PD7). Genuinely off when EN is low.
  *
- *             ⚠️ 200 mA is a LOT for a battery beacon. Anything that lights D2
- *             on a duty cycle costs real charge, unlike the ring below. The idle
+ *             ⚠️ MEASURED 38.8 mA at full, 2026-08-14 -- the "200mA" on the
+ *             sheet is the driver's CAPABILITY, not its configured current, and
+ *             several comments in this tree were built on the larger figure
+ *             before anyone put a meter on it. 38.8 mA is still 12x the 3.2 mA
+ *             idle baseline, so anything that lights D2 on a duty cycle costs
+ *             real charge -- unlike the ring below, which is free. The idle
  *             heartbeat dims it via PWM for exactly this reason (see alarm.h).
  *
  *   D3..D10   the 8 PERIMETER ring LEDs. APDA3020SECK parts driven through

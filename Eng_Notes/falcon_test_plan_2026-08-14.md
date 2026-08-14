@@ -99,8 +99,8 @@ replay against the arrival bursts on file before anything is flown.
 |---|---|---|
 | 7 | ~~Battery trip point uncharacterised~~ — **✅ CLOSED.** Divider metered 2:1; thresholds derived in pack mV; chain validated against a meter to within 1 LSB | ✅ closed |
 | 8 | ~~ADC prescaler `/128`~~ — **✅ CLOSED.** `/16` = 62.5 kHz, the slowest in-spec option (a faster one would be worse: 250 kOhm source). Removed a measured 0.8% low bias | ✅ closed |
-| 9 | **BOD probably disabled** (factory efuse `0xFF`) | read the efuse |
-| 10 | **Quiescent current never measured** — heartbeat's ~0.25 mA is arithmetic off a 200 mA rating | blocks any runtime claim |
+| 9 | **BOD disabled** — confirmed, `efuse 0xF7` (BODLEVEL 111). Enabling costs 0.8% of idle, so clearly worth it: `efuse:w:0xF5:m` = 2.7 V | read ✅, write pending |
+| 10 | ~~Quiescent current never measured~~ — **✅ CLOSED.** 3.2 mA idle, 2.1 mA without logging; heartbeat 4 µA; D2 full 38.8 mA not 200 mA | ✅ closed |
 | 11 | **Low-battery chirp never heard** — pack reads 2535 against a 1600 trip | untested path |
 | 12 | **Degraded double-heartbeat never seen** — needs a rejected calibration | untested path |
 | 13 | **6 s calibration is bench-only** | needs hoistway `XY: bmax` |
@@ -195,8 +195,48 @@ AAA discharge curve rather than a nuisance threshold (fresh is 1.67 V/cell).
 the end. The honest claim is "some warning instead of none"; measuring it needs
 a pack run down under a representative duty cycle, which nobody has done.
 
-**Remaining in Session A:** A5 quiescent current (shipping build, **cable
-disconnected**), A6 efuse read, A4 hear the chirp, A7 double wink.
+#### ✅ A5 MEASURED — and it corrected a figure this project had been reasoning from
+
+Meter in series with the pack, serial disconnected, `idle_current` build:
+
+| phase | reading | derived |
+|---|---|---|
+| D2 off, logging on | **3.2 mA** | idle baseline |
+| D2 dim, logging on | 3.4 mA | D2 dim = **0.20 mA** |
+| D2 full, logging on | 42 mA | D2 full = **38.8 mA** |
+| D2 off, logging off | **2.1 mA** | logging = **1.10 mA** |
+
+⛔ **D2 IS 38.8 mA, NOT 200 mA.** Sheet 3's "LED DRIVER RED LED 200mA" is the
+driver's *capability*, not its configured current, and several comments in this
+tree — plus a recommendation to change battery chemistry — were built on the
+larger number. Corrected in `common.h` and `alarm.h`.
+
+⭐ **The heartbeat is effectively free: 4 µA**, against a predicted 250 µA. But
+the dimming is what makes it so — a full-brightness beat would cost 0.78 mA,
+**24% of idle**. The decision was right; the reasoning behind it was off by 60×.
+
+⬜ **The dim is 12× dimmer than its duty cycle implies** — 0.52% of full against
+a 6.3% PWM duty. Likely the TPS92201's soft-start: at Timer0's 61 Hz the on-time
+is ~1 ms and the converter spends much of it ramping. **Brightness is not linear
+in `HEARTBEAT_PWM_DUTY` at this frequency.** ⚠️ Nobody has confirmed the wink is
+actually *visible* — that is now the open question on the heartbeat.
+
+🔴 **Continuous serial logging costs 1.10 mA — 34% of idle.** The shipping build
+prints a decimated sample line at 62500 baud forever, listener or not:
+
+| | 1000 mAh | 1200 mAh |
+|---|---|---|
+| logging on (3.2 mA) | 13.0 d | 15.6 d |
+| logging off (2.1 mA) | **19.8 d** | **23.8 d** |
+
+**A production build with logging compiled out buys ~50% more standby life.**
+
+✅ **BOD is now clearly worth enabling** — ~25 µA is 0.8% of baseline. The cost
+argument that made it a judgement call is gone.
+
+**Remaining in Session A:** A4 hear the chirp, A6 write the efuse (read done:
+`efuse 0xF7`, BOD disabled), A7 double wink, and confirm the heartbeat is
+visible.
 
 #### Historical: the prior that A1 confirmed
 
