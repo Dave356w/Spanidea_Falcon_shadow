@@ -31,12 +31,67 @@ justified entirely by bench data.
 
 | # | item | status |
 |---|---|---|
-| 1 | **§5.7 vibration hypothesis** — endurance proven *stationary* only (588 s); every historical death was in a *moving* car | untested |
+| 1 | ~~**§5.7 vibration hypothesis**~~ — **CLOSED 2026-08-14: the deaths were a COM-link lockup, not the device.** See §1.3 | ✅ closed, was #1 |
 | 2 | **§4.2** — 34 automatic stops release on a distribution centred on the gate; worst margin **1.009×** | measured, unfixed |
 | 3 | **§5.1** — ramp detector (14 latches, never executed) and reversal arming (`v=2`, never fired in ~32 runs) | armed, never observed working |
 | 4 | **§5.2** — single-floor terminal approach: `pk` reads 0.00 through a real excursion, beacon sounded **85 s** over a car stationary for 78 | reproducible, unfixed |
 | 5 | **§5.3** — arming margin spans `q=6…15` on nominally identical mountings, `ro=8` once (zero) | measured, unfixed |
 | 6 | **§5.6** — one shaft and one unit per configuration; 500 fpm is n=3 | coverage gap |
+
+### 1.3 🟢 §5.7 CLOSED — the brownout was the COM link
+
+**Established at the bench 2026-08-14: the ~4-minute deaths during sustained
+alarms were a COM-link lockup, not a device failure.**
+
+This retires the item that has sat at the top of this project since 2026-08-11,
+and it retires both competing explanations at once — the rail-sag hypothesis and
+the intermittent-contact-under-vibration hypothesis were arguing about a failure
+that was in the measuring apparatus.
+
+It also fits facts that never sat comfortably with either: the bench procedure
+already documents that the USB-serial cable back-powers the board through the RX
+ESD clamp, that pulling cells with the cable attached is not a power cycle, and
+that "monitor handle-drop plus avrdude-signature-read revival is routine." The
+serial link was known to be an active participant in the power and reset
+behaviour of the board. It was not suspected as the cause of the deaths.
+
+#### What this unblocks
+
+| | |
+|---|---|
+| **`LATCH_FAILSAFE_MS`** | clamped to 240 s purely to stay inside a 243 s limit that does not exist. §7.3 gated raising it on a clean endurance run; that gate is gone. **Raise toward 600 s.** ⚠️ It is the backstop that ends a stuck beacon, so a longer value also lengthens a §5.2 position lie — the trade is real, but silence on a long slow ride is the worse failure |
+| **The low-speed long run (§5.6, item 6)** | "never completed, because both attempts were abandoned when the device stopped." If the stopping was the COM link, **the test is runnable now** — with serial disconnected, or with the link fixed |
+| **Beacon audibility** | see below — the largest product consequence |
+
+#### ⭐ The beacon was made quieter to defend against a phantom
+
+On 2026-08-11 the piezo duty was cut 2/5 → 1/5 **specifically** to attack the
+brownout, knowingly costing audible beacon length — and the mechanic ranges the
+counterweight **by ear**. The sequence-aligned rework on 2026-08-13 then took
+the current 150 ms blast per 800 ms (18.75%) under the same constraint, with
+`alarm.h` explicitly reasoning that a naive louder pattern "runs straight into
+the 243 s brownout."
+
+**That constraint is void.** The beacon can be made louder and longer.
+
+⚠️ **But it is not free, and the reason has nothing to do with the battery.**
+Piezo duty trades directly against **sensor coverage**: every millisecond the
+piezo is driven, plus `BUZZER_RINGDOWN_MS`, is a millisecond the accelerometer
+is blanked, and the FSM must hear the arrival transient *while the beacon is
+sounding*. The current numbers are 25% blanked and a 600 ms contiguous quiet
+stretch. `alarm.h` carries the table.
+
+🔴 **And one figure from that history still binds.** The 2026-08-07 false release
+— a beacon released 12 s into a ride — was caused by raising the QUIET fraction
+to 0.75, which let cruise any-motion edges pair up and satisfy the arrival
+cluster. The present timing sits at exactly 0.75 and is safe only because both
+arrival paths now also require `arrival_peak_hit()`. **Any change to the blast
+must be re-checked against that**, not just against loudness.
+
+**Recommendation:** treat beacon audibility as a deliberate re-open with its own
+measurement, not as a revert. The right question is "how much blast can we buy
+before the listening window costs us an arrival?", and that is answerable by
+replay against the arrival bursts on file before anything is flown.
 
 ### 1.2 Added or left open by 2026-08-14
 
@@ -196,35 +251,26 @@ unconfirmed reading can travel.
 
 ---
 
-### SESSION B — endurance in a moving car (~30 min in car)
+### SESSION B — ~~endurance in a moving car~~ ✅ CLOSED, NOT NEEDED
 
-**This is item 1, and it is still the cheapest test with the largest
-consequence.** The 588 s bench result proves the device survives a long alarm
-*while held still*; every historical death was in motion. An intermittent
-battery contact under vibration would produce exactly the observed signature —
-sudden death, no reboot, healthy readings to the last sample — and would
-specifically not reproduce on a still bench.
+**Dave established on the bench that the ~4-minute "brownout" was a COM-link
+lockup, not the device.** The serial connection was the failure, not the pack
+and not a contact.
 
-```bash
-cd falcon_srcs && pio run -e brownout_test -t upload
-```
+This was **item 1 — the highest-priority open item in the project since
+2026-08-11**, and the whole session existed to run `brownout_test` in a moving
+car to separate a rail sag from an intermittent contact. Both hypotheses are
+moot: there was never a device failure to explain.
 
-⛔ **Bench/test build. The FSM is bypassed and NOTHING can release the beacon.**
-Never leave it on the device for a real run.
+**Do not run this session.** If a long-alarm endurance figure is ever wanted for
+its own sake, run it **with serial disconnected** and judge it by ear and by the
+LEDs — the instrument was the fault, so instrumenting it the same way would
+reproduce the artifact rather than the behaviour.
 
-| observation | verdict |
-|---|---|
-| survives 600 s+ in motion, `tw=` flat | vibration hypothesis dead; §5.7 closes |
-| dies with `vcc_blast` << `vcc_quiet` | rail sag after all |
-| dies with both flat, no reboot | **intermittent contact — hardware** |
-| `Reset cause: 0x8` mid-alarm | TWI wedge, watchdog caught it |
-
-**If B is clean:** raise `LATCH_FAILSAFE_MS` back toward 600 s (§7.3). It was
-clamped to 240 s to stay inside a limit that now appears not to exist, and that
-clamp is currently hiding the long-run case.
-
-⚠️ **Re-flash the shipping build afterwards.** Confirm by flash size: shipping
-is ~31416, `brownout_test` is ~21086.
+⚠️ **The 588 s "successful" endurance test is also reinterpreted.** It did not
+demonstrate that the device survives a long alarm *when held still*; it
+demonstrated that the COM link happened to hold that time. It was never evidence
+about the pack in either direction.
 
 ---
 
@@ -273,16 +319,16 @@ Not testing. Listed so the order is explicit.
 ## 3. Dependency order, compressed
 
 ```
-A (bench, meter)  ──┬──> C (hoistway regression + data)
-                    │
-B (moving car)  ────┴──> C6 (low-speed long run) ──> LATCH_FAILSAFE_MS -> 600 s
+A (bench, meter)  ──> C (hoistway regression + data)
+                                  │
+B  CLOSED (§1.3) ─────────────────┴──> C6 (low-speed long run), now unblocked
 
+LATCH_FAILSAFE_MS -> 600 s   no longer gated on B; do it
 D  independent, but D1 must be replayed before it is ever in a car
 ```
 
-**If there is time for only one session: B.** It is 30 minutes, it is the
-product's core use case, and it is the only open item that can kill the device
-outright while a counterweight is moving.
+**Session B is closed (§1.3), so C now leads.** It is the regression run for
+2026-08-14 and it collects the site data three separate items need.
 
 **If there is time for only one bench hour: A1–A3.** Everything about the
 battery alert is currently built on a number nobody has measured.
@@ -294,7 +340,7 @@ battery alert is currently built on a number nobody has measured.
 Honest statement of the bar, because several items above characterise rather
 than fix:
 
-- §5.7 closed by measurement (B)
+- ✅ §5.7 closed — it was the COM link (§1.3)
 - battery trip point derived from a meter, chirp exercised (A)
 - 6 s calibration validated on site, or reverted (C1)
 - beacon visual confirmed in a real alert (C2)
