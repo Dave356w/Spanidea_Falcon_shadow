@@ -376,8 +376,43 @@ static_assert(XY_CALIB_MIN_BUCKETS <= XY_CALIB_BUCKETS,
  * sustain a long alarm, no failsafe value is defensible and the whole
  * long-slow-run case is untestable -- both attempts at it died mid-run for
  * exactly this reason.
+ *
+ * ─── ⛔ EVERYTHING ABOVE DESCRIBES A FAULT THAT WAS NOT IN THE DEVICE ────────
+ *
+ * 🟢 2026-08-14, established at the bench by Dave: THE ~243 s DEATHS WERE A
+ * COM-LINK LOCKUP. Not rail sag, not depletion, not the TWI wedge, not an
+ * intermittent contact under vibration. The serial link was the failure.
+ *
+ * Note what the block above actually rests on: "dead" was inferred ENTIRELY
+ * from the log stopping. No reset flag, no LED state, no measured rail voltage
+ * -- and the bench procedure already recorded that the USB-serial cable
+ * back-powers this board through the RX ESD clamp. The one instrument being
+ * used to detect the failure was itself powering the thing it was watching.
+ * The rail-sag mechanism above was a confident explanation of an artifact, and
+ * it is retained only so the reasoning is not rebuilt from scratch.
+ *
+ * RAISED 240000 -> 600000 on Dave's instruction, 2026-08-14. The clamp existed
+ * solely to stay under an endurance limit that does not exist, so the constraint
+ * that set it is gone.
+ *
+ * WHAT 600 s BUYS: the long-slow-run case. An 8-floor 18 fpm descent needs
+ * ~300 s and was being cut short at 240 s -- the failsafe was silencing the
+ * beacon over a MOVING counterweight, which is the catastrophic direction and
+ * far worse than anything a longer timeout does.
+ *
+ * ⚠️ WHAT IT COSTS, and it is a real cost: this is the backstop that ends a
+ * beacon nothing else released, so every stuck-beacon failure now sounds for up
+ * to 10 minutes instead of 4. The §5.2 single-floor blind spot is reproducible
+ * on demand and produced an 85 s position lie; with this value the same defect
+ * could run to 600 s. That is accepted deliberately -- a position lie destroys
+ * trust in the instrument, while silence over a moving counterweight is the
+ * failure the whole product exists to prevent. The asymmetry decides it.
+ *
+ * ⬜ THIS IS NOT A LICENCE TO STOP FIXING §5.2. A 10-minute false beacon is a
+ * worse symptom than a 4-minute one; the arming-gate redesign (test plan D1)
+ * is what actually closes it.
  */
-#define LATCH_FAILSAFE_MS              240000
+#define LATCH_FAILSAFE_MS              600000UL
 
 /*
  * How long the average must stay inside STOP_BAND_VALUE of the zero

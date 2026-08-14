@@ -59,7 +59,7 @@ behaviour of the board. It was not suspected as the cause of the deaths.
 
 | | |
 |---|---|
-| **`LATCH_FAILSAFE_MS`** | clamped to 240 s purely to stay inside a 243 s limit that does not exist. §7.3 gated raising it on a clean endurance run; that gate is gone. **Raise toward 600 s.** ⚠️ It is the backstop that ends a stuck beacon, so a longer value also lengthens a §5.2 position lie — the trade is real, but silence on a long slow ride is the worse failure |
+| **`LATCH_FAILSAFE_MS`** | ✅ **DONE — raised 240 s → 600 s, flashed 2026-08-14.** The clamp existed only to stay inside a 243 s limit that does not exist. ⚠️ It is the backstop that ends a stuck beacon, so a §5.2 position lie can now run to 600 s rather than 240 s. Accepted deliberately: a position lie destroys trust, silence over a moving counterweight is the failure the product exists to prevent. **Not a licence to stop fixing §5.2 — D1 is what closes it** |
 | **The low-speed long run (§5.6, item 6)** | "never completed, because both attempts were abandoned when the device stopped." If the stopping was the COM link, **the test is runnable now** — with serial disconnected, or with the link fixed |
 | **Beacon audibility** | see below — the largest product consequence |
 
@@ -323,7 +323,7 @@ A (bench, meter)  ──> C (hoistway regression + data)
                                   │
 B  CLOSED (§1.3) ─────────────────┴──> C6 (low-speed long run), now unblocked
 
-LATCH_FAILSAFE_MS -> 600 s   no longer gated on B; do it
+LATCH_FAILSAFE_MS -> 600 s   DONE 2026-08-14
 D  independent, but D1 must be replayed before it is ever in a car
 ```
 
