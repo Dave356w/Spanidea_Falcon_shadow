@@ -642,6 +642,36 @@ void heartbeat_service()
     }
 }
 
+#if defined(IDLE_CURRENT_TEST)
+/*
+ * ⛔ BENCH ONLY -- see the declaration in alarm.h. Deliberately built out of the
+ * same register writes as heartbeat_led(), so the dim reading a meter takes here
+ * is the current the heartbeat genuinely draws, not an approximation of it.
+ */
+void bench_set_d2(uint8_t mode)
+{
+    switch (mode) {
+    case 1:                                  /* dim -- heartbeat brightness   */
+        OCR0A   = HEARTBEAT_PWM_DUTY;
+        TCCR0A |= (1 << COM0A1);
+        digitalWrite(PIN_RED_LED_EN, HIGH);
+        break;
+
+    case 2:                                  /* full -- alarm brightness      */
+        TCCR0A &= ~(1 << COM0A1);
+        digitalWrite(PIN_RED_LED_PWM, HIGH);
+        digitalWrite(PIN_RED_LED_EN, HIGH);
+        break;
+
+    default:                                 /* off                           */
+        digitalWrite(PIN_RED_LED_EN, LOW);
+        TCCR0A &= ~(1 << COM0A1);
+        digitalWrite(PIN_RED_LED_PWM, LOW);
+        break;
+    }
+}
+#endif /* IDLE_CURRENT_TEST */
+
 uint8_t get_alarm_status()
 {
     uint8_t al_status = alarm_status_g | battery_alarm_status_g;

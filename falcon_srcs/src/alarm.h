@@ -377,4 +377,16 @@ void ready_signal(uint8_t chirps);
 void heartbeat_set(uint8_t pattern);
 void heartbeat_service();
 
+#if defined(IDLE_CURRENT_TEST)
+/*
+ * ⛔ BENCH ONLY. Hold D2 in a FIXED state so a meter can read it, instead of
+ * chasing an 80 ms pulse every 4 s. 0 = off, 1 = HEARTBEAT_PWM_DUTY, 2 = full.
+ *
+ * Lives in alarm.cpp rather than in the test harness so the OCR0A / COM0A1
+ * handling stays in one file -- the same code the heartbeat uses, so what the
+ * meter reads is what the heartbeat actually costs.
+ */
+void bench_set_d2(uint8_t mode);
+#endif
+
 #endif

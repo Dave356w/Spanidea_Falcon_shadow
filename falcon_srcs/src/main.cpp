@@ -1139,6 +1139,11 @@ extern uint16_t read_vcc_mv();
 /* Bench-only battery characterisation -- defined below loop(). */
 static void bench_battery_service();
 #endif
+#if defined(IDLE_CURRENT_TEST)
+/* Bench-only stepped current measurement -- defined below loop(). */
+static void idle_current_service();
+static bool ic_log_enabled = true;
+#endif
 extern bool get_buzzer_status();
 
 /*
@@ -1449,11 +1454,26 @@ void loop()
 
         ms.fsm_run();
 
-        emit_sample_log();
-        emit_burst_log();
-        emit_ramp_log();
-        emit_arm_log();
-        emit_acc_int_log();
+        /*
+         * Phase 4 of the idle-current test compiles nothing out -- it gates the
+         * emitters at runtime, so the ONLY difference from phase 1 is whether
+         * Serial.print runs. That is what makes the difference between the two
+         * readings attributable to logging rather than to a different build.
+         *
+         * poll_acc_int_status() is deliberately NOT gated: it is an I2C
+         * transaction, not a log line, and stopping it would change what the
+         * device is doing rather than what it is saying.
+         */
+#if defined(IDLE_CURRENT_TEST)
+        if (ic_log_enabled)
+#endif
+        {
+            emit_sample_log();
+            emit_burst_log();
+            emit_ramp_log();
+            emit_arm_log();
+            emit_acc_int_log();
+        }
         poll_acc_int_status();
 
         /*
@@ -1479,6 +1499,10 @@ void loop()
          * and the blast would stop landing on LED 1.
          */
         heartbeat_service();
+
+#if defined(IDLE_CURRENT_TEST)
+        idle_current_service();
+#endif
         break;
 
     default:
@@ -2419,6 +2443,95 @@ void poll_acc_int_status()
         Serial.print(F("\r\n"));
     }
 }
+
+#if defined(IDLE_CURRENT_TEST)
+/*
+ * ─── BENCH ONLY: stepped quiescent-current measurement (test plan A5) ────────
+ *
+ * ⛔ NEVER SHIP. Built only by [env:idle_current]. It holds D2 in fixed states
+ * and disables logging for a quarter of every cycle, so it does not represent
+ * shipping behaviour even though it is built from shipping code.
+ *
+ * WHY A STEPPED TEST RATHER THAN JUST READING THE METER. The heartbeat is an
+ * 80 ms event every 4 s. A DMM integrates over ~100-300 ms, so pointed at that
+ * it reports neither the baseline nor the peak but an unrepeatable blend of the
+ * two, depending on where its window lands. Holding the LED in a FIXED state
+ * gives a steady reading that can actually be trusted, and the heartbeat's true
+ * average is then arithmetic on a measured number rather than on a datasheet
+ * rating:
+ *
+ *     heartbeat average = (dim - baseline) x HEARTBEAT_FLASH_MS / HEARTBEAT_PERIOD_MS
+ *                       = (dim - baseline) x 80 / 4000
+ *                       = (dim - baseline) / 50
+ *
+ * FOUR PHASES, 60 s each, looping forever. Each is announced by N piezo chirps
+ * so the phase is identifiable BY EAR -- which matters, because this measurement
+ * is only valid with the serial cable DISCONNECTED (it back-powers the board
+ * through the RX ESD clamp, §6.1) and there is therefore no console to watch.
+ *
+ *   1 chirp   D2 off,  logging ON    baseline: shipping idle, minus the beat
+ *   2 chirps  D2 dim,  logging ON    dim - baseline = the heartbeat's LED cost
+ *   3 chirps  D2 full, logging ON    full - baseline = the ALARM's LED cost
+ *   4 chirps  D2 off,  logging OFF   baseline - this = cost of continuous
+ *                                    serial logging, which the shipping build
+ *                                    does forever whether or not anyone listens
+ *
+ * Read the meter in the QUIET stretch between markers, not during them.
+ *
+ * ⚠️ KEEP THE UNIT STILL. If it is knocked, the FSM latches a departure and the
+ * beacon runs -- and LATCH_FAILSAFE_MS is now 600 s, so that would wreck the
+ * rest of the cycle. If you hear the beacon, restart the test.
+ *
+ * ⚠️ The heartbeat is forced off throughout. D2 is driven directly here, and
+ * two writers on one LED would produce a reading that is neither state.
+ */
+#define IC_PHASE_MS   60000UL
+#define IC_PHASES     4
+#define IC_START_MS   15000UL   /* after calibration completes (~13.3 s) */
+
+static void idle_current_service()
+{
+    static uint32_t ic_last    = 0;
+    static uint8_t  ic_phase   = 0;
+    static bool     ic_started = false;
+    uint32_t        now        = millis();
+
+    if (!ic_started) {
+        if (now < IC_START_MS) {
+            return;
+        }
+        ic_started = true;
+        ic_phase   = IC_PHASES - 1;   /* so the first step lands on phase 0 */
+        ic_last    = now - IC_PHASE_MS;
+    }
+
+    if ((now - ic_last) < IC_PHASE_MS) {
+        return;
+    }
+
+    ic_phase = (uint8_t)((ic_phase + 1) % IC_PHASES);
+
+    /*
+     * Silence the heartbeat every phase, not just once: the FSM re-arms it at
+     * the end of any recalibration, and a beat landing mid-measurement would
+     * move the meter for reasons the phase label does not explain.
+     */
+    heartbeat_set(HEARTBEAT_OFF);
+
+    /* Marker first -- it is blocking, and drives D2 itself. */
+    ready_signal((uint8_t)(ic_phase + 1));
+
+    switch (ic_phase) {
+    case 0:  bench_set_d2(0); ic_log_enabled = true;  break;
+    case 1:  bench_set_d2(1); ic_log_enabled = true;  break;
+    case 2:  bench_set_d2(2); ic_log_enabled = true;  break;
+    default: bench_set_d2(0); ic_log_enabled = false; break;
+    }
+
+    /* Start the clock AFTER the marker, so every phase is a full 60 s. */
+    ic_last = millis();
+}
+#endif /* IDLE_CURRENT_TEST */
 
 #if defined(BATTERY_BENCH)
 /*
