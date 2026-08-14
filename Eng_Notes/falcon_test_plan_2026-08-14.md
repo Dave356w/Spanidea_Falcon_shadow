@@ -2,8 +2,10 @@
 
 **Date:** 2026-08-14
 **Firmware on the device:** `31416` — Flash 31416/32256 (840 free), RAM 1357/2048
-**Basis:** open items from `falcon_state_of_project_2026-08-13.md` §5–§7, plus
-everything the 2026-08-14 session changed and could not exercise.
+**Basis:** open items from the state-of-project note, plus everything the
+2026-08-14 session changed and could not exercise.
+**Current state note:** `falcon_state_of_project_2026-08-14.md` — read §0 and §7
+before the car session.
 
 ---
 

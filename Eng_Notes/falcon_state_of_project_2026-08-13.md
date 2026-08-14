@@ -1,3 +1,8 @@
+> ⛔ **SUPERSEDED by `falcon_state_of_project_2026-08-14.md`.** Retained for its
+> measurements, which stand. Two of its conclusions do NOT: §5.7's brownout was a
+> COM-link lockup rather than a device failure, and §5.8's two hardware settings
+> are both resolved. §6's priority order is therefore wrong — item 1 is closed.
+
 # Falcon firmware — state of the project
 
 **Date:** 2026-08-13
