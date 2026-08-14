@@ -889,9 +889,30 @@ static volatile bool         accel_avg_primed = false;
 #define LOG_DECIMATE_N  8
 
 /*
- * ─── BATTERY THRESHOLDS, DERIVED 2026-08-14 ──────────────────────────────────
+ * ─── BATTERY THRESHOLDS, DERIVED AND VALIDATED 2026-08-14 ────────────────────
  *
- * ✅ RESOLVED. The divider is 2:1, metered on the bench (499k/499k, sheet 3).
+ * ✅ THE WHOLE MEASUREMENT CHAIN IS NOW TRUSTWORTHY END TO END, validated
+ * against a meter:
+ *
+ *     meter at the pack     5.010 V
+ *     firmware pack_mv      5012
+ *
+ * 2 mV apart on 5 V -- better than one LSB (1 LSB = 3100/1023 = 3.03 mV at the
+ * node, 6.06 mV of pack), so as close as a 10-bit ADC can resolve. That single
+ * comparison validates the divider ratio, the 3100 mV reference assumption and
+ * the ADC configuration simultaneously, because an error in any one of them
+ * would show up here.
+ *
+ * It also confirms the prescaler fix did real work rather than just satisfying
+ * the datasheet. At /128 the same chain read 4860 against a 4900 meter -- 0.8%
+ * LOW, which is exactly the direction a sample-and-hold that has not finished
+ * charging from a 250 kOhm source will err. See configure_adc_channel().
+ *
+ * ⭐ SO THE CHIRP CAN NOW BE PRESENTED AS A CALIBRATED WARNING. The earlier
+ * prohibition in this block is lifted; it existed because nobody could say what
+ * the logged number meant in volts, and now anybody can.
+ *
+ * The divider is 2:1, metered on the bench (499k/499k, sheet 3).
  * read_adc_pc2_voltage() returns the NODE voltage in millivolts against the
  * 3100 mV rail, so a pack figure divides by two to become a threshold. Stated
  * in PACK millivolts below and halved at compile time, so the next reader
@@ -934,10 +955,9 @@ static volatile bool         accel_avg_primed = false;
  * A product decision, not an arithmetic one -- left at the historical 3.2 V
  * pending Dave's call.
  *
- * ⚠️ STILL OUTSTANDING: the ADC prescaler is /128 under a comment reading "for
- * 8MHz clock" while F_CPU is 1 MHz, so the ADC clock is 7.8 kHz against a
- * 50 kHz datasheet minimum (Eng_Notes §5.8). These thresholds were characterised
- * at that setting. If the prescaler is fixed, RE-TAKE the bench numbers.
+ * ✅ THE PRESCALER IS FIXED (/128 -> /16, 62.5 kHz, in spec) and these numbers
+ * were re-taken afterwards against the meter, which is the reading quoted at
+ * the top of this block. Nothing here is left standing on the old setting.
  */
 #define VBATT_LOW_MV              3200    /* pack millivolts -- Release.txt    */
 #define VBATT_CLEAR_MV            3500    /* pack millivolts -- hysteresis     */

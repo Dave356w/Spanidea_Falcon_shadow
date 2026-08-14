@@ -97,8 +97,8 @@ replay against the arrival bursts on file before anything is flown.
 
 | # | item | status |
 |---|---|---|
-| 7 | **Battery trip point uncharacterised** — mV compared against a number with no divider applied; `Release.txt` says 3.2 V, arithmetic says 7.04 V | blocks shipping the chirp |
-| 8 | **ADC prescaler `/128` at F_CPU 1 MHz** → 7.8 kHz vs 50 kHz datasheet minimum. Every battery reading ever taken is out of spec | one-line fix, needs a check |
+| 7 | ~~Battery trip point uncharacterised~~ — **✅ CLOSED.** Divider metered 2:1; thresholds derived in pack mV; chain validated against a meter to within 1 LSB | ✅ closed |
+| 8 | ~~ADC prescaler `/128`~~ — **✅ CLOSED.** `/16` = 62.5 kHz, the slowest in-spec option (a faster one would be worse: 250 kOhm source). Removed a measured 0.8% low bias | ✅ closed |
 | 9 | **BOD probably disabled** (factory efuse `0xFF`) | read the efuse |
 | 10 | **Quiescent current never measured** — heartbeat's ~0.25 mA is arithmetic off a 200 mA rating | blocks any runtime claim |
 | 11 | **Low-battery chirp never heard** — pack reads 2535 against a 1600 trip | untested path |
@@ -170,7 +170,26 @@ characterisation transfers.
 Also visible: `vcc` drops 3120 → 3103 on the sample where the forced chirp
 starts — the piezo load appearing on the rail, via the bandgap read.
 
-#### 🔎 A1 has a strong prior now — check this first with the meter
+#### ✅ A1/A2/A3 CLOSED — the chain is validated end to end
+
+```
+meter at the pack   5.010 V
+firmware pack_mv    5012        (2 mV apart -- inside one LSB of 6.06 mV)
+```
+
+One comparison validates the divider ratio, the 3100 mV reference assumption and
+the ADC configuration at once, because an error in any of them would surface
+here. **The chirp can now be presented to a customer as a calibrated warning** —
+the prohibition that blocked it is lifted.
+
+The prescaler fix did real work, not just datasheet compliance: at `/128` the
+same chain read 4860 against a 4900 meter, **0.8% low**, exactly the direction an
+unfinished sample-and-hold charge errs from a 250 kOhm source.
+
+**Remaining in Session A:** A5 quiescent current (shipping build, **cable
+disconnected**), A6 efuse read, A4 hear the chirp, A7 double wink.
+
+#### Historical: the prior that A1 confirmed
 
 `main.h` declares `BATT_R1 5100` / `BATT_R2 1500`, ratio 4.4, which is what made
 `BATTERY_LOW_THRESHOLD 1600` look like an implausible 7.04 V pack. **But sheet 3
