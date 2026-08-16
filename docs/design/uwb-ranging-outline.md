@@ -354,7 +354,7 @@ commissioned system.
 | Five-year hazard-unit life not met | Med | Adaptive gating designed in from the start; arm-on-inspection |
 | Required sensitivity is millimetre-scale releveling creep | Med | Open question Q2 — would invalidate the approach; resolve before Phase 2 |
 | Module lifecycle or supply discontinuity | Med | FiRa-compliant parts only; second-source assessment at Phase 4 |
-| Scope creep toward a certified safety device | Low | Section 12 boundary held explicitly in product and documentation |
+| Scope creep toward a certified safety device | Low | Section 13 boundary held explicitly in product and documentation |
 
 ---
 
@@ -369,6 +369,8 @@ Two off-the-shelf dev kits, no custom hardware. Log raw range at 10 Hz in an act
 while simultaneously logging the existing accelerometer stream. Run the physical test set
 that currently gives the accelerometer approach trouble. Replay offline through the
 existing `falcon_srcs/simulation/` harness and `falcon_srcs/graph/plot.py`.
+
+Bill of materials, instrumentation approach and firmware path are in Section 11.
 
 > **Gate** — does Δrange separate bump from real closure on the exact runs where the
 > current state machine fails? Characterise multipath, NLOS outlier rate, and usable range
@@ -402,7 +404,78 @@ second-source assessment.
 
 ---
 
-## 11. Open questions
+## 11. Phase 1 bill of materials and instrumentation
+
+Prices and stock as researched 16 Aug 2026. UWB module lead times are volatile — reconfirm
+before ordering.
+
+### Hardware — 2 × Qorvo DWM3001CDK
+
+Approximately **$29.50 each at DigiKey**, in stock. Under $60 for the pair, and it is the
+same silicon this document specifies for production, so Phase 1 measurements carry into
+Phase 2 without revalidation on different hardware.
+
+| Requirement | How the DWM3001CDK meets it |
+|---|---|
+| UWB ranging on target silicon | DWM3001C = DW3110 + nRF52833 + planar antenna + accelerometer + PMIC + crystal |
+| Simultaneous accelerometer log | Onboard accelerometer — no added hardware for the Phase 1 gate |
+| Battery operation | Documented power options: 2 × micro-USB, Raspberry Pi header, battery, external supply |
+| Debug and capture | Onboard J-Link providing SWD and UART |
+| Clean power measurement | Runs on the module's own nRF52833; no external MCU distorting Phase 2 figures |
+
+**Order four, not two.** Mouser flags a long lead time on the part despite immediate stock.
+Spares cost ~$60 total and protect against a multi-month stall; a third unit also exercises
+the one-to-many bank-of-elevators case without reordering.
+
+### Instrumentation — where the data lands
+
+The counterweight unit cannot be tethered to a laptop. The instinct is to add SD logging to
+both ends and reconcile two files afterwards. **Do not.**
+
+In SS-TWR the *initiator* computes the range. Make the worker unit the initiator, sit it on
+the car top tethered to a laptop, and every range measurement lands there already. The
+counterweight unit then needs battery and nothing else.
+
+That leaves the counterweight's accelerometer stream, which is wanted because the current
+state machine runs on that equipment. **Piggyback accelerometer samples in the TWR response
+payload.** There is room in the frame, it costs almost nothing, and both streams land in
+one file that is inherently time-aligned — no clock synchronisation, no post-hoc
+correlation, no second log to reconcile. Build it this way from the first run.
+
+### Diagnostics to capture from day one
+
+Characterising multipath is the whole point of the Phase 1 gate, and these runs are
+expensive to recreate:
+
+- Raw CIR from register `0x15` — 992 samples at 16 MHz PRF, 1016 at 64 MHz
+- `dwt_readaccdata()` and `dwt_readdiagnostics()` for first path index (`FP_INDEX`), first
+  path amplitude (`FP_AMPL`) and `maxNoise`
+
+### Firmware path
+
+- **[Uberi/DWM3001C-starter-firmware](https://github.com/Uberi/DWM3001C-starter-firmware)**
+  to get moving quickly — community-maintained, Dockerised build, runs directly on the
+  onboard nRF52833, and considerably simpler than the official SEGGER Embedded Studio flow.
+- **Official DW3_QM33_SDK** (v1.1.1, Aug 2025, FiRa 2.0 compliant) for CFO correction and
+  the diagnostics registers.
+
+### Considered and rejected for Phase 1
+
+| Option | Why not |
+|---|---|
+| Qorvo QM33120WDK1 | Newer QM33 silicon, AoA daughterboard and *external antennas* — the only one of these that answers the antenna-orientation risk. But bulky nRF52840 DK boards are awkward to battery-mount on a counterweight, and it is materially more expensive. Buy it for Phase 2/4 antenna and production-silicon work, not for the go/no-go. |
+| Makerfabs ESP32 UWB DW3000 | Arduino-native and fits the existing PlatformIO workflow, but the DW3000 Arduino library is third-party and aimed at simple ranging demos — no CFO correction, no diagnostics registers. No onboard accelerometer. Choosing familiar tooling over the measurements the phase exists to collect. |
+| MDEK1001 / DWM1001 | DW1000 generation. Already excluded in Section 4. |
+
+### Known gap
+
+The DWM3001C carries an **integrated planar antenna with no u.FL connector**, so it cannot
+answer the antenna-orientation question listed as a top-tier risk in Section 9. That
+requires the QM33120WDK1 daughterboards or a chip-down test fixture, and belongs to Phase 2.
+
+---
+
+## 12. Open questions
 
 These drive architecture and should not be guessed at. Q2 in particular can invalidate the
 entire approach and is cheap to answer now.
@@ -431,7 +504,7 @@ topology enough to need their own pass.
 
 ---
 
-## 12. Scope boundary
+## 13. Scope boundary
 
 > **Hold this line explicitly.** This is a **secondary alert aid, not a protective
 > device**. It does not substitute for lockout/tagout or for the mechanic's-protection
