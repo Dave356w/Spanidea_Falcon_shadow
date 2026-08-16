@@ -415,17 +415,38 @@ Approximately **$29.50 each at DigiKey**, in stock. Under $60 for the pair, and 
 same silicon this document specifies for production, so Phase 1 measurements carry into
 Phase 2 without revalidation on different hardware.
 
+Confirmed against the DWM3001CDK Product Brief (Rev. B, May 2022) and the DWM3001CDK Quick
+Start Guide (QM33SDK-1.0.0, Aug 2024):
+
 | Requirement | How the DWM3001CDK meets it |
 |---|---|
-| UWB ranging on target silicon | DWM3001C = DW3110 + nRF52833 + planar antenna + accelerometer + PMIC + crystal |
-| Simultaneous accelerometer log | Onboard accelerometer — no added hardware for the Phase 1 gate |
-| Battery operation | Documented power options: 2 × micro-USB, Raspberry Pi header, battery, external supply |
-| Debug and capture | Onboard J-Link providing SWD and UART |
-| Clean power measurement | Runs on the module's own nRF52833; no external MCU distorting Phase 2 figures |
+| UWB ranging on target silicon | DWM3001C = DW3110 (non-PDoA) + nRF52833 with Bluetooth 5.2 |
+| Battery operation | Dedicated battery connector with VBAT rail into the onboard DCDC; also 2 × micro-USB, Raspberry Pi header, external supply |
+| Debug and capture | Onboard J-Link OB providing SWD and UART; second USB direct to the DWM3001C |
+| Both candidate channels testable | Supports UWB bands 5 (6.5 GHz) and 9 (8 GHz) — settles the Section 8 channel question on real hardware |
+| Phase 2 power measurement | **Dedicated header on the VCC trace for measuring module current** — directly serves the Phase 2 gate |
+| Expansion | 26-pin Raspberry Pi compatible header, access to all DWM3001C GPIOs, GPIO test points |
 
 **Order four, not two.** Mouser flags a long lead time on the part despite immediate stock.
 Spares cost ~$60 total and protect against a multi-month stall; a third unit also exercises
 the one-to-many bank-of-elevators case without reordering.
+
+### Unresolved: is there an accelerometer on board?
+
+**Treat this as unconfirmed and settle it before ordering.** Qorvo's product page describes
+the DWM3001C as having an integrated motion sensor, but neither the DWM3001CDK Product Brief
+nor the Quick Start Guide mentions one. The Product Brief's key-feature list enumerates
+module-level detail (the nRF52833, both RF bands, the two integrated antennas) and its
+functional block diagram enumerates board detail down to the ground point and GPIO test
+points — an accelerometer appears in neither. Both documents do treat the DWM3001C itself as
+a single block, so an in-module part would not necessarily be drawn. The definitive source is
+the DWM3001C *module* datasheet, not the kit documentation.
+
+This does not change the board selection, because the contingency is cheap: the kit exposes
+all DWM3001C GPIOs plus a 26-pin Raspberry Pi header, so an I²C accelerometer breakout can
+be added to each unit if needed — and the team already has BMA456 driver experience. But the
+Phase 1 gate requires logging range *and* acceleration on the same runs, so this must be
+known before the parts order rather than discovered during bring-up.
 
 ### Instrumentation — where the data lands
 
@@ -437,10 +458,12 @@ the car top tethered to a laptop, and every range measurement lands there alread
 counterweight unit then needs battery and nothing else.
 
 That leaves the counterweight's accelerometer stream, which is wanted because the current
-state machine runs on that equipment. **Piggyback accelerometer samples in the TWR response
-payload.** There is room in the frame, it costs almost nothing, and both streams land in
-one file that is inherently time-aligned — no clock synchronisation, no post-hoc
-correlation, no second log to reconcile. Build it this way from the first run.
+state machine runs on that equipment (subject to the accelerometer question above — if the
+module has none, an I²C breakout on the GPIO header supplies it). **Piggyback accelerometer
+samples in the TWR response payload.** There is room in the frame, it costs almost nothing,
+and both streams land in one file that is inherently time-aligned — no clock
+synchronisation, no post-hoc correlation, no second log to reconcile. Build it this way from
+the first run.
 
 ### Diagnostics to capture from day one
 
@@ -453,11 +476,35 @@ expensive to recreate:
 
 ### Firmware path
 
+**Boards ship blank.** The Quick Start Guide is explicit that DWM3001CDK boards are not
+shipped preprogrammed — the SEGGER J-Link Software and Documentation Pack must be installed
+and UCI firmware flashed via J-Flash Lite before anything runs.
+
 - **[Uberi/DWM3001C-starter-firmware](https://github.com/Uberi/DWM3001C-starter-firmware)**
   to get moving quickly — community-maintained, Dockerised build, runs directly on the
   onboard nRF52833, and considerably simpler than the official SEGGER Embedded Studio flow.
 - **Official DW3_QM33_SDK** (v1.1.1, Aug 2025, FiRa 2.0 compliant) for CFO correction and
   the diagnostics registers.
+
+### Calibration — mandatory, with a trap
+
+Section 4 argues that per-unit antenna delay calibration can be skipped in *production*,
+because a constant bias cancels in the rate. That reasoning still holds. It does not,
+however, apply to the dev kits in Phase 1, and the Quick Start Guide is unambiguous:
+calibration is **mandatory** on first use of a kit and again whenever the SDK is upgraded,
+since calibration data is not guaranteed compatible across firmware versions.
+
+It is also cheap. A preset calibration file ships for this exact board
+(`.../calib_files/DWM3001CDK/dual-hoe_non_aoa.json`), and the Qorvo One TWR GUI has an
+**auto-calibration** feature that sets antenna delay automatically and is documented as
+highly recommended. Run it — Phase 1 then yields trustworthy absolute range for the
+time-to-contact term as well as clean rate data.
+
+> **The trap.** Calibration lives in NVM and survives power cycles and firmware updates, but
+> **a chip erase silently invalidates it** and it must be reapplied. Because the resulting
+> error is a constant bias, it will *not* appear as noise in the rate data — it surfaces as
+> an unexplained step in absolute range between runs, which is an expensive artifact to
+> chase. Record the calibration state alongside every capture.
 
 ### Considered and rejected for Phase 1
 
@@ -469,9 +516,11 @@ expensive to recreate:
 
 ### Known gap
 
-The DWM3001C carries an **integrated planar antenna with no u.FL connector**, so it cannot
-answer the antenna-orientation question listed as a top-tier risk in Section 9. That
+The DWM3001C carries **two integrated antennas (BLE and UWB) with no u.FL connector**, so it
+cannot answer the antenna-orientation question listed as a top-tier risk in Section 9. That
 requires the QM33120WDK1 daughterboards or a chip-down test fixture, and belongs to Phase 2.
+The DW3110 is additionally **non-PDoA**, confirming that no angle-of-arrival work is possible
+on this kit — consistent with Section 7, which rejects AoA for this application anyway.
 
 ---
 
