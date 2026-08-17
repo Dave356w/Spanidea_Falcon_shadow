@@ -153,9 +153,12 @@ ToF   = (T_round − T_reply) / 2
 error ≈ (clock_offset × T_reply) / 2
 ```
 
-At 20 ppm over a 1 ms reply delay that is roughly 3 m. But the receiver's carrier
-integrator estimates that offset to about 0.1 ppm, dropping residual error to roughly
-1.5 cm.
+The DWM3001C datasheet (Rev F) reports the module's 38.4 MHz crystal is **factory trimmed to
+under 2 ppm** initial frequency error, so a realistic module-to-module offset is a few ppm
+rather than the 20 ppm worst case. At 4 ppm over a 1 ms reply delay that is roughly 0.6 m
+uncorrected — an order of magnitude better than a naive worst-case estimate suggests. The
+receiver's carrier integrator then estimates the residual offset to about 0.1 ppm, dropping
+error to roughly 1.5 cm.
 
 **Second, and decisively**: the residual is a *slowly varying bias*, drifting on thermal
 timescales while the measurement window is about one second. It is common-mode across the
@@ -288,11 +291,43 @@ machined rail faces over the entire travel. Anything on a running face is sheare
 Mounting is restricted to the rail back, web, or a bracket — which is precisely where steel
 shadowing is worst. This is a substantive argument for preferring the car-top topology.
 
+### Antenna keep-out versus magnet mounting
+
+The datasheet is emphatic about metal near the module antenna: a **minimum 10 mm clearance
+with no metal either side**, no copper pour in the keep-out area, and explicitly *"do not
+place battery under antenna."*
+
+This is in direct tension with the product concept. A magnet-mounted device clamps itself to
+a large steel mass — a counterweight frame or a rail bracket — which is exactly the condition
+the guidance warns against. Resolving it is a mechanical design problem for Phase 4:
+cantilever the antenna end of the PCB off the magnet, stand the enclosure off the steel, or
+accept a characterised pattern degradation. It should be treated as a named constraint on the
+enclosure, not discovered during layout.
+
 ### Cell and pulse response
 
 Li-SOCl₂ gives the shelf life and temperature range wanted for the hazard unit but has poor
 pulse response; UWB TX bursts will sag the terminal voltage. A hybrid-layer capacitor or
 supercapacitor buffer is required. Budget it early — it is a common late-stage surprise.
+
+**Watch the upper voltage limit.** The DWM3001C specifies VDD max **3.6 V**, while a fresh
+Li-SOCl₂ cell (ER14505, 3.6 V nominal) sits around 3.67 V open-circuit. That is over the
+limit before any load is applied. A series diode, an LDO, or a different chemistry is
+required — do not connect the cell directly.
+
+Measured device figures now available from the datasheet, for the Phase 2 budget:
+
+| State | Current |
+|---|---:|
+| SLEEP | 850 nA |
+| INIT (Ch5 / Ch9) | 6 mA |
+| IDLE Ch5 | 18 mA |
+| IDLE Ch9 | 32 mA |
+| TX / RX Ch5 | 40 mA |
+| TX / RX Ch9 | 45 mA |
+
+These are more favourable than the estimates in Section 6, which should be recomputed
+against them during Phase 2 rather than assumed to still hold.
 
 ### Environment
 
@@ -329,9 +364,11 @@ and should be priced into the schedule honestly.
   between UWB working in a steel shaft and not. Start at a 128-symbol preamble; a shaft
   waveguides, so range may exceed free-space expectations and preamble length can likely be
   traded back for energy once measured.
-- **Channel.** Ch5 (6.5 GHz) propagates better through a steel shaft than Ch9 (8 GHz), but
-  regional regulatory rules differ. Confirm against target markets before locking, since it
-  drives antenna design.
+- **Channel — Ch5, and now on two grounds.** Ch5 (6.5 GHz) propagates better through a steel
+  shaft than Ch9 (8 GHz). The datasheet adds a power argument: **Ch5 idle draws 18 mA against
+  Ch9's 32 mA**, with TX/RX at 40 mA versus 45 mA. Regional regulatory rules still differ, so
+  confirm against target markets before locking, but the engineering case for Ch5 is now
+  strong on both propagation and energy.
 
 ### Configuration
 
@@ -348,7 +385,7 @@ commissioned system.
 
 | Risk | Sev | Mitigation |
 |---|---|---|
-| Multipath in a steel shaft degrades first-path detection beyond usable | High | Phase 1 exists to answer exactly this, before any hardware spend |
+| Multipath in a steel shaft degrades first-path detection beyond usable | High | **Vendor-corroborated** — see Section 11. Phase 1 exists to answer exactly this, before any hardware spend |
 | Alarm fatigue from nuisance alarms; device gets switched off | High | Motion-gated suppression rule; link-loss hold-off; TTC rather than distance |
 | Antenna orientation sensitivity under arbitrary mounting | High | Characterise early; u.FL variant; possible diversity antenna |
 | Five-year hazard-unit life not met | Med | Adaptive gating designed in from the start; arm-on-inspection |
@@ -431,22 +468,50 @@ Start Guide (QM33SDK-1.0.0, Aug 2024):
 Spares cost ~$60 total and protect against a multi-month stall; a third unit also exercises
 the one-to-many bank-of-elevators case without reordering.
 
-### Unresolved: is there an accelerometer on board?
+### Accelerometer — resolved, with a caveat
 
-**Treat this as unconfirmed and settle it before ordering.** Qorvo's product page describes
-the DWM3001C as having an integrated motion sensor, but neither the DWM3001CDK Product Brief
-nor the Quick Start Guide mentions one. The Product Brief's key-feature list enumerates
-module-level detail (the nRF52833, both RF bands, the two integrated antennas) and its
-functional block diagram enumerates board detail down to the ground point and GPIO test
-points — an accelerometer appears in neither. Both documents do treat the DWM3001C itself as
-a single block, so an in-module part would not necessarily be drawn. The definitive source is
-the DWM3001C *module* datasheet, not the kit documentation.
+**Confirmed present.** The DWM3001C datasheet (Rev F, Oct 2025) specifies an **ST LIS2DH12TR**
+three-axis accelerometer on the module, sharing the nRF52833's I²C bus — module pins 14 and
+15 are `I2C0_SDA` and `I2C0_SCL`, documented as serving both the MCU and the accelerometer.
+No added hardware is needed for the Phase 1 gate.
 
-This does not change the board selection, because the contingency is cheap: the kit exposes
-all DWM3001C GPIOs plus a 26-pin Raspberry Pi header, so an I²C accelerometer breakout can
-be added to each unit if needed — and the team already has BMA456 driver experience. But the
-Phase 1 gate requires logging range *and* acceleration on the same runs, so this must be
-known before the parts order rather than discovered during bring-up.
+Qorvo's stated rationale for including it is worth noting, because it is precisely the
+architecture in Section 6: *"RTLS tags commonly use accelerometers to initiate UWB ranging
+only when a tag moves so that battery life can be extended by staying in the lowest power
+mode by default."* The accelerometer-gated adaptive rate this document treats as mandatory is
+the vendor's own intended usage pattern.
+
+> **The caveat — it is not a BMA456.** The LIS2DH12 is a lower-specification part than the
+> BMA456 currently in `falcon_srcs`: coarser resolution and higher noise density. The current
+> algorithm discriminates on `MOVING_ACC_THRESHOLD` of 0.05 m/s² (~5 mg) and a variance floor
+> of 0.001, which is fine-grained relative to what the LIS2DH12 delivers.
+>
+> This matters for Phase 1's *fairness*, not its feasibility. The gate compares ranging
+> against the accelerometer approach on the same runs — but if the accelerometer arm runs on
+> a noisier sensor than the product would use, the comparison is biased in favour of ranging
+> and the gate could pass for the wrong reason. Either keep a BMA456 in the loop over the
+> exposed I²C bus, or characterise the noise difference and account for it in the analysis.
+> Do not silently substitute one for the other.
+
+### Landmine: the dev kits are engineering samples
+
+The kit's ordering part number is **DWM3001CDKE1.0**, an *Engineering* Development Kit, and
+the datasheet carries a specific warning for that part number and the engineering-sample
+modules:
+
+> *"do not use the Channel 5 Antenna Delay in OTP — use default value 16390."*
+
+The OTP Channel 5 antenna delay on engineering samples is wrong. This lands squarely on the
+critical path, because Section 8 selects **Channel 5** for hoistway propagation.
+
+The failure mode is the nasty kind. A wrong antenna delay is a *constant bias*, so by this
+document's own reasoning in Section 4 it will be invisible in the rate data — Δrange and
+closing-rate results would look perfectly healthy — while every absolute range, and therefore
+every time-to-contact figure, is silently offset. Override the OTP value with 16390 on Ch5
+before the first capture, and record that you did.
+
+Related: the datasheet's ordering table lists the DWM3001CDK at **MOQ 20 units** direct from
+Qorvo, while distributors sell singles. Order through a distributor.
 
 ### Instrumentation — where the data lands
 
@@ -513,6 +578,30 @@ time-to-contact term as well as clean rate data.
 | Qorvo QM33120WDK1 | Newer QM33 silicon, AoA daughterboard and *external antennas* — the only one of these that answers the antenna-orientation risk. But bulky nRF52840 DK boards are awkward to battery-mount on a counterweight, and it is materially more expensive. Buy it for Phase 2/4 antenna and production-silicon work, not for the go/no-go. |
 | Makerfabs ESP32 UWB DW3000 | Arduino-native and fits the existing PlatformIO workflow, but the DW3000 Arduino library is third-party and aimed at simple ranging demos — no CFO correction, no diagnostics registers. No onboard accelerometer. Choosing familiar tooling over the measurements the phase exists to collect. |
 | MDEK1001 / DWM1001 | DW1000 generation. Already excluded in Section 4. |
+
+### Vendor guidance on the exact Phase 1 risk
+
+The datasheet contains a section titled *"Note on Ranging Performance in Harsh Multipath
+Environments"*, and it describes this application closely enough to raise the prior on the
+Phase 1 gate.
+
+The module antenna is **cross-polarised in some regions** — horizontal and vertical gain
+roughly equal. That is genuinely good news for a device magnet-mounted at an arbitrary
+attitude, since it holds the link budget up as orientation changes. But Qorvo then warns that
+the same polarisation diversity *"can lead to variation in ranging accuracy as tags move in
+harsh multipath environments, such as where there are many reflections in confined indoor
+spaces, e.g. narrow corridors."*
+
+A hoistway is a narrower, more reflective, more fully metal-lined version of that example.
+This does not invalidate the approach — but it is the vendor stating that ranging accuracy
+degrades in precisely the environment Phase 1 must characterise, and it should be read as
+raising, not lowering, the weight on that gate.
+
+The stated mitigation is a layout constraint for Phase 4: **keep the module at least 1 cm
+from the edge of the carrier PCB**, which suppresses the horizontally polarised component and
+improves multipath resilience. Note this pulls against the antenna keep-out guidance in
+Section 7, which wants the antenna away from metal and ideally overhanging — the two
+constraints have to be resolved together rather than separately.
 
 ### Known gap
 
