@@ -125,7 +125,9 @@ would never survive contact with a construction site anyway.
 ### Radio
 
 UWB two-way ranging, on a module with an integrated host MCU and BLE — the Qorvo DWM3001C
-class of part (DW3110 + nRF52833 + PA/LNA + antenna, pre-certified). That single choice:
+class of part — per its datasheet, DW3110 + nRF52833 + planar UWB antenna + LIS2DH12
+accelerometer + DCDC + trimmed crystal, pre-certified to FCC, ISED and ETSI. That single
+choice:
 
 - collapses the UWB-for-measurement / BLE-for-control split into one component
 - puts deep sleep in the low microamps
@@ -391,7 +393,7 @@ commissioned system.
 | Five-year hazard-unit life not met | Med | Adaptive gating designed in from the start; arm-on-inspection |
 | Required sensitivity is millimetre-scale releveling creep | Med | Open question Q2 — would invalidate the approach; resolve before Phase 2 |
 | Module lifecycle or supply discontinuity | Med | FiRa-compliant parts only; second-source assessment at Phase 4 |
-| Scope creep toward a certified safety device | Low | Section 13 boundary held explicitly in product and documentation |
+| Scope creep toward a certified safety device | Low | Section 14 boundary held explicitly in product and documentation |
 
 ---
 
@@ -613,7 +615,105 @@ on this kit — consistent with Section 7, which rejects AoA for this applicatio
 
 ---
 
-## 12. Open questions
+## 12. Phase 1 bring-up procedure
+
+Ordered deliberately: each stage exists to make the next one interpretable. The single
+governing principle is that **you cannot diagnose a bad result in a hoistway unless you
+already know what a good result looks like on the bench.** Do not skip Stage 2.
+
+### Stage 0 — before the parts arrive
+
+| Step | Detail |
+|---|---|
+| Install SEGGER J-Link Software and Documentation Pack | Boards ship unprogrammed; nothing runs until J-Flash Lite is available |
+| Obtain DW3_QM33_SDK and clone the starter firmware | Needed for CFO correction and diagnostics registers |
+| Source a battery lead | Confirm the DK's battery connector type and make up a lead for the hazard-side unit |
+| **Resolve the accelerometer decision** | LIS2DH12 as-is, or add a BMA456 on the exposed I²C bus. This changes what gets built, so decide before building (see Section 11) |
+| **Answer Q2** | Minimum detectable motion. If the requirement is millimetre-scale creep, no RF ranging reaches it and Phase 1 should not be run at all |
+
+### Stage 1 — out of box
+
+1. Flash UCI firmware to both boards via J-Flash Lite (device `NRF52833_xxAA`, SWD, 4000 kHz).
+2. **Physically label the two units** with their roles and record their identifiers. Every
+   later capture references them, and two identical boards are trivially confused.
+3. Import the preset calibration for this board:
+   `.../calib_files/DWM3001CDK/dual-hoe_non_aoa.json`.
+4. **Override the Channel 5 antenna delay with `16390`.** These are `DWM3001CDKE1.0`
+   engineering samples and the OTP value is wrong. Section 11 has the detail; this is the
+   step most likely to be skipped and least likely to announce itself later.
+5. Run auto-calibration in the Qorvo One TWR GUI on both units.
+6. Confirm ranging works at a known distance in the GUI before writing any code.
+
+> **Gate.** Do not proceed until reported range at a tape-measured distance agrees to within
+> a few centimetres. If it is off by tens of centimetres, the antenna delay override did not
+> take effect — fix that now rather than discovering it in the shaft.
+
+### Stage 2 — establish the bench reference
+
+This is the stage that gets skipped and regretted. Without it, disappointing shaft data is
+uninterpretable: you will not know whether the hoistway broke the measurement or the setup
+was never good.
+
+All of the following in open air, line of sight, before going anywhere near a hoistway:
+
+- **Static noise floor** at fixed separations across the working range — roughly 1, 5, 10,
+  20 and 40 m. Record σ of range at each. This is the baseline every shaft number is later
+  compared against.
+- **Rate estimator validation.** Confirm the least-squares slope over a 1 s window at 10 Hz
+  achieves the ~1.3 cm/s predicted in Section 5. If it does not, the problem is the
+  estimator, not the environment.
+- **Orientation sweep.** At one fixed distance, rotate a unit through the three principal
+  planes and log range error alongside the first-path metrics. This is the only orientation
+  data obtainable on this kit, and it partially probes the cross-polarisation warning in
+  Section 11 before multipath is added on top.
+- **Absolute accuracy check** at a tape-measured distance, confirming the Stage 1 override.
+
+### Stage 3 — instrument for capture
+
+Move off the GUI to the SDK or starter firmware. Configure SS-TWR with CFO correction, and
+the worker unit as initiator per Section 11.
+
+Log **every exchange**: timestamp, range, CFO estimate, `FP_INDEX`, `FP_AMPL`, `maxNoise`,
+RX power, sequence number, and the piggybacked accelerometer samples.
+
+> **Raw CIR needs a throughput plan.** A CIR record is ~1016 samples; at 10 Hz that is on the
+> order of 40 KB/s, against roughly 11.5 KB/s available on a 115200 baud UART. It will not
+> fit. Two workable approaches, and they combine well:
+>
+> - Use the **USB CDC interface** rather than UART — the nRF52833 provides USB 2.0 full speed
+>   (12 Mbps), and the DK brings it out on a second micro-USB port.
+> - Log full CIR on a **subsample** (say 1 Hz) or **on trigger** when the scalar first-path
+>   metrics look anomalous, while logging the scalars every exchange.
+
+### Stage 4 — hoistway captures
+
+Worker unit on the car top, tethered. Hazard unit on the counterweight, on battery. Capture
+at minimum:
+
+| Run | Purpose |
+|---|---|
+| Full travel, both directions | Range envelope, link continuity over the whole shaft |
+| Inspection speed, repeated stops and starts | The realistic service case |
+| Car stationary, induced bumps and rope movement | **The discrimination case** — the runs the current state machine fails |
+| Mid-travel passing event | Minimum range, maximum closing rate, the actual hazard |
+| Deliberate occlusion | Link-loss behaviour and recovery |
+
+### Capture metadata — record with every run
+
+The calibration trap in Section 11 makes this non-optional. A chip erase silently invalidates
+calibration, and the resulting constant bias is invisible in rate data — so the only defence
+is knowing which firmware and calibration state produced each file.
+
+- Unit identifiers and which was initiator
+- Firmware version and build hash
+- Calibration state: preset file, auto-calibration date, antenna delay in use
+- Channel, PRF, preamble length, TX power
+- Physical mounting: position, orientation, distance from steel
+- Elevator configuration, nominal speed, and what was moving
+
+---
+
+## 13. Open questions
 
 These drive architecture and should not be guessed at. Q2 in particular can invalidate the
 entire approach and is cheap to answer now.
@@ -642,7 +742,7 @@ topology enough to need their own pass.
 
 ---
 
-## 13. Scope boundary
+## 14. Scope boundary
 
 > **Hold this line explicitly.** This is a **secondary alert aid, not a protective
 > device**. It does not substitute for lockout/tagout or for the mechanic's-protection
