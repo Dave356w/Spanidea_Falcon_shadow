@@ -1,8 +1,8 @@
 # Falcon — Ranging-Based Hazard Alert for Elevator Hoistways
 
-**Clean-sheet outline · Rev B · 17 Aug 2026**
+**Clean-sheet outline · Rev C · 17 Aug 2026**
 
-Status: concept, pre-prototype
+Status: concept, pre-prototype — with a Phase 0 prototype now scoped on existing hardware
 Supersedes: the accelerometer + barometer approach in `falcon_srcs/src/movement_service.cpp`
 
 Two or more identical battery-powered devices measure the distance between themselves by
@@ -12,6 +12,12 @@ permanent installation.
 
 > Quantitative figures are estimates pending bench confirmation in Phases 1–2, except where
 > attributed to Qorvo documentation.
+
+**New in Rev C.** Section 11 scopes **Phase 0**, a two-node prototype built from the two
+existing Falcons plus Makerfabs MaUWB DW3000 modules on Falcon UART0. It is a learning and
+instrumentation exercise on hardware already in hand — it does not alter the target
+architecture in Sections 2 to 9, and it is not on the path to the product. Sections 12 to 15
+are the former Sections 11 to 14, renumbered.
 
 ---
 
@@ -561,7 +567,7 @@ Resolving this is a Phase 4 mechanical problem: cantilever the antenna end of th
 magnet, stand the enclosure off the steel, or accept a characterised pattern degradation.
 Treat it as a named constraint on the enclosure, not something discovered during layout.
 
-It also pulls against the separate guidance in Section 11 to keep the module at least 1 cm
+It also pulls against the separate guidance in Section 12 to keep the module at least 1 cm
 from the carrier PCB edge for multipath resilience. The two must be resolved together.
 
 ### Mounting constraint, counterweight rail
@@ -574,7 +580,7 @@ or a bracket — which is precisely where steel shadowing is worst.
 
 Every device alarms, in an environment with machine noise, and often out of the operator's
 line of sight. A piezo alone is unlikely to be sufficient; plan for loud audible plus visual,
-and evaluate haptic for a device carried on the person. This is an open question (Section 13).
+and evaluate haptic for a device carried on the person. This is an open question (Section 14).
 
 ### Environment
 
@@ -601,6 +607,11 @@ Nordic SDK or Zephyr. That is a full port, not an incremental change.
 | Accelerometer driver | Rewritten | LIS2DH12 over I²C, vibration-energy only |
 | Alarm output, battery sense | Rewritten | New pin map, charging topology |
 | Ranging session, scheduling, sleep | New | |
+
+Phase 0 (Section 11) moves in the opposite direction — it keeps the ATmega and adds to it —
+and none of that firmware survives into the target design. What transfers from it is design
+rather than code: the CSV schema, the replay pipeline and whatever the logs teach about
+thresholds.
 | Change detection and discriminators | New | The genuine engineering effort |
 
 ### Signal processing notes
@@ -627,14 +638,17 @@ accessory rather than a commissioned system.
 | Risk | Sev | Mitigation |
 |---|---|---|
 | Multipath produces false motion; false alarms destroy trust | High | **The primary Phase 1 gate.** Discriminators in Section 5; overnight locked-out measurement |
-| Multipath degrades first-path detection beyond usable | High | **Vendor-corroborated** (Section 11). Phase 1 answers it before hardware spend |
+| Multipath degrades first-path detection beyond usable | High | **Vendor-corroborated** (Section 12). Phase 1 answers it before hardware spend |
 | The pit — the driving use case — is the worst RF environment in the building | High | Dedicated Phase 1 capture rather than one position among several |
 | Antenna orientation and metal proximity under magnet mounting | High | Characterise early; keep-out versus mount resolved together in Phase 4 |
 | Fail-silent: link loss indistinguishable from "nothing moving" | High | Liveness annunciation, Section 5 |
 | Devices deployed both-on-hazards or both-with-people | Med | Single deployment rule, Section 3; training and product documentation |
 | Module lifecycle or supply discontinuity | Med | FiRa-compliant parts only; second-source assessment at Phase 4 |
 | 40-hour target missed | Low | ~5× margin without gating; gating available in reserve |
-| Scope creep toward a certified safety device | Low | Section 14 boundary held explicitly |
+| Scope creep toward a certified safety device | Low | Section 15 boundary held explicitly |
+| Phase 0's rate rule clears the alarm at closest approach | High | Quantified in Section 11; Phase 0 is an instrument, the Section 5 any-motion rule is the detector |
+| Phase 0 rail brownout — 3.1 V under alarm plus ranging | Med | Section 11 Step 26 measurement before any production power decision |
+| Phase 0 becomes the product path by momentum | Med | Section 11 exit criteria and its Step 27 stop rule; Phase 1 neither waits on Phase 0 nor depends on it |
 
 ---
 
@@ -642,6 +656,18 @@ accessory rather than a commissioned system.
 
 Each phase ends at a gate that can stop the project cheaply. The cheapest experiment that
 could invalidate the approach runs first.
+
+### Phase 0 — Falcon-hosted MaUWB prototype *(optional, parallel)*
+
+Two existing Falcons, two Makerfabs MaUWB DW3000 modules on UART0, a CSV log out of the second
+USART. Detailed in Section 11. It runs on hardware already owned, ahead of and independent of
+the DWM3001CDK order, and it exists to build ranging intuition, the logging and replay
+pipeline, and a tunable state machine — not to produce a product architecture.
+
+> **Gate** — this phase gates nothing. Phase 1 does not wait for it, does not depend on it,
+> and is not cancelled by it. If Phase 0 slips or disappoints, Phase 1 proceeds unchanged.
+> The one outcome that would matter to Phase 1 is a *positive* one: a clean hoistway range
+> trace obtained early, which sharpens what Phase 1 goes looking for.
 
 ### Phase 1 — Feasibility in a real hoistway
 
@@ -685,7 +711,390 @@ against the mount, charging and cell selection, phone app, regional regulatory c
 
 ---
 
-## 11. Phase 1 bill of materials and instrumentation
+## 11. Phase 0 — Falcon-hosted MaUWB prototype
+
+A two-node prototype built from the two existing Falcons and two Makerfabs MaUWB DW3000
+modules, wired to Falcon UART0. Each Falcon keeps its BMA456, its LED/strobe and its buzzer,
+adds a UWB range measurement, and streams engineering data out of a second UART for logging
+and threshold tuning.
+
+### What it is for, and what it is not
+
+Phase 0 exists because the hardware is already on the bench. It buys three things early:
+familiarity with UWB ranging behaviour in a real shaft, a CSV capture-and-replay pipeline that
+Phase 1 reuses unchanged, and a state machine whose thresholds can be moved without a
+reflash. All three are transferable. The hardware it runs on is not.
+
+> **This is not the production architecture, and no part of it should be read as amending
+> Sections 2 to 9.** Section 8 ends the ATmega328P; Section 12 records that the target module
+> needs no external microcontroller. Phase 0 keeps the ATmega because the ATmega is what
+> exists today, not because the argument for removing it has weakened.
+
+Where Phase 0 diverges from the target design, it does so knowingly:
+
+| Target design | Phase 0 | Why the divergence is acceptable |
+|---|---|---|
+| Module's own Cortex-M4 is the only processor | ATmega328PB hosts a UART-attached module | Uses hardware in hand; the port is deferred, not avoided |
+| N identical peers, no roles | One "moving" node, one "fixed" pit node | A deliberate simplification for first light, not a product split |
+| Peer-to-peer initiator/responder vocabulary | The module's own anchor/tag configuration words | Confined to module config; see the naming warning below |
+| Any sustained change over a window alarms | Range-rate thresholds with a stop timer | **A known defect at closest approach — quantified below** |
+| Thresholds set from data, never guessed | Provisional starting values | Labelled test-only, and replaced from logs in Step 24 |
+| Vibration energy from the accelerometer | BMA456 magnitude and a motion flag | Fine for bench work; revisit before it means anything |
+
+### Step 1 — the two-node arrangement
+
+```text
+NODE A — MOVING                     NODE B — FIXED
+car or counterweight                elevator pit
+
+Falcon                              Falcon
+  ├── BMA456 accelerometer            ├── MaUWB DW3000
+  ├── MaUWB DW3000                    ├── LED / strobe
+  ├── LED / strobe                    └── buzzer
+  └── buzzer
+```
+
+One module is configured as the ranging tag, the other as the anchor.
+
+> **Keep that vocabulary inside the module.** Section 2 explains why *anchor* and *tag* must
+> not enter the system description: they pull the design toward an RTLS stack built on
+> surveyed positions and fixed infrastructure, none of which is true here. In Phase 0 they are
+> two configuration words in a vendor firmware. They are not roles, they are not product
+> variants, and nothing in the Falcon firmware should be named after them.
+
+**Nothing connects to the elevator.** No controller interface, no safety circuit, no brake, no
+control equipment. This is a supplemental warning device on a bench and then on a magnet — the
+boundary in Section 15 applies to Phase 0 in full and from the first day.
+
+### Steps 2–3 — verify what already works, before adding anything
+
+Confirm on both units, with the modules still unconnected: power-on, LED, buzzer, BMA456,
+battery ADC, J1 UART, J2 ISP programming. Then measure J2 `VCC_3V1` to GND with the module
+disconnected and confirm roughly 3.1 V.
+
+Schematic pinout for J2:
+
+```text
+J2-1  VCC        J2-2  MOSI
+J2-3  GND        J2-4  MISO
+J2-5  SCK        J2-6  RESET
+```
+
+> The Rev.2 PCB may present these pads differently from the schematic drawing. **Meter the
+> actual 3V1 and GND pogo positions before building the fixture**, not after.
+
+Two facts about the committed firmware are worth knowing before this starts, both from
+Section 1: `ms.run()` is commented out at `main.cpp:134`, so what is on the boards is a
+data-collection build with the movement state machine dormant; and the DPS310 barometer paths
+are `#if 0`-ed out. Phase 0's state machine is a new detector alongside that code, not a layer
+on top of it. Do not re-enable `MovementService` to "compare" — Section 1 documents why its
+output would not be meaningful.
+
+### Steps 4–5 — power and the UART link
+
+```text
+Falcon 3V1 ──┬──────────► MaUWB +V         FALCON            MaUWB
+             │                             UART0_TXD ──────► RX
+          47–100 µF                        UART0_RXD ◄────── TX
+             │                             GND ───────────── GND
+            GND
+
+3V1 ─── 100 nF ─── GND      (both close to the module)
+```
+
+Tie the module's power pads together rather than feeding it through a single ground contact.
+Direct TX/RX wiring, no level translator and no series resistor, is acceptable for a short
+bench link with both ends near 3.1 V logic.
+
+> **The rail is the first thing likely to bite.** Falcon's `VCC_3V1` is a battery rail, not a
+> regulated supply with headroom, and modules in the MaUWB class carry an ESP32-class host
+> alongside the DW3000 — a part whose supply range bottoms out at about 3.0 V and whose
+> current draw is spiky, not flat. Running that from 3.1 V leaves almost nothing between a
+> transmit burst and a brownout, and the worst case is not ranging alone: it is **ranging
+> while the buzzer and strobe are both driven**, which is exactly the moment the device must
+> not reset. Treat Step 4 as experimental, and do not close it out until the measurements in
+> Step 26 exist. Confirm the module's actual supply range and peak current from its own
+> documentation before applying power the first time.
+
+### Step 6 — bench the modules alone, first
+
+Range the two modules against each other at 1, 2, 5 and 10 m before any Falcon firmware is
+touched. Record actual distance, reported distance, variability, invalid readings and dropouts,
+then walk one unit slowly toward and away from the other and confirm the reported distance
+follows smoothly.
+
+> **Establish what "good" looks like on the bench before entering a hoistway.** This is the
+> same instruction as Section 13, Stage 2, and for the same reason: a bad number in a shaft is
+> uninterpretable without a clean-air reference to compare it against.
+>
+> **And check one thing here that decides how much Phase 0 can ever prove.** Section 5 permits
+> exactly one class of false-alarm mitigation — discrimination on first-path quality, using
+> `FP_AMPL`, `FP_INDEX` and `maxNoise` — and forbids the alternative of raising thresholds.
+> Whether those diagnostics are reachable through the module's AT interface is unknown and
+> should be settled at Step 6, not discovered at Step 23. If they are not exposed, Phase 0 can
+> measure the false-motion rate but cannot legitimately reduce it, and any quiet it achieves by
+> moving `RANGE_ON` upward is desensitization, which Section 5 rejects.
+
+### Steps 7–9 — two UARTs
+
+Start with three functions on UART0 and nothing else: send command, receive line, parse range.
+Prove that the Falcon repeatedly obtains plausible values and recognises missing or malformed
+ones before any motion logic exists.
+
+The logging UART uses the ATmega328PB's second USART, whose pins are shared with ISP:
+
+```text
+runtime                                    programming
+J2 MOSI / PB3 / TXD1 ─────► USB-UART RX    J2 reverts to AVR ISP
+J2 MISO / PB4 / RXD1 ◄───── USB-UART TX
+J2 GND ──────────────────── USB-UART GND   SCK and RESET stay free for the programmer
+```
+
+Giving two independent links: UART0 to the module, UART1 to the laptop. Key the pogo fixture
+so it cannot be fitted backwards.
+
+> **Three things to resolve before writing that code.**
+>
+> - **USART1 exists on the ATmega328PB and not on the ATmega328P.** `platformio.ini` currently
+>   builds `board = ATmega328P`, and the Arduino core selected there has no `Serial1`.
+>   Phase 0 needs a 328PB target and a core that exposes the second USART; confirm that before
+>   designing around it.
+> - **The pogo fixture and the programmer must never be attached at once.** PB3/PB4 are MOSI
+>   and MISO. A USB-UART sitting on those lines during an ISP cycle is a bus contention, and
+>   an ISP cycle during logging corrupts the log.
+> - **UART0 is currently the only debug channel.** Every `Serial.print` in `main.cpp` goes out
+>   of the port that is now committed to the module. Those calls move to UART1 or they become
+>   noise on the module's receive line.
+
+### Steps 10–12 — the engineering stream
+
+The value of Phase 0 is mostly here. Generate a CSV diagnostic stream rather than echoing raw
+module output:
+
+```text
+time,accel,range_raw,range_filt,delta,velocity,state,alarm
+12540,18,8241,8238,3,30,ARMED,0
+12640,116,8268,8249,27,110,SUSPECT,0
+12740,143,8307,8271,39,225,MOVING,1
+12840,72,8350,8302,43,310,MOVING,1
+```
+
+Full field set: timestamp, accelerometer magnitude, accelerometer motion flag, raw range,
+filtered range, range difference, range velocity, UWB-valid flag, link status, state, alarm
+state, transition reason, battery ADC.
+
+Filter lightly — a 3 to 5 sample moving average is enough for an ATmega — and **keep both
+`range_raw` and `range_filt` in the output** so the filter itself can be evaluated rather than
+trusted. Range rate follows from the filtered series:
+
+```text
+range_delta    = filtered_now − filtered_previous
+range_velocity = range_delta / elapsed_time
+```
+
+Range rate is the measurement that keeps working when the accelerometer goes quiet during
+constant-speed travel — the failure Section 1 identifies in the existing firmware and
+Section 5 addresses by never depending on acceleration in the first place.
+
+> Keep the CSV column names and units stable from the first capture. Section 10 replays
+> captures through `falcon_srcs/simulation/` and `falcon_srcs/graph/plot.py`; a schema that
+> changes mid-programme means early runs cannot be re-scored against later thresholds, which
+> is most of the reason to log at all.
+
+### Steps 13–14 — state machine and provisional thresholds
+
+```text
+STARTUP → ARMED → MOTION_SUSPECTED → MOVING → STOP_CONFIRM → ARMED
+                  (accel or range rate) (confirmed)  (quiet for X s)
+
+FAULT — separate, for communications and measurement problems
+```
+
+Starting values, **for bring-up only**:
+
+```text
+MOTION_RANGE_RATE = 75 mm/s        MOTION_CONFIRM    = 2–3 measurements
+STOP_RANGE_RATE   = 25 mm/s        STOP_CONFIRM_TIME = 3000 ms
+```
+
+These are firmware variables, not compile-time constants, and they are guesses. Open question
+Q4 stands: real values come from logged runs in Step 24. The one rule that governs how they
+move is in Section 5 — thresholds are never raised to quiet a false alarm.
+
+> #### The defect in this rule, quantified
+>
+> Section 5 rejects rate-based alarm logic, and Phase 0 adopts it anyway for tractability. The
+> cost is specific and it should be understood before any hoistway run, not rediscovered in
+> the data.
+>
+> For a pit node at lateral offset `d` from the counterweight's path, with vertical separation
+> `h` and travel speed `v`:
+>
+> ```
+> r  = √(h² + d²)          |ṙ| = v · h / r  ≈  v · h / d   for h ≪ d
+> ```
+>
+> The range rate passes through **zero** as the counterweight arrives level. It falls below
+> `STOP_RANGE_RATE` while `h < d·R_off/v`, and the time spent in that band is:
+>
+> ```
+> dwell = 2·d·R_off / v²
+> ```
+>
+> With `d` = 2 m and `R_off` = 25 mm/s:
+>
+> | Travel speed | Rate-null dwell | Against `STOP_CONFIRM_TIME` = 3000 ms |
+> |---|---|---|
+> | 500 mm/s (normal) | 0.4 s | Alarm survives |
+> | 150 mm/s (inspection) | **4.4 s** | **Alarm clears at closest approach** |
+> | 50 mm/s (creep) | **40 s** | **Alarm clears for the whole approach** |
+>
+> Dwell scales as `1/v²`, so the slower the car, the worse it gets — and inspection speed is
+> the realistic service case, closest approach is the dangerous moment, and the pit node is
+> the one next to a person. The accelerometer AND-term does not rescue it: the pit node is
+> genuinely stationary throughout.
+>
+> Three consequences. **One:** `STOP_CONFIRM_TIME` must exceed `2·d·R_off/v²` at the slowest
+> speed of interest, which pushes it to tens of seconds and makes the stop rule nearly
+> vacuous. **Two:** this is the concrete demonstration of why Section 5 specifies sustained
+> *change* over a window rather than instantaneous rate — the any-motion rule has no null.
+> **Three:** if Phase 0 is to produce a detector rather than an instrument, the fix is to
+> adopt the Section 5 rule, not to tune around this. Recording the null in real data is itself
+> a worthwhile Phase 0 result.
+
+### Step 15 — live threshold commands
+
+Tuning without reflashing, over UART1:
+
+```text
+STATUS   SET RANGE_ON 75   SET RANGE_OFF 25   SET STOP_TIME 3000
+SET ACCEL_ON 120           SAVE               DEFAULTS
+```
+
+The unit echoes what it stored — `RANGE_ON=75` / `OK` — so a clamped or rejected value is
+visible in the log at the moment it happened.
+
+### Steps 16–18 — alarm, peer, and clearing
+
+On entering `MOVING`, drive `BUZZ_EN` and the strobe pattern; the existing AO3400A MOSFET
+already switches the buzzer, so no module-side driver is needed. The moving node also drives
+the pit node into alarm, and **the motion condition is refreshed continuously while movement
+lasts** rather than sent as a single packet — a lost packet must not clear an alarm.
+
+That refresh is nearly free: Section 4 notes that in single-sided TWR only the initiator
+computes the range, so a result has to travel to the peer in any case. The same field carries
+the alarm condition.
+
+Clearing requires `|range_velocity| < STOP_RANGE_RATE` **and** a quiet accelerometer,
+continuously, for the whole of `STOP_TIME`. One unchanged measurement is not a stop.
+
+### Step 19 — faults must not look like quiet
+
+Detect at minimum: module not responding, no valid range, link lost, UART framing or parse
+failure, low battery, unexpected MCU reset. Log the reason, not just the state:
+
+```text
+STATE=FAULT
+REASON=UWB_TIMEOUT
+```
+
+> **A fault must never present as a healthy stationary system.** This is the fail-silent
+> requirement from Section 5, and it is the one piece of Phase 0 that is genuinely
+> safety-relevant rather than exploratory: a device that goes quiet because its link died,
+> while looking exactly like a device that is quiet because nothing is moving, is worse than
+> no device. Give it a distinct annunciation, and hold the alarm through a fault that
+> interrupts an active alarm rather than clearing it.
+
+### Steps 20–25 — test, plot, tune, freeze
+
+Bench first, moving one Falcon relative to the other: stationary, slow, fast, short movement,
+vibration without translation, translation without large acceleration, start-stop-start, and
+temporary radio obstruction. Capture a log for every run and plot range, range velocity,
+accelerometer, state and alarm on a common time axis.
+
+The two rows that matter are the discrimination cases — vibration without translation must not
+alarm, and translation without acceleration must — because they are the two the existing
+accelerometer firmware gets wrong.
+
+Then the hoistway: stationary car, initial movement, acceleration, constant-speed travel,
+deceleration, stop, short jog, multi-floor travel. Vary car height, pit-node position, antenna
+orientation, doors, occupancy, car versus counterweight mounting, and maximum separation.
+Record range error, variance, packet loss, maximum usable distance, false detections and
+missed movement.
+
+> **Add the overnight run.** Section 5 defines the one measurement that needs no interpretation:
+> lock the elevator out, leave both units mounted and armed overnight, and count alarms. Every
+> alarm is unambiguously false. It is the primary Phase 1 gate, it costs nothing here beyond a
+> night, and without it Phase 0 is a demonstration rather than a measurement.
+
+Freeze what survives: parameters to EEPROM, plus firmware version, module configuration,
+threshold set and test results recorded together. Each unit reports its configuration on the
+logging UART at startup:
+
+```text
+FALCON UWB MOTION TEST
+FW=0.4   RANGE_ON=78   RANGE_OFF=24   STOP_TIME=3000   FILTER=5   NODE=PIT
+```
+
+Section 13's capture-metadata list applies here too, and for the same reason: identical units
+and undocumented configuration make a capture unreadable a week later.
+
+### Steps 26–27 — power measurement, and where Phase 0 stops
+
+Measure current in four conditions — Falcon alone, Falcon plus module idle, Falcon plus module
+ranging, and alarm plus ranging together — and record rail behaviour under each. That data
+decides between the existing 3.1 V rail and a dedicated 3.3 V regulator off `VCC_4V5_RVP`, and
+**no production power design is frozen until it exists**.
+
+Step 27 sketches a Falcon UWB daughterboard: module, UART connection, power input, regulator
+if required, bulk and bypass capacitors, programming pads, mechanical support and antenna
+clearance, with the antenna near or beyond the PCB edge and away from the battery and large
+metal.
+
+> **This is the point to stop and re-read Section 8.** A daughterboard is a commitment to the
+> ATmega-plus-module architecture, and Section 8 argues the target design has no external
+> microcontroller at all — the module's own MCU is the host, which deletes the UART protocol,
+> the second USART, the level and rail questions, and the daughterboard itself. Phase 0 can
+> justify its own bring-up fixtures. It cannot justify a production PCB revision. If a
+> daughterboard starts to look necessary, that is the signal Phase 0 has outgrown its purpose
+> and the decision belongs to Phase 4 on Phase 1 data.
+
+### Phase 0 exit criteria
+
+The prototype has done its job when all of the following hold. The first ten are the Rev-0
+success criteria; the last two are what make the exercise a measurement rather than a demo.
+
+| # | Criterion |
+|---|---|
+| 1 | Both modules range reliably |
+| 2 | Falcon reads range over UART0 |
+| 3 | UART1 logs state-machine data continuously |
+| 4 | Falcon detects the start of equipment motion |
+| 5 | UWB confirms continued movement |
+| 6 | Both Falcons alarm during movement |
+| 7 | The alarm stays active through constant-speed travel |
+| 8 | The alarm clears only after a confirmed stop |
+| 9 | Link loss produces a distinguishable fault condition |
+| 10 | Thresholds can be tuned from logs without reflashing |
+| 11 | **An overnight locked-out capture exists, with the false-alarm count from it** |
+| 12 | **The closest-approach rate null is either observed in real data or shown not to occur** |
+
+### What Phase 0 can and cannot answer
+
+| Phase 1 question | Phase 0 | Note |
+|---|---|---|
+| Does a real elevator produce an unambiguous range signature? | **Yes** | The most transferable result available here |
+| What is the range envelope and link continuity in a shaft? | **Yes** | Module-specific, but indicative |
+| What is the false-motion rate from multipath? | **Partly** | Measurable; reducing it needs first-path diagnostics that may not be exposed |
+| Can first-path quality gating suppress false motion? | **Only if the AT interface exposes the metrics** | Settle at Step 6 |
+| Does the pit case work? | **Partly** | Worst RF case in the building; a negative here is informative, a positive is not conclusive on different silicon |
+| Antenna orientation dependence | **No** | Different module, different antenna; Section 12 records this gap on the DK too |
+| Power budget for the product | **No** | Different processor, different radio duty cycle, different battery |
+| Sleep and 40-hour endurance | **No** | Phase 0 is mains- or bench-powered in practice |
+
+---
+
+## 12. Phase 1 bill of materials and instrumentation
 
 Prices and stock as researched 16 Aug 2026. Reconfirm before ordering.
 
@@ -799,7 +1208,7 @@ angle-of-arrival work is possible on this kit, which this design does not need.
 
 ---
 
-## 12. Phase 1 bring-up procedure
+## 13. Phase 1 bring-up procedure
 
 Ordered deliberately: each stage exists to make the next interpretable. **You cannot diagnose
 a bad result in a hoistway unless you already know what a good result looks like on the
@@ -845,7 +1254,7 @@ Open air, line of sight, before going near a hoistway:
 ### Stage 3 — instrument for capture
 
 Move off the GUI to the SDK or starter firmware. Configure SS-TWR with CFO correction, the
-tethered device as initiator, and the logging and CIR throughput plan from Section 11.
+tethered device as initiator, and the logging and CIR throughput plan from Section 12.
 
 ### Stage 4 — hoistway captures
 
@@ -869,7 +1278,7 @@ tethered device as initiator, and the logging and CIR throughput plan from Secti
 
 ---
 
-## 13. Open questions
+## 14. Open questions
 
 **Q1 — Group formation.** How do N devices know they are on the same job, with no setup
 screen? Needs a zero-config answer before Phase 3.
@@ -893,6 +1302,13 @@ assumes traction with a roped counterweight.
 **Q7 — Charging workflow.** Several devices per mechanic, charged with their other tools.
 Dock, individual USB-C, or something else.
 
+**Q8 — Does the candidate module expose first-path diagnostics?** Section 5 permits false
+alarms to be attacked only by discrimination, and every permitted discriminator needs
+`FP_AMPL`, `FP_INDEX` or `maxNoise`. A module that reports a range and nothing else cannot
+implement the alarm logic in this document — it can only be desensitized, which is rejected.
+**This is a module selection criterion, not a detail**, and it applies to the MaUWB AT
+interface in Phase 0 as much as to any production candidate.
+
 ### Resolved since Rev A
 
 - *Is the hazard device semi-permanent or per-job?* — **Per-job.** Devices are placed and
@@ -904,7 +1320,7 @@ Dock, individual USB-C, or something else.
 
 ---
 
-## 14. Scope boundary
+## 15. Scope boundary
 
 > **Hold this line explicitly.** This is a **secondary alert aid, not a protective device**.
 > It does not substitute for lockout/tagout, the pit stop switch, or the
@@ -919,7 +1335,9 @@ Three deliberate exclusions follow, and each also keeps the engineering simpler:
 
 - **No interface to the permanent installation.** No controller integration, no wiring, no
   modification to the elevator. Battery and magnet mount only. This is what keeps the device
-  out of A17.1 certification scope.
+  out of A17.1 certification scope. **This binds prototypes from the first bench day**, not
+  only shipped product — a Phase 0 unit is not permitted near the controller, the safety
+  circuit or the brakes either.
 - **No commissioning.** No site survey, no surveyed positions, no field calibration.
   Zero-config or it will not be used.
 - **No position, only distance.** Absolute position is not needed, not measured, not claimed.
