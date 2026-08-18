@@ -522,7 +522,58 @@ from the jog question:
 So the windowed test's place is a **pre-filter that rejects non-departures**, not
 a replacement for the jog verdict.
 
-### ⭐⭐ 0.0e-1 LABELLED CONFIRMATION — the pre-filter separates knocks from departures
+### ☠️☠️ 0.0e-0 THE PRE-FILTER IS REFUTED TOO — a real 20 fpm departure lands in the knock band
+
+**READ THIS BEFORE §0.0e-1, WHICH IT OVERTURNS.** §0.0e-1 below reported a clean
+4.4× separation between knocks and departures on 3 labelled points and called the
+windowed pre-filter a candidate. **Dave then ran three labelled 20 fpm down
+departures specifically to probe the low end, and the separation collapsed.**
+
+```
+LABELLED 20 fpm DOWN departures (Dave-confirmed)
+  #1  opk=149  ->  block-mean=199  dir= 92%
+  #2  opk=188  ->  block-mean= 45  dir= 75%    <-- REAL DEPARTURE, IN THE KNOCK BAND
+  #3  opk=170  ->  block-mean=160  dir= 92%
+
+LABELLED NON-DEPARTURES (Dave-confirmed)
+  walk #2      block-mean= 14  dir= 58%
+  bump         block-mean= 33  dir= 75%
+  walk #1      block-mean= 34  dir= 50%
+```
+
+🔴 **A genuine 20 fpm departure scored 45 at 75% directionality — the same
+directionality as the bump, and a block mean 1.3× the highest knock.** The
+claimed 4.4× gap was an artefact of sampling only fast/strong departures.
+**Directionality does not separate either** once slow real departures are
+included: 75% and 92% for real departures against 50–75% for knocks.
+
+⛔ **AND THE FAILURE DIRECTION IS THE CATASTROPHIC ONE.** Any floor set high
+enough to reject the walks (>34) rejects this real departure, manufacturing a
+missed departure — §14.4. Note the shipping `opk` gate classified run #2
+CORRECTLY (`opk=188` → RUN). **On this event the windowed pre-filter would have
+been strictly worse than what ships today.**
+
+**So the pre-filter idea is withdrawn as well.** What survives from §0.0d–§0.0e
+is only the negative knowledge, which is still worth having:
+
+- amplitude (`ANYMOTION_THRESHOLD`) cannot separate knocks from slow departures
+  — §0.0d, a bump is *larger* than a real departure;
+- departure *shape* cannot separate jogs from runs — §0.0e, a jog's departure is
+  a real departure;
+- departure shape cannot reliably separate knocks from **slow** departures
+  either — this section.
+
+⭐ **The methodological lesson, for the fourth time today:** every one of these
+looked clean on 3 labelled points and failed on the next measurement. **Three
+points is not a separation.** The corpus-scale replay (§0.0e) and the low-end
+probe (this section) are what falsified them, and both were cheap.
+
+⬜ **Where this leaves the false-alarm problem:** unresolved, and no candidate
+rule currently survives. The honest next step is more labelled data across BOTH
+classes — especially the weak end of real departures, where every idea has died —
+before any further rule design.
+
+### ⭐⭐ 0.0e-1 LABELLED CONFIRMATION — the pre-filter separates knocks from departures ☠️ (SUPERSEDED BY §0.0e-0 ABOVE — the separation does not hold)
 
 **Dave deliberately induced a false alarm by WALKING ON THE CARTOP, then handed
 the event over labelled.** This is the first ground-truth non-departure in the
