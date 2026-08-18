@@ -468,6 +468,50 @@ static_assert(XY_CALIB_MIN_BUCKETS <= XY_CALIB_BUCKETS,
  */
 #define MONITOR_REARM_MS               6000
 
+/*
+ * ─── REST-GATED EARLY CLEAR OF THE RE-ARM BLANK (2026-08-18) ────────────────
+ *
+ * THE DEFECT THIS ADDRESSES. The fixed 6 s blank above is a 6-SECOND WINDOW IN
+ * WHICH A REAL DEPARTURE IS SILENTLY DISCARDED, and because cruise generates
+ * essentially NO any-motion edges, the departure edge is the ONLY edge until
+ * the brake. Discard it and the entire run is undetected: beacon silent over a
+ * moving counterweight, then a latch at the stop and an alarm on a car that has
+ * already arrived.
+ *
+ * Measured on the cartop 2026-08-18 (inverted mount, slow up runs from the
+ * lower landing): 6 of 12 runs missed, and 4 of those 6 carry explicit
+ * "any-motion ignored, re-arm blanking" lines for the departure edge. 32 such
+ * discards across the session. See falcon_jog_ringing_2026-08-18.md §0.0c.
+ *
+ * THE FIX. End the blank as soon as the mechanical disturbance from the
+ * previous stop has actually subsided, instead of after a fixed 6 s.
+ * lat_monitor.quiet_run() counts consecutive lateral metrics under the
+ * per-deployment learned still-threshold: it is driven to 0 by the ringing a
+ * stop produces and climbs once that ringing passes. Requiring it to REACH
+ * MONITOR_REARM_QUIET once (the flag then latches for that MONITORING episode)
+ * is a direct measurement of "the car has settled", which is the condition the
+ * 6 s was standing in for.
+ *
+ * ⚠️ THIS CAN ONLY EVER SHORTEN THE BLANK, NEVER LENGTHEN IT. MONITOR_REARM_MS
+ * remains a hard cap, and MONITOR_REARM_MIN_MS is a floor that still covers the
+ * two cases the original guard was written for -- loop() ordering (an edge
+ * raised in DECELERATING delivered after MONITORING is entered) and the first
+ * instants of residual ringing.
+ *
+ * 🔴 THE RISK, STATED PLAINLY. The 6 s exists because on 2026-08-07 a
+ * terminal-floor brake set re-latched 3.5 s after MONITORING was entered and
+ * produced a 73-SECOND ALARM ON A STATIONARY CAR. If the lateral goes quiet
+ * before such a brake set, this change lets that edge through again. The
+ * mitigating fact -- recorded in the comment above -- is that STOP_CONFIRM_MS
+ * is what actually closed that hole; MONITOR_REARM_MS is explicitly "the
+ * backstop rather than the fix".
+ *
+ * ⛔ SO THE THING TO WATCH ON THE CAR IS AN ALARM THAT STARTS ON A CAR THAT HAS
+ * ALREADY STOPPED. If that appears, revert by setting MONITOR_REARM_QUIET to 0.
+ */
+#define MONITOR_REARM_QUIET            8     /* lateral quiet metrics = settled */
+#define MONITOR_REARM_MIN_MS           1500  /* floor; ordering + first ringing */
+
 
 enum MotionStates
 {
@@ -528,6 +572,7 @@ class MovementService {
     bool     ramp_reported;        /* ramp verdict logged this run        */
     uint32_t stop_confirm_timer;   /* start of the settled-at-1g window   */
     uint32_t monitor_entered_ms;   /* when STATE_MONITORING was entered   */
+    bool     rearm_cleared;        /* settled seen -> blank ended early    */
     uint8_t  arrival_edge_count;   /* any-motion edges inside the window  */
     uint32_t arrival_edge_first;   /* timestamp of the first of them      */
 

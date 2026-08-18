@@ -29,6 +29,7 @@ MovementService::MovementService(RollingAvg<float> *acc_avg)
     arrival_seen       = false;
     stop_confirm_timer = 0;
     monitor_entered_ms = 0;
+    rearm_cleared      = false;
     arrival_edge_count = 0;
     arrival_edge_first = 0;
     vel_departure      = 0.0f;
@@ -148,8 +149,22 @@ void MovementService::notify_any_motion(uint32_t edge_ms)
         return;
     }
 
-    if ((int32_t)(edge_ms - monitor_entered_ms) < (int32_t)MONITOR_REARM_MS) {
-        Serial.print(F("FSM: any-motion ignored, re-arm blanking \r\n"));
+    /*
+     * Re-arm blanking, rest-gated. See the MONITOR_REARM_QUIET block in the
+     * header for the measured defect this closes and the risk it carries.
+     *
+     * rearm_cleared is latched by fsm_run() once the lateral has actually gone
+     * quiet, so the blank ends when the car has settled rather than after a
+     * fixed 6 s. MONITOR_REARM_MS still caps it, so this can only shorten the
+     * window in which a real departure is thrown away.
+     */
+    if (!rearm_cleared &&
+        (int32_t)(edge_ms - monitor_entered_ms) < (int32_t)MONITOR_REARM_MS) {
+        Serial.print(F("FSM: any-motion ignored, re-arm blanking t="));
+        Serial.print((int32_t)(edge_ms - monitor_entered_ms));
+        Serial.print(F(" q="));
+        Serial.print(lat_monitor.quiet_run());
+        Serial.print(F("\r\n"));
         return;
     }
 
@@ -358,6 +373,7 @@ void MovementService::fsm_run()
              */
             monitor_entered_ms = millis();
             any_motion_pending = false;
+            rearm_cleared      = false;
 
             /*
              * Clear the window for the same reason MONITOR_REARM_MS exists:
@@ -369,6 +385,27 @@ void MovementService::fsm_run()
             vel_window.reset(millis());
             vel_departure = 0.0f;
             vel_reported  = false;
+        }
+
+        /*
+         * End the re-arm blank as soon as the car has actually settled.
+         *
+         * quiet_run() is driven to 0 by the ringing a stop produces and climbs
+         * once it passes, so reaching MONITOR_REARM_QUIET is a direct
+         * measurement of "settled" rather than the fixed 6 s guess. Latched:
+         * once cleared it stays cleared for this MONITORING episode, so ordinary
+         * ambient jitter afterwards cannot re-blank a departure.
+         *
+         * MONITOR_REARM_MIN_MS floors it so the loop()-ordering case and the
+         * first instants of ringing are still covered.
+         */
+        if (!rearm_cleared &&
+            (millis() - monitor_entered_ms) >= MONITOR_REARM_MIN_MS &&
+            lat_monitor.quiet_run() >= MONITOR_REARM_QUIET) {
+            rearm_cleared = true;
+            Serial.print(F("FSM: re-arm blank cleared early, settled at "));
+            Serial.print(millis() - monitor_entered_ms);
+            Serial.print(F(" ms\r\n"));
         }
 
         present_accel = acceleration_avg_ref->avg();
