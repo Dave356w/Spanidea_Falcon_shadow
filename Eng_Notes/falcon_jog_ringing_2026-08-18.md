@@ -461,6 +461,80 @@ The pre-patch firmware would have latched it identically.
 detector. Handling an armed unit mid-deployment is not a case the design claims
 to cover — but it is a case that will happen in the field.
 
+## 0.0e ☠️ "WINDOWED JOG TEST LIKE THE RAMP DETECTOR" — REPLAYED AND REFUTED
+
+Dave asked: *"windowed jog similar to ramp?"* — following §0.0d's conclusion that
+shape, not amplitude, is the discriminator. **Replayed against all 177 departure
+bursts on file (`graph/jog_window_replay.py`, written for this) and it does not
+work.** The §0.0d conclusion that pointed at it is retracted with it.
+
+### The measurement
+
+Best-block mean and directionality (ramp detector's own math, `RAMP_BLOCK_N` 12,
+`RAMP_DIR_PCT` 85) against the shipping `opk` verdict, on today's labelled log:
+
+```
+real runs (opk low):   blkmean 148-475 at dir 100%  ... and also 26, 33, 38, 61, 66, 79, 103
+jogs      (opk high):  blkmean  83-1017, MANY at dir 100%  (134, 225, 206, 279, 202, 260, 269 ...)
+```
+
+**Complete overlap, on both axes.** Across all 177 bursts the floor sweep gives
+33–50 disagreements with the shipping gate at *every* floor from 80 to 300 — no
+setting reconciles them.
+
+### ⭐ WHY it fails — the principled reason, worth keeping
+
+**A jog's departure IS a real departure.** The car genuinely accelerates, so its
+departure ramp is one-signed and sustained, arithmetically identical to a real
+run's. The difference between a jog and a run is not in the departure at all —
+it is the REVERSAL that follows. **And the reversal is exactly what `opk`
+measures.**
+
+🔴 **So `opk` is on the RIGHT axis, and §0.0d's "the redesign should key on
+sustained one-signed shape over a longer window" was WRONG for the jog
+question.** Shape-of-departure cannot separate a jog from a run because there is
+nothing there to separate.
+
+⚠️ **METHOD NOTE — the first version of this comparison was circular.** It scored
+the windowed test against "bursts the shipping gate calls JOG/RUN", and those
+labels ARE `opk`-thresholded by definition, so `opk` separating them perfectly
+(691 vs 972) is a tautology, not evidence. Only the overlap on the *proposed*
+statistic carries information. **This is the same trap as scoring a rule against
+its own output; do not repeat it.**
+
+### ✅ What DID survive — a different question, a different instrument
+
+The bump from §0.0d separates cleanly on the windowed statistic:
+
+```
+bump        blkmean  33   dir  75%
+real runs   blkmean 148-475  dir 100%
+```
+
+because a knock has **no sustained ramp at all**. That is a different question
+from the jog question:
+
+| question | right instrument |
+|---|---|
+| "was this a departure at all, or a knock?" | **windowed shape** — works |
+| "was this departure part of a jog?" | **`opk` / reversal** — shape cannot help |
+
+So the windowed test's place is a **pre-filter that rejects non-departures**, not
+a replacement for the jog verdict.
+
+### ⛔ BLOCKED ON THE SAME GAP, AND THIS IS THE REAL ACTION ITEM
+
+Several `RUN`-labelled bursts score low (26, 33, 38, 61, 66, 79, 103). They are
+either **genuine slow departures** — in which case a floor of 120 manufactures
+MISSED DEPARTURES, the catastrophic direction — or they are **knocks mislabelled
+as runs**. **The logs contain no ground truth and nobody can tell which.**
+
+⬜ **THE HIGHEST-VALUE NON-CAR WORK IS NOW LABELLING, NOT ALGORITHM DESIGN.**
+Every rule proposed today (this one, D1, the `opk` retune) is unfalsifiable
+against a 177-burst corpus with no labels. A labelling pass — even just marking
+each burst run/jog/knock from the session notes and the operator's own calls —
+converts the whole corpus into something a replay can actually score.
+
 ## 0. The headline
 
 **The jog verdict silences the beacon on a real, moving counterweight whenever
