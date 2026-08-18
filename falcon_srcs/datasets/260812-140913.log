@@ -1,5 +1,7 @@
 XY: calib b=10 peak=0.0500 mv=0
 FSM: READY 
+Zero-Calib-Value : 9.770277
+Threshold-Value  : 0.400000
 XY-Still-Value   : 0.0540
 FSM: Transitioned to STATE_MONITORING 
 ACC-STAT s=0x3F6 pin=0 n=1 sk=1
@@ -87,6 +89,8 @@ ACC-INT n=1 t=5292 st=7 bz=0 pin=0
 FSM: Performing Self Calibration 
 XY: calib b=10 peak=0.0500 mv=0
 FSM: READY 
+Zero-Calib-Value : 9.769828
+Threshold-Value  : 0.400000
 XY-Still-Value   : 0.0570
 FSM: Transitioned to STATE_MONITORING 
 ACC-STAT s=0x3FA pin=0 n=1 sk=1
@@ -166,6 +170,8 @@ FSM: Performing Self Calibration
 ACC-STAT s=0x3E4 pin=0 n=1 sk=0
 XY: calib b=10 peak=0.0490 mv=0
 FSM: READY 
+Zero-Calib-Value : 9.768593
+Threshold-Value  : 0.400000
 XY-Still-Value   : 0.0555
 FSM: Transitioned to STATE_MONITORING 
 ACC-INT n=2 t=29376 st=2 bz=0 pin=1
@@ -278,6 +284,8 @@ FSM: Performing Self Calibration
 ACC-STAT read FAILED
 XY: calib b=10 peak=0.0470 mv=0
 FSM: READY 
+Zero-Calib-Value : 9.771757
+Threshold-Value  : 0.400000
 XY-Still-Value   : 0.0555
 FSM: Transitioned to STATE_MONITORING 
 ACC-STAT s=0x41F pin=0 n=1 sk=0
@@ -515,6 +523,8 @@ ACC-INT n=1 t=5275 st=7 bz=0 pin=0
 FSM: Performing Self Calibration 
 XY: calib b=10 peak=0.0920 mv=0
 FSM: READY 
+Zero-Calib-Value : 9.772055
+Threshold-Value  : 0.400000
 XY-Still-Value   : 0.0795
 FSM: Transitioned to STATE_MONITORING 
 ACC-STAT s=0x421 pin=0 n=1 sk=0
@@ -557,6 +567,8 @@ ACC-STAT s=0x432 pin=0 n=1 sk=0
 ACC-STAT s=0x421 pin=0 n=1 sk=0
 XY: calib b=10 peak=0.0570 mv=0
 FSM: READY 
+Zero-Calib-Value : 9.771005
+Threshold-Value  : 0.400000
 XY-Still-Value   : 0.0480
 FSM: Transitioned to STATE_MONITORING 
 ACC-STAT s=0x41D pin=0 n=1 sk=0

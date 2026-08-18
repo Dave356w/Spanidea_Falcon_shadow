@@ -1,0 +1,8 @@
+FSM: re-arm blank cleared early, settled at 1589 ms
+ACC-STAT s=0x406 pin=0 n=3 sk=0
+ACC-STAT s=0x3DC pin=0 n=3 sk=1
+ACC-STAT s=0xEA pin=0 n=3 sk=2
+ACC-STAT read FAILED
+ACC-STAT s=0x401 pin=0 n=3 sk=0
+ACC-STAT s=0x3E9 pin=0 n=3 sk=1
+ACC-STAT s=0x3F9 pin=0 n=3 sk=2

@@ -531,7 +531,9 @@ class MovementService {
     MotionStates last_state;
     RollingAvg<float> *acceleration_avg_ref;
     float zero_calib_value;
-    float threshold_value;
+    float threshold_value;       /* learned polled departure gate       */
+    float z_cal_min;             /* z average min across calibration    */
+    float z_cal_max;             /* z average max across calibration    */
 
     MovementService(RollingAvg<float> *acc_avg);
 

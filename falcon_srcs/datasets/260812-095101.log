@@ -2,6 +2,8 @@ ACC-INT n=1 t=5275 st=7 bz=0 pin=0
 FSM: Performing Self Calibration 
 XY: calib b=10 peak=0.0670 mv=0
 FSM: READY 
+Zero-Calib-Value : 9.763335
+Threshold-Value  : 0.400000
 XY-Still-Value   : 0.0495
 FSM: Transitioned to STATE_MONITORING 
 ACC-STAT s=0xFF1E pin=0 n=1 sk=0
@@ -33,6 +35,8 @@ ACC-INT n=1 t=5275 st=7 bz=0 pin=0
 FSM: Performing Self Calibration 
 XY: calib b=10 peak=0.0450 mv=0
 FSM: READY 
+Zero-Calib-Value : 9.759537
+Threshold-Value  : 0.400000
 XY-Still-Value   : 0.0495
 FSM: Transitioned to STATE_MONITORING 
 ACC-STAT s=0x43B pin=0 n=1 sk=0

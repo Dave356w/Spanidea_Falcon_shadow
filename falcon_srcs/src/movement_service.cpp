@@ -3,7 +3,21 @@
 /*
  * Polled departure threshold, on |acceleration_avg - zero_calib|.
  *
- * ⚠️ 0.40 -> 0.20, 2026-08-18, TRIAL. Revert is this one number.
+ * ⚠️ 0.40 -> 0.20 -> 0.10, 2026-08-18, TRIAL. Revert is this one number.
+ *
+ * 0.20 was flashed and shown HARMLESS but not USEFUL: 2 runs right-side up,
+ * both caught by any-motion, so the backstop never fired. 0.10 is the value
+ * where the backstop actually carries weight -- 72% of departures against 18%
+ * -- while keeping 3.9x headroom on the worst right-side-up rest sample
+ * (MAX 0.0257, n=470).
+ *
+ * ⚠️ THE REST TAIL IS UNCHARACTERISED IN THIS MOUNTING. 470 quiet samples
+ * right-side up against 21391 inverted; MAX 0.0257 is the worst of a SMALL
+ * sample and the tail may be higher. There is less room for it at 0.10.
+ *
+ * ⚠️ HANDLING THE DEVICE WILL NOW LATCH. A hand bump measured 0.136 and
+ * walking reached 0.87 -- both far above 0.10. Plugging in debug wiring will
+ * fire a departure. That is the threshold working as configured, not a fault.
  *
  * WHY. This path is the BACKSTOP for a missed any-motion departure, and on
  * 2026-08-18 that backstop was needed and absent: any-motion missed 6 of 12
@@ -42,7 +56,66 @@
  * alarm (see falcon_jog_ringing_2026-08-18.md §0.0d). Watch for a latch with no
  * car movement; revert to 0.40 if it appears.
  */
-#define DEFAULT_THRESHOLD_VALUE 0.20
+#define DEFAULT_THRESHOLD_VALUE 0.10
+
+/*
+ * ─── SELF-CALIBRATED POLLED DEPARTURE THRESHOLD (2026-08-18) ────────────────
+ *
+ * THE PROBLEM WITH A CONSTANT. The polled departure excursion is
+ * MOUNTING-DEPENDENT, measured the same afternoon on one device:
+ *
+ *   inverted (cwt-bottom sim)   departures median 0.136, max 0.398
+ *   right-side up               departures 0.050 - 0.120, median 0.067
+ *
+ * A 2-3x spread. Any fixed DEFAULT_THRESHOLD_VALUE is therefore wrong in every
+ * mounting but the one it was measured in: 0.40 caught 1/82 (dead), 0.20 caught
+ * 0/8 right-side up, 0.10 catches 1/8. Meanwhile the REST noise is stable and
+ * small in both (right-side up p99 0.0143, MAX 0.0257 over 470 samples;
+ * inverted p99 0.0151) -- so the noise floor, not the departure, is the thing
+ * worth measuring per deployment.
+ *
+ * THE FIX, and it reuses a pattern this device already ships. XY_STILL learns
+ * the LATERAL noise floor during the 6 s calibration window and sets the
+ * lateral gate as a multiple of it, clamped. This does the same for Z: measure
+ * the spread of the z average across the calibration window, and set the
+ * polled departure threshold to a multiple of that.
+ *
+ * The deployment sequence is what makes this sound -- placement happens BEFORE
+ * power-on, so calibration is guaranteed to run at rest, on the counterweight,
+ * in the building (falcon_spec_primary_usecase_2026-08-09 §1).
+ *
+ * ⚠️ THE MARGIN IS THE UNMEASURED PART, exactly as XY_STILL's was. Rest spread
+ * over a 6 s window has never been measured directly -- it is inferred from
+ * per-sample deviation, and the weakest real departure seen right-side up is
+ * 0.050 against a rest MAX deviation of 0.0257, i.e. under 2x separation. That
+ * is thin, and it is why the derived value is PRINTED at READY: read it on the
+ * bench, compare against the departures in the same log, and tune Z_THRESH_MARGIN
+ * from data rather than from this comment.
+ *
+ * 🔴 FAILURE DIRECTIONS. Too low -> false departure -> beacon on a stationary
+ * car for LATCH_FAILSAFE_MS (600 s). Too high -> the backstop is dead again,
+ * which is the state this replaces. The clamps bound both: Z_THRESH_MAX stops a
+ * calibration taken during motion from disabling the detector, Z_THRESH_MIN
+ * stops a freakishly quiet one from making it hair-trigger.
+ */
+#define Z_THRESH_MARGIN    (1.50f)   /* multiple of measured rest spread     */
+#define Z_THRESH_MIN       (0.040f)  /* floor: below weakest departure seen  */
+#define Z_THRESH_MAX       (0.200f)  /* ceiling: a moving calibration        */
+#define Z_THRESH_FALLBACK  DEFAULT_THRESHOLD_VALUE
+
+/*
+ * Skip the head of the calibration window while the 32-sample average is still
+ * converging. Measured 2026-08-18, first samples of a real window:
+ *
+ *     avg = 7.499, 8.522, 9.758, 9.757, 9.755, ...
+ *
+ * The |z|>5 priming guard does NOT exclude 7.499/8.522, so the spread came out
+ * 2.26 and the derived threshold CLAMPED to Z_THRESH_MAX (printed as exactly
+ * 0.200000) -- the backstop dead, which is the state this whole change exists
+ * to fix. The average spans 32 samples at 25 Hz = 1.28 s, so 1500 ms clears it
+ * with margin and still leaves 4.5 s of the 6 s window to measure noise in.
+ */
+#define Z_CAL_SETTLE_MS    (1500UL)
 
 /* Raw-sample arrival peak, maintained in the sampling ISR. See main.cpp. */
 extern void  arrival_peak_reset();
@@ -79,6 +152,15 @@ MovementService::MovementService(RollingAvg<float> *acc_avg)
     ramp_reported      = false;
     calib_moved        = false;
     calib_attempts     = 0;
+
+    /*
+     * Until a calibration completes there is no learned z noise floor, so the
+     * polled gate holds the compile-time fallback rather than 0.0 -- which
+     * would make every sample a departure.
+     */
+    threshold_value    = Z_THRESH_FALLBACK;
+    z_cal_min          =  1.0e9f;
+    z_cal_max          = -1.0e9f;
 }
 
 /*
@@ -255,6 +337,13 @@ void MovementService::fsm_run()
              * lateral.h.
              */
             lat_monitor.calib_begin(millis());
+
+            /*
+             * Same window, same reasoning, for the Z noise floor -- see the
+             * Z_THRESH_MARGIN block. Seeded so the first sample sets both ends.
+             */
+            z_cal_min =  1.0e9f;
+            z_cal_max = -1.0e9f;
             calib_moved = false;
 
             /*
@@ -264,6 +353,36 @@ void MovementService::fsm_run()
              * verdict from the deployment before it.
              */
             heartbeat_set(HEARTBEAT_OFF);
+        }
+
+        /*
+         * Track the z average across the calibration window. Spread rather
+         * than sigma: it needs two floats and no accumulation, and the window
+         * is short enough that a single outlier cannot be hidden by a mean.
+         * See the Z_THRESH_MARGIN block.
+         */
+        {
+            float za = acceleration_avg_ref->avg();
+
+            /*
+             * ⚠️ ONLY ONCE THE AVERAGE HOLDS REAL GRAVITY. The FSM enters
+             * calibration before the first accelerometer sample has been
+             * folded in, so `avg` reads ~0 for the opening pass(es). Measured
+             * 2026-08-18: including them made the spread 9.76 (9.759 - 0),
+             * the derived threshold 14.6, and the value CLAMPED to
+             * Z_THRESH_MAX -- printed as exactly 0.200000, which is how it was
+             * caught. Unclamped that would have silently disabled the polled
+             * detector for the whole deployment.
+             *
+             * Any plausible mounting reads |z| near 1 g in this window, so 5.0
+             * separates "primed" from "not yet" with enormous margin and needs
+             * no orientation assumption -- inverted reads -9.7, upright +9.76.
+             */
+            if ((millis() - start_timer) > Z_CAL_SETTLE_MS &&
+                (za > 5.0f || za < -5.0f)) {
+                if (za < z_cal_min) { z_cal_min = za; }
+                if (za > z_cal_max) { z_cal_max = za; }
+            }
         }
 
         if ((millis() - start_timer) > CALIB_TIMEOUT_MS) {
@@ -353,7 +472,27 @@ void MovementService::fsm_run()
              * hand it to the FSM as "at rest" for the whole deployment.
              */
             zero_calib_value = acceleration_avg_ref->avg();
-            threshold_value = DEFAULT_THRESHOLD_VALUE;
+
+            /*
+             * Derive the polled departure threshold from the z noise measured
+             * in THIS deployment, clamped both ways -- see Z_THRESH_MARGIN.
+             * A window that produced no samples falls back to the constant
+             * rather than to an arbitrary small number.
+             */
+            /*
+             * No separate spread print: `Threshold-Value` below already
+             * carries the result at 6 decimals, and the clamps are legible in
+             * it -- exactly 0.040000 or 0.200000 means the value was clamped
+             * rather than learned. Flash headroom is 60-500 bytes on this
+             * build; a redundant string is not worth it.
+             */
+            if (z_cal_max >= z_cal_min) {
+                threshold_value = (z_cal_max - z_cal_min) * Z_THRESH_MARGIN;
+                if (threshold_value < Z_THRESH_MIN) { threshold_value = Z_THRESH_MIN; }
+                if (threshold_value > Z_THRESH_MAX) { threshold_value = Z_THRESH_MAX; }
+            } else {
+                threshold_value = Z_THRESH_FALLBACK;
+            }
 
             /* The raw peak detector measures against the same baseline. */
             arrival_zero_set(zero_calib_value);
@@ -463,7 +602,7 @@ void MovementService::fsm_run()
          * STATE_MOVEMENT_DETECTED state.
          */
 
-        if (delta_accel > DEFAULT_THRESHOLD_VALUE) {
+        if (delta_accel > threshold_value) {
             start_timer = millis();
             set_state(STATE_MOVEMENT_DETECTED);
         }

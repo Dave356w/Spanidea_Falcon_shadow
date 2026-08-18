@@ -1,6 +1,8 @@
 FSM: Performing Self Calibration 
 XY: calib b=10 peak=0.0473 mv=0
 FSM: READY 
+Zero-Calib-Value : 9.735907
+Threshold-Value  : 0.400000
 XY-Still-Value   : 0.0485
 FSM: Transitioned to STATE_MONITORING 
 ACC-INT n=1 t=55197 st=2 bz=0 pin=1

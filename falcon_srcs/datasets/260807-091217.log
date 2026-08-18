@@ -1,4 +1,6 @@
 FSM: Performing Self Calibration 
+Zero-Calib-Value : 9.712702
+Threshold-Value  : 0.400000
 FSM: Transitioned to STATE_MONITORING 
 ACC-INT n=1 t=20840 st=2 bz=0 pin=1
 ACC-STAT s=0x40 pin=0 n=1

@@ -53,6 +53,8 @@ ACC-STAT s=0x40 pin=0 n=21
 FSM: Transitioned to STATE_STOPPED 
 FSM: Transitioned to STATE_MONITORING 
 FSM: Performing Self Calibration 
+Zero-Calib-Value : 9.749527
+Threshold-Value  : 0.400000
 FSM: Transitioned to STATE_MONITORING 
 ACC-INT n=1 t=97501 st=2 bz=0 pin=1
 FSM: Departure latched (any-motion) 
@@ -110,6 +112,8 @@ FSM: Transitioned to STATE_MOVEMENT_DETECTED
 ACC-STAT s=0x40 pin=0 n=19
 FSM: Transitioned to STATE_MOVING 
 FSM: Performing Self Calibration 
+Zero-Calib-Value : 9.739498
+Threshold-Value  : 0.400000
 FSM: Transitioned to STATE_MONITORING 
 ACC-INT n=1 t=110526 st=2 bz=0 pin=1
 FSM: Departure latched (any-motion) 
@@ -246,6 +250,8 @@ FSM: Transitioned to STATE_STOPPED
 FSM: Transitioned to STATE_MONITORING 
 ACC-INT n=1 t=5275 st=7 bz=0 pin=0
 FSM: Performing Self Calibration 
+Zero-Calib-Value : 9.748928
+Threshold-Value  : 0.400000
 FSM: Transitioned to STATE_MONITORING 
 ACC-INT n=2 t=70025 st=2 bz=0 pin=1
 FSM: Departure latched (any-motion) 

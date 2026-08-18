@@ -1,3 +1,5 @@
+Zero-Calib-Value : 9.754466
+Threshold-Value  : 0.400000
 FSM: Transitioned to STATE_MONITORING 
 ACC-STAT s=0xFDF6 pin=0 n=0 sk=1
 VEL: departure w=-0.269 cov=5111 obs

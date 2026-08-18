@@ -3,6 +3,8 @@ ACC-STAT s=0x41B pin=0 n=1 sk=0
 ACC-STAT s=0x420 pin=0 n=1 sk=0
 XY: calib b=10 peak=0.0515 mv=0
 FSM: READY 
+Zero-Calib-Value : 9.726942
+Threshold-Value  : 0.400000
 XY-Still-Value   : 0.0512
 FSM: Transitioned to STATE_MONITORING 
 ACC-STAT s=0x413 pin=0 n=1 sk=0
