@@ -1,0 +1,25 @@
+ACC-INT n=35 t=723812 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=35
+ACC-INT n=36 t=725172 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=37
+ACC-INT n=37 t=725286 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=37
+ACC-INT n=38 t=762462 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=38
+ACC-INT n=39 t=763346 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=39
+ACC-INT n=40 t=783663 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=40
+ACC-INT n=41 t=783958 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=42
+ACC-INT n=42 t=784973 st=2 bz=0 pin=1
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ACC-STAT s=0x40 pin=0 n=42
+FSM: Transitioned to STATE_MOVING 
+FSM: Buzzer timeout happened 
+FSM: Chase-LED timeout happened 
+FSM: Average : 9.726923
+FSM: Delta   : 0.021854
+FSM: Transitioned to STATE_DECELERATING 
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 

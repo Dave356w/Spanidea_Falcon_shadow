@@ -1,0 +1,6 @@
+ACC-INT n=3 t=167526 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=3
+ACC-INT n=4 t=167821 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=5
+ACC-INT n=5 t=168837 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=5

@@ -1,0 +1,40 @@
+ACC-INT n=2 t=74022 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=3
+ACC-INT n=3 t=74760 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=3
+ACC-INT n=4 t=84983 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=4
+ACC-INT n=5 t=85983 st=2 bz=0 pin=1
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ACC-STAT s=0x40 pin=0 n=5
+ACC-INT n=6 t=86900 st=3 bz=0 pin=1
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=6
+FSM: Buzzer timeout happened 
+FSM: Chase-LED timeout happened 
+FSM: Average : 9.756263
+FSM: Delta   : 0.007485
+FSM: Transitioned to STATE_DECELERATING 
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-INT n=7 t=106758 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=7
+ACC-INT n=8 t=107462 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=8
+ACC-INT n=9 t=118915 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=9
+ACC-INT n=10 t=119570 st=2 bz=0 pin=1
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ACC-STAT s=0x40 pin=0 n=10
+ACC-INT n=11 t=120274 st=3 bz=0 pin=1
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=1 n=12
+ACC-INT n=12 t=121274 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=12
+FSM: Buzzer timeout happened 
+FSM: Chase-LED timeout happened 
+FSM: Average : 9.750575
+FSM: Delta   : 0.001797
+FSM: Transitioned to STATE_DECELERATING 
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 

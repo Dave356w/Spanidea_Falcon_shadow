@@ -1,0 +1,83 @@
+ACC-INT n=1 t=5275 st=7 bz=0 pin=0
+FSM: Performing Self Calibration 
+XY: calib b=10 peak=0.2460 mv=0
+FSM: READY 
+XY-Still-Value   : 0.1920
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x396 pin=0 n=1 sk=0
+ACC-STAT s=0xFFB2 pin=0 n=1 sk=0
+ACC-STAT s=0x39C pin=0 n=1 sk=0
+ACC-STAT s=0x39E pin=0 n=1 sk=0
+ACC-STAT s=0x3D1 pin=0 n=1 sk=1
+ACC-INT n=2 t=83869 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=2 sk=0
+ACC-INT n=3 t=84279 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=3 sk=0
+ACC-INT n=4 t=86736 st=4 bz=0 pin=1
+BURST k=dep pre=20 n=80 signed_mmss=23 36 -65 -175 206 33 -197 96 28 -111 -3 -110 -127 -91 -260 -203 -192 -437 -334 -256 -420 -421 -414 -467 -510 -554 -565 -614 -580 -582 -560 -548 -651 -585 -602 -616 -598 -606 -561 -600 -606 -638 -528 -575 -630 -609 -567 -579 -602 -618 -564 -554 -659 -635 -561 -588 -595 -581 -598 -573 -613 -602 -560 -597 -562 -543 -522 -515 -484 -458 -444 -380 -345 -331 -318 -284 -296 -225 -211 -154 
+ACC-STAT s=0x40 pin=0 n=4 sk=0
+ACC-INT n=5 t=101679 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=5 sk=0
+FSM: Arrival (polled), peak 0.465
+FSM: Transitioned to STATE_DECELERATING 
+ACC-INT n=6 t=102137 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=6 sk=0
+BURST k=arr pre=20 n=80 signed_mmss=-12 -12 -39 -20 2 48 26 -27 12 6 -4 -30 2 -3 8 45 2 -56 -44 -2 21 11 -15 -14 15 20 -5 -20 -13 60 25 -35 -39 -1 -12 -11 -1 -24 -43 18 23 -15 0 45 14 -51 -45 -117 -70 -62 -42 68 153 220 279 285 334 404 464 468 500 550 547 552 605 609 606 634 604 606 633 581 612 588 570 621 593 590 588 620 
+ACC-INT n=7 t=104710 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=7 sk=0
+ACC-INT n=8 t=105136 st=5 bz=0 pin=1
+ACC-STAT s=0x37E pin=0 n=8 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-INT n=9 t=142278 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ACC-STAT s=0x40 pin=0 n=9 sk=0
+FSM: departure velocity w=0.000
+ACC-INT n=10 t=142655 st=4 bz=0 pin=1
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=10 sk=0
+ACC-INT n=11 t=145178 st=4 bz=0 pin=1
+BURST k=dep pre=20 n=80 signed_mmss=11 23 2 -2 -15 -33 15 9 15 45 20 28 103 105 126 197 226 261 358 354 337 373 366 418 490 515 582 613 587 578 570 594 582 619 640 624 605 624 592 626 593 576 576 615 603 590 595 623 645 605 570 605 618 602 619 615 578 615 633 597 605 603 604 560 619 639 552 511 492 489 473 396 364 370 324 344 309 245 240 170 
+ACC-STAT s=0x40 pin=0 n=11 sk=0
+ACC-STAT s=0x3B0 pin=0 n=11 sk=0
+ACC-INT n=12 t=160153 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=12 sk=0
+FSM: Arrival (polled), peak 0.508
+ACC-INT n=13 t=160579 st=5 bz=0 pin=1
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=13 sk=0
+BURST k=arr pre=20 n=80 signed_mmss=-6 62 50 -12 -93 -19 53 37 -18 -39 22 11 0 -66 7 5 -45 -5 8 6 5 -1 -24 -37 0 -11 -15 -18 -15 3 13 -23 -29 0 18 -36 4 22 -19 -15 5 44 -2 77 64 -257 -345 -270 -325 -428 -394 -386 -385 -373 -508 -542 -469 -499 -606 -616 -599 -607 -634 -592 -597 -628 -634 -594 -607 -641 -598 -626 -619 -561 -566 -615 -633 -590 -628 -601 
+ACC-INT n=14 t=163282 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=14 sk=0
+ACC-INT n=15 t=163577 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=15 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x38B pin=0 n=15 sk=0
+ACC-STAT s=0x38D pin=0 n=15 sk=0
+ACC-STAT read FAILED
+ACC-STAT s=0x3A8 pin=0 n=15 sk=0
+ACC-STAT s=0x3A4 pin=0 n=15 sk=0
+ACC-STAT s=0x3FB pin=0 n=15 sk=1
+ACC-INT n=1 t=5275 st=7 bz=0 pin=0
+FSM: Performing Self Calibration 
+ACC-STAT s=0x3E7 pin=0 n=1 sk=0
+XY: calib b=10 peak=0.0870 mv=0
+FSM: READY 
+XY-Still-Value   : 0.0705
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x3BB pin=0 n=1 sk=0
+ACC-STAT s=0x3D4 pin=0 n=1 sk=1
+ACC-STAT s=0x3CD pin=0 n=1 sk=1
+ACC-STAT s=0x300 pin=0 n=1 sk=0
+ACC-STAT s=0x3E6 pin=0 n=1 sk=1
+ACC-STAT s=0x3ED pin=0 n=1 sk=2
+ACC-STAT s=0x3CF pin=0 n=1 sk=1
+ACC-STAT read FAILED
+ACC-STAT s=0x3FD pin=0 n=1 sk=1
+ACC-STAT s=0x3EB pin=0 n=1 sk=1

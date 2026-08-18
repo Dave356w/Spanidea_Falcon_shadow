@@ -1,0 +1,81 @@
+XY: calib b=10 peak=0.0443 mv=0
+FSM: READY 
+XY-Still-Value   : 0.0494
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x40E pin=0 n=1 sk=0
+ACC-STAT s=0x406 pin=0 n=1 sk=0
+ACC-STAT s=0x40A pin=0 n=1 sk=0
+ACC-STAT s=0x424 pin=0 n=1 sk=0
+ACC-STAT s=0x41C pin=0 n=1 sk=0
+ACC-STAT s=0x428 pin=0 n=1 sk=0
+ACC-INT n=2 t=123322 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: departure velocity w=-0.061
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=2 sk=0
+ACC-INT n=3 t=149651 st=4 bz=1 pin=1
+FSM: Arrival (polled), peak 1.796
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=3 sk=0
+ACC-INT n=4 t=150536 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=4 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x418 pin=0 n=4 sk=0
+ACC-STAT read FAILED
+ACC-STAT s=0x40D pin=0 n=4 sk=0
+ACC-STAT s=0x400 pin=0 n=4 sk=0
+ACC-STAT s=0x41D pin=0 n=4 sk=0
+ACC-STAT s=0x411 pin=0 n=4 sk=0
+ACC-STAT s=0x40D pin=0 n=4 sk=0
+ACC-STAT s=0x411 pin=0 n=4 sk=0
+ACC-STAT s=0x41F pin=0 n=4 sk=0
+ACC-STAT s=0x41C pin=0 n=4 sk=0
+ACC-STAT s=0x407 pin=0 n=4 sk=0
+ACC-STAT s=0x41A pin=0 n=4 sk=0
+ACC-STAT s=0x404 pin=0 n=4 sk=0
+ACC-STAT s=0x41C pin=0 n=4 sk=0
+ACC-STAT s=0x411 pin=0 n=4 sk=0
+ACC-INT n=5 t=367722 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=5 sk=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ACC-INT n=6 t=367984 st=3 bz=0 pin=1
+FSM: departure velocity w=0.179
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=6 sk=0
+ACC-INT n=7 t=369131 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=7 sk=0
+ACC-INT n=8 t=385925 st=4 bz=1 pin=1
+FSM: Arrival (polled), peak 1.583
+ACC-STAT s=0x374 pin=1 n=9 sk=0
+FSM: Transitioned to STATE_DECELERATING 
+ACC-INT n=9 t=386187 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=10 sk=0
+ACC-INT n=10 t=387203 st=5 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=10 sk=0
+ACC-INT n=11 t=388268 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=11 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x426 pin=0 n=11 sk=0
+ACC-STAT s=0x40D pin=0 n=11 sk=0
+ACC-STAT s=0x413 pin=0 n=11 sk=0
+ACC-STAT s=0x41B pin=0 n=11 sk=0
+ACC-STAT s=0xFF32 pin=0 n=11 sk=0
+ACC-STAT s=0x42C pin=0 n=11 sk=0
+ACC-STAT s=0x436 pin=0 n=11 sk=0
+ACC-STAT s=0x414 pin=0 n=11 sk=0
+ACC-STAT s=0x412 pin=0 n=11 sk=0
+ACC-STAT s=0x418 pin=0 n=11 sk=0
+ACC-STAT s=0x409 pin=0 n=11 sk=0
+ACC-STAT s=0x440 pin=0 n=11 sk=1
+ACC-STAT s=0x417 pin=0 n=11 sk=0
+ACC-STAT s=0x41B pin=0 n=11 sk=0
+ACC-STAT s=0x413 pin=0 n=11 sk=0
+ACC-STAT s=0x417 pin=0 n=11 sk=0
+ACC-STAT s=0x440 pin=0 n=11 sk=1
+ACC-STAT s=0x419 pin=0 n=11 sk=0
+ACC-STAT s=0x411 pin=0 n=11 sk=0
+ACC-STAT s=0x418 pin=0 n=11 sk=0

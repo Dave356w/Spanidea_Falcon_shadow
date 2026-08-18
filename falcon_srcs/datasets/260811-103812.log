@@ -1,0 +1,3 @@
+ACC-STAT s=0x300 pin=0 n=7 sk=0
+ACC-STAT s=0xC5 pin=0 n=7 sk=1
+ACC-STAT s=0x3A9 pin=0 n=7 sk=0

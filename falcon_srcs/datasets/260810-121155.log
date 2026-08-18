@@ -1,0 +1,96 @@
+ACC-INT n=70 t=2899230 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: departure velocity w=-0.066
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=1 n=71 sk=0
+ACC-INT n=71 t=2899804 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=71 sk=0
+ACC-INT n=72 t=2900819 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=72 sk=0
+ACC-INT n=73 t=3112910 st=4 bz=0 pin=1
+FSM: Arrival (polled), delta 0.517922
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=1 n=74 sk=0
+ACC-INT n=74 t=3113402 st=5 bz=1 pin=1
+ACC-STAT s=0x40 pin=1 n=75 sk=0
+ACC-INT n=75 t=3114467 st=5 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=75 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-INT n=76 t=3242999 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: departure velocity w=-0.088
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=77 sk=0
+ACC-INT n=77 t=3243278 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=78 sk=0
+ACC-INT n=78 t=3244294 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=78 sk=0
+ACC-INT n=79 t=3245309 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=79 sk=0
+ACC-INT n=80 t=3324198 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=80 sk=0
+ACC-INT n=81 t=3325034 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=82 sk=0
+ACC-INT n=82 t=3326001 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=82 sk=0
+ACC-INT n=83 t=3327033 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=83 sk=0
+ACC-INT n=84 t=3349020 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=1 n=85 sk=0
+ACC-INT n=85 t=3349495 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=85 sk=0
+ACC-INT n=86 t=3362340 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=86 sk=0
+ACC-INT n=87 t=3362832 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=87 sk=0
+ACC-INT n=88 t=3363995 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=88 sk=0
+ACC-INT n=89 t=3364847 st=4 bz=1 pin=1
+FSM: Arrival (polled), delta 0.304168
+ACC-STAT s=0x40 pin=0 n=89 sk=0
+FSM: Transitioned to STATE_DECELERATING 
+ACC-INT n=90 t=3365928 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=90 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-INT n=91 t=3691347 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: departure velocity w=-0.093
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=1 n=92 sk=0
+ACC-INT n=92 t=3691986 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=92 sk=0
+ACC-INT n=93 t=3696246 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=94 sk=0
+ACC-INT n=94 t=3697082 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=94 sk=0
+ACC-INT n=95 t=3698180 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=95 sk=0
+ACC-INT n=96 t=3724115 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=96 sk=0
+ACC-INT n=97 t=3724738 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=97 sk=0
+ACC-INT n=98 t=3727785 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=1 n=99 sk=0
+ACC-INT n=99 t=3728834 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=99 sk=0
+ACC-INT n=100 t=3729965 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=100 sk=0
+ACC-INT n=101 t=3740450 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=101 sk=0
+ACC-INT n=102 t=3741450 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=102 sk=0
+ACC-INT n=103 t=3742105 st=4 bz=0 pin=1
+FSM: Arrival (any-motion), edges 2 delta 1.272
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=1 n=104 sk=0
+ACC-INT n=104 t=3743105 st=5 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=104 sk=0
+ACC-INT n=105 t=3744268 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=105 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 

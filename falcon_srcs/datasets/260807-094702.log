@@ -1,0 +1,4 @@
+ACC-INT n=10 t=286015 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=10
+ACC-INT n=11 t=286195 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=11

@@ -1,0 +1,8 @@
+ACC-INT n=2 t=59768 st=2 bz=0 pin=1
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ACC-STAT s=0x40 pin=0 n=2
+ACC-INT n=3 t=60604 st=3 bz=0 pin=1
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=3
+ACC-INT n=4 t=61620 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=4

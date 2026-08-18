@@ -1,0 +1,66 @@
+XY: calib b=10 peak=0.0479 mv=0
+FSM: READY 
+XY-Still-Value   : 0.0485
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x429 pin=0 n=1 sk=0
+ACC-STAT s=0x41B pin=0 n=1 sk=0
+ACC-STAT read FAILED
+ACC-STAT s=0x40A pin=0 n=1 sk=0
+ACC-STAT s=0x423 pin=0 n=1 sk=0
+ACC-STAT s=0x41E pin=0 n=1 sk=0
+ACC-INT n=2 t=66682 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: departure velocity w=0.133
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=2 sk=0
+ACC-INT n=3 t=67665 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=1 n=4 sk=0
+ACC-INT n=4 t=68485 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=4 sk=0
+ACC-INT n=5 t=69517 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=6 sk=0
+ACC-INT n=6 t=70500 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=6 sk=0
+ACC-INT n=7 t=89112 st=4 bz=0 pin=1
+FSM: Arrival (polled), peak 0.713
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=7 sk=0
+ACC-INT n=8 t=89784 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=8 sk=0
+ACC-INT n=9 t=90783 st=5 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=9 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x40E pin=0 n=9 sk=0
+ACC-STAT s=0x408 pin=0 n=9 sk=0
+ACC-INT n=10 t=142852 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: departure velocity w=0.215
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=10 sk=0
+ACC-INT n=11 t=143982 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=11 sk=0
+ACC-INT n=12 t=170131 st=4 bz=0 pin=1
+FSM: Arrival (polled), peak 1.413
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=12 sk=0
+ACC-INT n=13 t=170508 st=5 bz=1 pin=1
+ACC-STAT s=0x40 pin=1 n=14 sk=0
+ACC-INT n=14 t=171573 st=5 bz=1 pin=1
+ACC-STAT s=0x40 pin=1 n=15 sk=0
+ACC-INT n=15 t=172589 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=15 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x436 pin=0 n=15 sk=0
+ACC-STAT s=0x41D pin=0 n=15 sk=0
+ACC-STAT s=0x418 pin=0 n=15 sk=0
+ACC-STAT s=0x425 pin=0 n=15 sk=0
+ACC-STAT s=0x414 pin=0 n=15 sk=0
+ACC-STAT s=0x426 pin=0 n=15 sk=0
+ACC-STAT s=0x429 pin=0 n=15 sk=0
+ACC-STAT s=0x413 pin=0 n=15 sk=0
+ACC-STAT s=0x422 pin=0 n=15 sk=0
+ACC-STAT s=0x41C pin=0 n=15 sk=0

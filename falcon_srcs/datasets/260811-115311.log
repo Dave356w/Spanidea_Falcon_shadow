@@ -1,0 +1,61 @@
+XY: calib b=10 peak=0.1740 mv=0
+FSM: READY 
+XY-Still-Value   : 0.0630
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x39F pin=0 n=1 sk=0
+ACC-STAT s=0x375 pin=0 n=1 sk=1
+ACC-STAT s=0x397 pin=0 n=1 sk=0
+ACC-STAT s=0x37A pin=0 n=1 sk=1
+ACC-STAT s=0x37B pin=0 n=1 sk=2
+ACC-STAT read FAILED
+ACC-STAT s=0x38E pin=0 n=1 sk=0
+ACC-STAT s=0x39D pin=0 n=1 sk=0
+ACC-STAT s=0x39A pin=0 n=1 sk=0
+ACC-STAT s=0x39C pin=0 n=1 sk=0
+ACC-STAT s=0x383 pin=0 n=1 sk=0
+ACC-STAT s=0x393 pin=0 n=1 sk=0
+ACC-STAT s=0x390 pin=0 n=1 sk=0
+ACC-STAT s=0x3AF pin=0 n=1 sk=0
+ACC-INT n=2 t=155172 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ACC-STAT s=0x40 pin=0 n=2 sk=0
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-INT n=3 t=156303 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=3 sk=0
+BURST pre=20 n=80 signed_mmss=-51 -129 -156 242 37 10 88 -140 191 -272 -29 -127 -303 -50 -174 -37 -274 -268 -303 -374 -377 -409 -493 -530 -630 -524 -521 -562 -495 -515 -415 -375 -351 -262 -313 -169 8 -42 13 -20 13 0 37 3 4 1 -13 43 38 26 -19 35 -44 54 -15 56 -7 -20 22 20 18 -38 -70 10 -25 44 -5 -42 30 -6 0 -13 -20 0 17 25 -18 -17 -5 18 
+ACC-STAT s=0x3AA pin=0 n=3 sk=0
+ACC-INT n=4 t=203964 st=4 bz=1 pin=1
+FSM: Arrival (polled), peak 2.372
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=4 sk=0
+ACC-INT n=5 t=204390 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=5 sk=0
+ACC-INT n=6 t=205504 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=7 sk=0
+ACC-INT n=7 t=206520 st=5 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=7 sk=0
+ACC-INT n=8 t=207781 st=5 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=8 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x3A9 pin=0 n=8 sk=0
+ACC-STAT read FAILED
+ACC-INT n=9 t=287522 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ACC-STAT s=0x40 pin=0 n=9 sk=0
+FSM: departure velocity w=0.000
+ACC-INT n=10 t=287801 st=4 bz=0 pin=1
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=10 sk=0
+ACC-INT n=11 t=289849 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=12 sk=0
+ACC-INT n=12 t=289931 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=12 sk=0
+BURST pre=20 n=80 signed_mmss=-9 0 -6 -92 54 55 3 -32 -32 -44 6 43 85 99 108 142 218 310 354 372 304 265 236 181 101 10 -72 44 90 140 136 133 93 77 -11 -59 49 72 93 103 89 69 32 13 19 18 42 52 55 87 63 81 24 -35 -60 -62 -54 -62 46 27 39 25 -26 -58 -97 -76 -32 -9 -7 23 -35 -15 -50 -37 -54 -48 0 13 -5 1 
+ACC-STAT s=0x39B pin=0 n=12 sk=0
+ACC-STAT s=0x3A3 pin=0 n=12 sk=0
+ACC-STAT s=0x9C pin=0 n=12 sk=0
+ACC-STAT s=0x39E pin=0 n=12 sk=0

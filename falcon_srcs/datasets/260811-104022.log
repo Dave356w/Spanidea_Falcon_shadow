@@ -1,0 +1,55 @@
+XY: calib b=10 peak=0.0389 mv=0
+FSM: READY 
+XY-Still-Value   : 0.0494
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x3B6 pin=0 n=1 sk=0
+ACC-STAT s=0x3A1 pin=0 n=1 sk=0
+ACC-STAT s=0x3A6 pin=0 n=1 sk=0
+ACC-STAT s=0x3AC pin=0 n=1 sk=0
+ACC-STAT s=0x3B4 pin=0 n=1 sk=0
+ACC-INT n=2 t=92651 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: departure velocity w=-0.065
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=1 n=3 sk=0
+ACC-INT n=3 t=93306 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=3 sk=0
+ACC-INT n=4 t=94306 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=4 sk=0
+ACC-INT n=5 t=95518 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=5 sk=0
+ACC-INT n=6 t=189562 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=6 sk=0
+FSM: Arrival (polled), peak 1.731
+FSM: Transitioned to STATE_DECELERATING 
+ACC-INT n=7 t=191348 st=5 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=7 sk=0
+ACC-INT n=8 t=192233 st=5 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=8 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x3B2 pin=0 n=8 sk=0
+ACC-STAT s=0x3A2 pin=0 n=8 sk=0
+ACC-STAT s=0x3AE pin=0 n=8 sk=0
+ACC-STAT s=0x39E pin=0 n=8 sk=0
+ACC-STAT s=0x3AE pin=0 n=8 sk=0
+ACC-STAT s=0x39F pin=0 n=8 sk=0
+ACC-STAT s=0x39A pin=0 n=8 sk=0
+ACC-STAT s=0x39D pin=0 n=8 sk=0
+ACC-STAT s=0x3AC pin=0 n=8 sk=0
+ACC-STAT s=0x3B2 pin=0 n=8 sk=0
+ACC-STAT s=0x388 pin=0 n=8 sk=0
+ACC-STAT s=0x3A9 pin=0 n=8 sk=0
+ACC-STAT s=0x3A5 pin=0 n=8 sk=0
+ACC-STAT s=0x3AE pin=0 n=8 sk=0
+ACC-STAT s=0x3AD pin=0 n=8 sk=0
+ACC-STAT s=0x3A7 pin=0 n=8 sk=0
+ACC-STAT s=0x3A7 pin=0 n=8 sk=0
+ACC-STAT s=0x3A9 pin=0 n=8 sk=0
+ACC-STAT s=0x3A9 pin=0 n=8 sk=0
+ACC-STAT s=0x3A9 pin=0 n=8 sk=0
+ACC-STAT s=0x39B pin=0 n=8 sk=0
+ACC-STAT s=0x3A6 pin=0 n=8 sk=0
+ACC-STAT s=0x3A4 pin=0 n=8 sk=0
+ACC-STAT s=0x3AC pin=0 n=8 sk=0

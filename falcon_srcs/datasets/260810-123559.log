@@ -1,0 +1,59 @@
+ACC-STAT s=0x411 pin=0 n=1 sk=0
+ACC-STAT s=0x41B pin=0 n=1 sk=0
+ACC-STAT s=0x420 pin=0 n=1 sk=0
+XY: calib b=10 peak=0.0515 mv=0
+FSM: READY 
+XY-Still-Value   : 0.0512
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x413 pin=0 n=1 sk=0
+ACC-STAT s=0x431 pin=0 n=1 sk=0
+ACC-STAT s=0x42F pin=0 n=1 sk=0
+ACC-STAT s=0x40F pin=0 n=1 sk=0
+ACC-STAT s=0x429 pin=0 n=1 sk=0
+ACC-STAT s=0x42C pin=0 n=1 sk=0
+ACC-STAT s=0x42D pin=0 n=1 sk=0
+ACC-STAT s=0x426 pin=0 n=1 sk=0
+ACC-STAT s=0x417 pin=0 n=1 sk=0
+ACC-STAT s=0x413 pin=0 n=1 sk=0
+ACC-STAT s=0x410 pin=0 n=1 sk=0
+ACC-STAT s=0x429 pin=0 n=1 sk=0
+ACC-INT n=2 t=204521 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: departure velocity w=-0.106
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=2 sk=0
+ACC-INT n=3 t=276283 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=4 sk=0
+ACC-INT n=4 t=276447 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=5 sk=0
+ACC-INT n=5 t=277446 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=5 sk=0
+ACC-INT n=6 t=388284 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=6 sk=0
+ACC-INT n=7 t=388825 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=7 sk=0
+ACC-INT n=8 t=389922 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=9 sk=0
+ACC-INT n=9 t=390725 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=9 sk=0
+ACC-INT n=10 t=406765 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=10 sk=0
+ACC-INT n=11 t=407207 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=11 sk=0
+ACC-INT n=12 t=408109 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=13 sk=0
+FSM: Arrival (any-motion), edges 2 delta 0.208
+ACC-INT n=13 t=409092 st=5 bz=1 pin=1
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=13 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x408 pin=0 n=13 sk=0
+ACC-STAT s=0x425 pin=0 n=13 sk=0
+ACC-STAT s=0x41E pin=0 n=13 sk=0
+ACC-STAT s=0x408 pin=0 n=13 sk=0
+ACC-STAT s=0x428 pin=0 n=13 sk=0
+ACC-STAT s=0x40D pin=0 n=13 sk=0
+ACC-STAT s=0x42F pin=0 n=13 sk=0
+ACC-STAT s=0x420 pin=0 n=13 sk=0

@@ -1,0 +1,304 @@
+ACC-INT n=1 t=5275 st=7 bz=0 pin=0
+FSM: Performing Self Calibration 
+XY: calib b=10 peak=0.0580 mv=0
+FSM: READY 
+XY-Still-Value   : 0.0525
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x456 pin=0 n=1 sk=1
+ACC-STAT s=0x44B pin=0 n=1 sk=2
+ACC-STAT s=0x439 pin=0 n=1 sk=0
+ACC-INT n=2 t=41205 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ACC-STAT s=0x40 pin=0 n=2 sk=0
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-INT n=3 t=41549 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=3 sk=0
+ACC-INT n=4 t=42549 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=4 sk=0
+BURST k=dep pre=20 n=80 signed_mmss=0 9 -3 -6 -3 37 68 -47 -87 -32 2 -9 -39 -9 30 -46 -155 -204 -168 -185 -212 -274 -293 -306 -319 -394 -433 -391 -324 -273 -259 -233 -176 -99 -95 -105 -103 -83 -6 8 0 -35 -20 8 3 -15 -20 6 -9 -12 -3 18 2 -18 29 -9 -1 10 12 -15 -2 17 15 -11 -1 0 15 -12 16 16 24 -38 6 21 0 -2 -8 6 -14 4 
+JOGV pos=0 neg=4599 ratio=0 opk=68 verdict=RUN (armed)
+ACC-STAT s=0x42B pin=0 n=4 sk=0
+ACC-STAT s=0x449 pin=0 n=4 sk=0
+ACC-INT n=5 t=115589 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=6 sk=0
+ACC-INT n=6 t=116146 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=6 sk=0
+ACC-STAT s=0x431 pin=0 n=6 sk=0
+ACC-INT n=7 t=123011 st=4 bz=0 pin=1
+FSM: Arrival (polled), peak 2.571
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=7 sk=0
+ACC-INT n=8 t=123355 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=8 sk=0
+ACC-INT n=9 t=124387 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=9 sk=0
+ACC-INT n=10 t=125534 st=5 bz=0 pin=1
+BURST k=arr pre=20 n=80 signed_mmss=0 -52 -2 87 31 -12 -15 -45 -44 -12 22 1 -35 -27 -74 865 2570 762 -715 631 -449 -1099 -751 304 1027 713 -237 -863 -682 55 632 543 -207 -682 -472 -334 121 422 266 -116 -381 -285 68 271 191 99 -146 -246 -107 113 185 74 -134 -192 -80 81 126 23 14 -99 -117 -38 82 103 -18 -88 -74 -31 84 24 45 -9 -39 -62 -29 28 12 -12 -38 -47 
+ACC-STAT s=0x40 pin=0 n=10 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x453 pin=0 n=10 sk=1
+ACC-STAT s=0xFF53 pin=0 n=10 sk=2
+ACC-INT n=11 t=195264 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=11 sk=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-INT n=12 t=195788 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=12 sk=0
+BURST k=dep pre=20 n=80 signed_mmss=-56 -121 -42 46 77 51 45 63 77 102 121 186 264 340 354 381 434 470 469 431 404 395 397 344 301 246 248 210 185 185 184 130 110 7 -21 -2 -31 10 -30 -37 -20 -9 16 -2 9 -7 -12 10 16 0 -22 -31 3 2 -16 3 2 15 -4 -23 1 6 4 -6 -3 18 -18 -18 -12 12 18 -11 -15 2 -2 -15 15 -15 -12 -19 
+JOGV pos=6428 neg=0 ratio=0 opk=121 verdict=RUN (armed)
+ACC-INT n=13 t=205307 st=4 bz=1 pin=1
+FSM: Arrival (polled), peak 0.965
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=1 n=14 sk=0
+ACC-INT n=14 t=205668 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=15 sk=0
+ACC-INT n=15 t=206651 st=5 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=15 sk=0
+BURST k=arr pre=20 n=80 signed_mmss=-37 -150 -65 -32 -4 30 -36 -4 0 -5 -9 63 -35 -19 20 -111 -54 -56 -964 -731 -625 -932 -1285 -1000 -366 1976 -13 -1700 -1361 -867 -44 723 552 -105 -559 -466 67 554 403 -134 -473 -177 -60 261 255 -37 -293 -209 44 213 157 -68 -209 -145 -132 6 109 79 -50 -124 -73 33 93 42 -80 -83 -44 -47 -21 27 37 -8 -39 -36 -5 15 7 -31 -70 -9 
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x455 pin=0 n=15 sk=1
+ACC-STAT s=0x442 pin=0 n=15 sk=1
+ACC-STAT s=0x400 pin=0 n=15 sk=0
+ACC-STAT s=0x44A pin=0 n=15 sk=1
+ACC-STAT s=0x43E pin=0 n=15 sk=0
+ACC-STAT s=0x444 pin=0 n=15 sk=1
+ACC-STAT s=0x432 pin=0 n=15 sk=0
+ACC-STAT s=0x436 pin=0 n=15 sk=0
+ACC-INT n=16 t=351993 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ACC-STAT s=0x40 pin=0 n=16 sk=0
+ACC-INT n=17 t=352305 st=3 bz=0 pin=1
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=17 sk=0
+ACC-INT n=18 t=353239 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=18 sk=0
+ACC-INT n=19 t=354222 st=4 bz=1 pin=1
+BURST k=dep pre=20 n=80 signed_mmss=-5 0 -5 6 16 22 -11 -18 -36 -21 20 25 39 40 69 80 109 162 186 231 264 334 367 393 400 413 443 425 -138 -1114 -40 1983 2083 -1157 -2225 -1064 876 1715 816 -707 -1342 -712 648 1233 485 816 270 -456 -582 36 547 444 -88 -467 -374 93 438 294 -154 -402 -209 -303 -99 209 223 -8 -173 -156 8 160 124 -38 -172 -111 54 146 89 136 -5 -108 
+JOGV pos=16858 neg=11769 ratio=69 opk=2225 verdict=JOG (armed)
+ACC-STAT s=0x40 pin=0 n=19 sk=0
+FSM: Release (jog verdict) 
+FSM: Transitioned to STATE_DECELERATING 
+BURST k=arr pre=20 n=80 signed_mmss=209 223 -8 -173 -156 8 160 124 -38 -172 -111 54 146 89 136 -5 -108 24 52 -14 -43 -29 18 40 14 10 -26 -36 0 26 4 1 -12 -20 5 29 10 -13 -7 -30 -14 16 6 6 -6 -1 0 0 13 -5 -5 -24 15 3 10 3 -12 -2 -4 -3 0 -11 4 -18 12 2 -15 -1 -9 -3 0 -10 4 0 10 -18 -6 -1 6 0 
+FSM: Performing Self Calibration 
+ACC-STAT s=0x431 pin=0 n=0 sk=0
+XY: calib b=10 peak=0.0470 mv=0
+FSM: READY 
+XY-Still-Value   : 0.0525
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x437 pin=0 n=0 sk=0
+ACC-STAT s=0x438 pin=0 n=0 sk=0
+ACC-STAT s=0x43B pin=0 n=0 sk=0
+ACC-STAT s=0x43B pin=0 n=0 sk=0
+ACC-STAT s=0x444 pin=0 n=0 sk=1
+ACC-STAT s=0x435 pin=0 n=0 sk=0
+ACC-STAT s=0x421 pin=0 n=0 sk=0
+ACC-STAT s=0x428 pin=0 n=0 sk=0
+ACC-STAT s=0x421 pin=0 n=0 sk=0
+ACC-STAT s=0x43A pin=0 n=0 sk=0
+ACC-STAT s=0x42F pin=0 n=0 sk=0
+ACC-STAT s=0x431 pin=0 n=0 sk=0
+ACC-STAT s=0x445 pin=0 n=0 sk=1
+ACC-STAT s=0x428 pin=0 n=0 sk=0
+ACC-STAT read FAILED
+ACC-STAT s=0x423 pin=0 n=0 sk=0
+ACC-STAT s=0x426 pin=0 n=0 sk=0
+ACC-STAT s=0x3FB pin=0 n=0 sk=1
+ACC-STAT s=0x437 pin=0 n=0 sk=0
+ACC-STAT s=0x42C pin=0 n=0 sk=0
+ACC-STAT s=0x43F pin=0 n=0 sk=0
+ACC-STAT s=0x430 pin=0 n=0 sk=0
+Reset cause: 0x7
+ACC-INT n=1 t=5292 st=7 bz=0 pin=0
+FSM: Performing Self Calibration 
+XY: calib b=10 peak=0.0540 mv=0
+FSM: READY 
+XY-Still-Value   : 0.0510
+FSM: Transitioned to STATE_MONITORING 
+Reset cause: 0x8
+ACC-INT n=1 t=5292 st=7 bz=0 pin=0
+FSM: Performing Self Calibration 
+XY: calib b=10 peak=0.0480 mv=0
+FSM: READY 
+XY-Still-Value   : 0.0510
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x432 pin=0 n=1 sk=0
+ACC-INT n=2 t=47955 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=2 sk=0
+ACC-INT n=3 t=48775 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=3 sk=0
+ACC-INT n=4 t=49938 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=4 sk=0
+BURST k=dep pre=20 n=80 signed_mmss=19 0 6 43 15 -47 -78 -47 67 97 43 33 60 106 119 121 168 215 302 351 383 418 464 470 459 827 -28 1551 2078 485 -1297 -1592 -391 1144 1460 -115 -1209 -955 157 983 783 -166 409 -257 -580 -259 277 474 181 -268 -375 27 328 270 -52 -274 -183 80 -76 123 182 29 -122 -140 33 113 65 -41 -81 -22 59 74 12 -56 -23 -49 -31 38 47 12 
+JOGV pos=14819 neg=7806 ratio=52 opk=1592 verdict=JOG (armed)
+FSM: Release (jog verdict) 
+FSM: Transitioned to STATE_DECELERATING 
+BURST k=arr pre=20 n=80 signed_mmss=-140 33 113 65 -41 -81 -22 59 74 12 -56 -23 -49 -31 38 47 12 -25 -7 22 14 21 -17 -13 -7 14 10 -8 -1 -20 7 13 12 -11 -16 -5 4 11 6 -1 4 -4 -1 12 13 -10 2 0 -16 -7 9 -15 0 0 -10 9 9 -15 4 6 0 5 -7 -1 1 -7 2 0 4 -8 -9 -11 0 -4 -4 9 -6 11 1 -17 
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+Reset cause: 0x8
+ACC-INT n=2 t=5341 st=7 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=2 sk=0
+FSM: Performing Self Calibration 
+XY: calib b=10 peak=0.0500 mv=0
+FSM: READY 
+XY-Still-Value   : 0.0585
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x43E pin=0 n=2 sk=0
+ACC-STAT s=0x437 pin=0 n=2 sk=0
+ACC-STAT s=0x42B pin=0 n=2 sk=0
+ACC-STAT s=0x423 pin=0 n=2 sk=0
+ACC-STAT s=0x43D pin=0 n=2 sk=0
+ACC-STAT s=0x436 pin=0 n=2 sk=0
+ACC-STAT read FAILED
+ACC-STAT s=0x430 pin=0 n=2 sk=0
+ACC-STAT s=0x442 pin=0 n=2 sk=1
+ACC-INT n=3 t=124583 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=3 sk=0
+ACC-INT n=4 t=125108 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=5 sk=0
+ACC-INT n=5 t=125911 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=6 sk=0
+ACC-INT n=6 t=126959 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=6 sk=0
+BURST k=dep pre=20 n=80 signed_mmss=6 9 35 40 -11 -89 -80 2 117 94 22 40 88 131 129 150 224 308 363 384 395 435 477 465 457 245 244 1024 -86 -1308 -2363 -2677 -1829 -235 1618 1773 123 -1472 -1331 -816 119 923 687 -228 -767 -471 253 651 163 -415 -304 -250 34 281 207 -68 -248 -138 111 223 99 -88 -161 -83 32 101 60 -28 -80 -28 50 67 27 -12 -35 -37 26 66 14 -15 
+JOGV pos=11800 neg=14875 ratio=79 opk=1773 verdict=JOG (armed)
+FSM: Release (jog verdict) 
+FSM: Transitioned to STATE_DECELERATING 
+BURST k=arr pre=20 n=80 signed_mmss=-83 32 101 60 -28 -80 -28 50 67 27 -12 -35 -37 26 66 14 -15 0 0 8 14 21 7 4 -5 -12 18 10 9 -16 8 14 4 11 0 -7 0 -3 17 4 -9 -4 4 4 -12 0 -6 -4 1 2 10 5 17 -9 -1 8 14 5 -4 -1 16 -2 5 2 4 5 14 -16 -1 7 7 10 -1 3 11 7 0 0 1 4 
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x447 pin=0 n=6 sk=1
+ACC-STAT s=0x47B pin=0 n=6 sk=1
+ACC-INT n=7 t=159711 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=7 sk=0
+ACC-INT n=8 t=160366 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=8 sk=0
+ACC-INT n=9 t=161366 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=9 sk=0
+ACC-INT n=10 t=162430 st=4 bz=0 pin=1
+BURST k=dep pre=20 n=80 signed_mmss=43 15 -17 -26 -2 25 4 -47 -60 -80 -107 -149 -174 -179 -243 -258 -304 -352 -378 -412 -456 -471 -454 -440 -440 -369 -331 -279 -267 -232 -180 621 2669 1287 2588 1151 -1334 -2116 -844 1301 1783 460 -1035 -1311 -340 862 96 746 571 -200 -643 -392 244 559 260 -247 -468 -188 269 417 86 -288 -249 -130 83 187 72 -104 -155 -59 136 158 -4 83 -44 -106 -54 24 46 -1 
+JOGV pos=16133 neg=16029 ratio=99 opk=2116 verdict=JOG (armed)
+FSM: Release (jog verdict) 
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=10 sk=0
+BURST k=arr pre=20 n=80 signed_mmss=-249 -130 83 187 72 -104 -155 -59 136 158 -4 83 -44 -106 -54 24 46 -1 -6 -30 -22 20 41 11 30 -21 -35 -1 14 -9 -12 -20 -9 18 34 15 -25 -29 -9 -4 23 6 8 -7 12 13 1 11 -4 -4 4 16 -6 -6 1 12 -13 11 2 0 -3 0 23 -12 4 -13 -7 8 1 -1 8 -9 -1 -4 2 2 -15 0 19 0 
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0xFF32 pin=0 n=10 sk=0
+ACC-STAT s=0x42F pin=0 n=10 sk=0
+ACC-STAT s=0x40A pin=0 n=10 sk=0
+ACC-INT n=11 t=224985 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ACC-STAT s=0x40 pin=0 n=11 sk=0
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-INT n=12 t=225574 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=12 sk=0
+BURST k=dep pre=20 n=80 signed_mmss=74 19 -47 -91 -49 56 80 52 31 59 120 110 131 170 222 313 359 392 417 469 491 474 432 390 392 348 299 192 158 140 138 116 68 50 37 45 0 -1 5 -19 -12 14 -4 -79 62 -22 -21 -7 52 -73 -6 -53 12 -12 -48 25 78 -130 -38 -22 55 32 -16 -27 -12 45 5 26 -31 2 10 16 56 -9 5 -36 -22 33 8 81 
+JOGV pos=5518 neg=0 ratio=0 opk=130 verdict=RUN (armed)
+FSM: Arrival (polled), peak 0.758
+ACC-INT n=13 t=234422 st=5 bz=0 pin=1
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=13 sk=0
+ACC-INT n=14 t=234766 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=14 sk=0
+ACC-INT n=15 t=235765 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=15 sk=0
+BURST k=arr pre=20 n=80 signed_mmss=12 -7 3 -24 -33 41 0 -11 75 52 -6 -9 19 -26 -24 6 -758 -1222 -1008 -886 -552 1573 -694 -1628 -839 422 1175 497 -520 -828 -186 484 706 269 -208 -454 -118 274 367 -34 -304 -203 90 256 174 -35 -166 -85 81 114 53 -58 -87 -29 83 61 -40 -62 -50 1 37 24 -10 -31 -27 28 28 10 -5 2 5 7 -8 -11 -4 0 0 -16 -13 -10 
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x42F pin=0 n=15 sk=0
+ACC-STAT s=0x428 pin=0 n=15 sk=0
+ACC-STAT s=0x43A pin=0 n=15 sk=0
+ACC-STAT s=0x44E pin=0 n=15 sk=1
+ACC-STAT s=0x440 pin=0 n=15 sk=1
+ACC-STAT s=0x43F pin=0 n=15 sk=0
+ACC-STAT s=0x43B pin=0 n=15 sk=0
+ACC-STAT s=0x435 pin=0 n=15 sk=0
+ACC-INT n=16 t=373981 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ACC-STAT s=0x40 pin=0 n=16 sk=0
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-INT n=17 t=374554 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=17 sk=0
+BURST k=dep pre=20 n=80 signed_mmss=-27 -20 11 22 29 32 50 82 122 152 181 246 268 313 346 380 410 432 440 410 426 413 378 349 312 293 256 230 216 181 -12 192 65 71 41 49 66 -20 37 67 -9 -6 -3 14 -9 70 1 -14 0 32 17 1 13 -65 29 -16 16 -20 -26 47 -36 14 -13 31 -15 -28 -29 13 -1 -20 -7 29 -13 11 -13 -17 -25 -64 57 14 
+JOGV pos=6824 neg=0 ratio=0 opk=65 verdict=RUN (armed)
+ACC-STAT s=0x40 pin=0 n=18 sk=0
+FSM: Arrival (polled), peak 1.245
+ACC-INT n=19 t=399572 st=5 bz=1 pin=1
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=19 sk=0
+ACC-INT n=20 t=400572 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=20 sk=0
+BURST k=arr pre=20 n=80 signed_mmss=-90 -33 26 -11 -103 -46 17 13 -34 16 29 49 -83 79 53 -31 -76 -1245 -746 -668 -817 -950 2553 415 -1497 -823 1357 1542 -671 -1304 -801 -31 716 459 -511 -543 101 644 155 -414 -397 166 439 52 -303 -192 118 156 -34 -167 -58 77 143 -24 -85 -58 77 47 -78 -61 50 47 -9 -88 -25 27 42 -4 -80 -19 -21 43 -7 -44 -43 9 35 -24 -35 -18 
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x42D pin=0 n=20 sk=0
+ACC-STAT s=0x433 pin=0 n=20 sk=0
+ACC-STAT s=0x42B pin=0 n=20 sk=0
+ACC-STAT s=0x42F pin=0 n=20 sk=0
+ACC-STAT s=0x42D pin=0 n=20 sk=0
+ACC-STAT s=0x436 pin=0 n=20 sk=0
+ACC-INT n=21 t=556171 st=2 bz=0 pin=1
+FSM: Departure latched (any-motion) 
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ACC-STAT s=0x40 pin=0 n=21 sk=0
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-INT n=22 t=556761 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=22 sk=0
+BURST k=dep pre=20 n=80 signed_mmss=2 -34 -24 17 20 44 56 86 104 118 152 196 238 278 322 353 395 409 417 418 428 411 392 370 360 309 277 234 234 205 153 147 112 81 -19 39 0 2 56 220 120 0 -94 -24 0 101 23 -15 31 77 54 -20 -15 34 164 77 -36 -101 107 99 43 -58 49 34 49 -28 0 -21 -180 -111 39 -143 -15 16 1 50 58 -23 -10 8 
+JOGV pos=6935 neg=180 ratio=2 opk=180 verdict=RUN (armed)
+ACC-STAT s=0x444 pin=0 n=22 sk=0
+ACC-STAT s=0x400 pin=0 n=22 sk=0
+FSM: Arrival (polled), peak 1.943
+FSM: Transitioned to STATE_DECELERATING 
+ACC-INT n=23 t=585908 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=23 sk=0
+ACC-INT n=24 t=586448 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=24 sk=0
+BURST k=arr pre=20 n=80 signed_mmss=11 43 -50 -68 -24 44 49 -106 -35 65 -15 -182 -44 67 72 -46 -150 50 -1943 -328 -782 -579 2801 -2219 -1249 -207 483 110 -710 456 735 -876 -479 839 -92 -662 347 -40 442 -265 -535 474 270 -450 277 167 -359 43 156 -132 64 107 8 109 -107 -52 107 -80 -23 89 -112 62 64 -121 -10 83 -58 -47 -32 -13 26 -55 -7 32 -56 -36 68 -16 -40 37 
+ACC-STAT s=0x464 pin=0 n=24 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x445 pin=0 n=24 sk=1
+ACC-STAT s=0x43F pin=0 n=24 sk=0
+ACC-STAT s=0x443 pin=0 n=24 sk=1
+ACC-STAT s=0x433 pin=0 n=24 sk=0
+ACC-STAT s=0x427 pin=0 n=24 sk=0
+ACC-STAT s=0x433 pin=0 n=24 sk=0
+ACC-STAT s=0x423 pin=0 n=24 sk=0
+ACC-STAT s=0x442 pin=0 n=24 sk=1
+ACC-STAT s=0x454 pin=0 n=24 sk=1
+ACC-STAT s=0x432 pin=0 n=24 sk=0
+FSM: Performing Self Calibration 
+XY: calib b=10 peak=0.2410 mv=0
+FSM: READY 
+XY-Still-Value   : 0.0600
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x413 pin=0 n=0 sk=0
+ACC-STAT s=0x415 pin=0 n=0 sk=0
+ACC-STAT s=0x406 pin=0 n=0 sk=0

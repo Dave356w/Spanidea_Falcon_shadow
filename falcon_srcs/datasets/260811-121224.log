@@ -1,0 +1,14 @@
+ACC-INT n=1 t=5275 st=7 bz=0 pin=0
+FSM: Performing Self Calibration 
+XY: calib b=10 peak=0.0480 mv=0
+FSM: READY 
+XY-Still-Value   : 0.0570
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x3AB pin=0 n=1 sk=0
+ACC-STAT s=0xFFA1 pin=0 n=1 sk=0
+ACC-STAT s=0x3A1 pin=0 n=1 sk=0
+ACC-STAT read FAILED
+ACC-STAT s=0x3A8 pin=0 n=1 sk=0
+ACC-STAT s=0x392 pin=0 n=1 sk=0
+ACC-STAT s=0x393 pin=0 n=1 sk=0
+ACC-STAT s=0x399 pin=0 n=1 sk=0

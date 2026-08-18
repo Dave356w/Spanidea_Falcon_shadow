@@ -1,0 +1,4 @@
+XY: calib b=10 peak=0.0533 mv=0
+FSM: READY 
+XY-Still-Value   : 0.0440
+FSM: Transitioned to STATE_MONITORING 

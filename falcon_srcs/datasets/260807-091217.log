@@ -1,0 +1,54 @@
+FSM: Performing Self Calibration 
+FSM: Transitioned to STATE_MONITORING 
+ACC-INT n=1 t=20840 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=1
+ACC-INT n=2 t=21413 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=2
+ACC-INT n=3 t=22921 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=3
+ACC-INT n=4 t=23298 st=2 bz=0 pin=1
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ACC-STAT s=0x40 pin=0 n=4
+FSM: Transitioned to STATE_MOVING 
+ACC-INT n=5 t=24494 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=5
+ACC-INT n=6 t=25362 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=6
+FSM: Buzzer timeout happened 
+FSM: Chase-LED timeout happened 
+FSM: Average : 9.653127
+FSM: Delta   : 0.059575
+FSM: Transitioned to STATE_DECELERATING 
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-INT n=7 t=43139 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=7
+ACC-INT n=8 t=43384 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=8
+ACC-INT n=9 t=44662 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=9
+ACC-INT n=10 t=45465 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=10
+ACC-INT n=11 t=46710 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=11
+ACC-INT n=12 t=47464 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=12
+ACC-INT n=13 t=48611 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=13
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+ACC-INT n=14 t=49758 st=3 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=14
+ACC-INT n=15 t=50495 st=3 bz=0 pin=1
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=15
+ACC-INT n=16 t=51511 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=16
+ACC-INT n=17 t=59949 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=17
+FSM: Buzzer timeout happened 
+FSM: Chase-LED timeout happened 
+FSM: Average : 9.658816
+FSM: Delta   : 0.053886
+FSM: Transitioned to STATE_DECELERATING 
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
