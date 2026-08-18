@@ -534,17 +534,22 @@ WALK burst -- LABEL: NOT a departure
   windowed : best-block mean=34   dir=50%    <- REJECTED
 ```
 
-Three labelled points now:
+Four labelled points now (walk repeated from a cleared state):
 
 | event | label | block mean | dir% | shipping gate |
 |---|---|---|---|---|
-| **walk on cartop** | not a departure | **34** | **50%** | RUN ✗ false alarm |
+| **walk on cartop #2** | not a departure | **14** | **58%** | RUN ✗ false alarm |
+| **walk on cartop #1** | not a departure | **34** | **50%** | RUN ✗ false alarm |
 | **hand bump** (§0.0d) | not a departure | **33** | **75%** | RUN ✗ false alarm |
 | real up runs | departure | **148–475** | **100%** | RUN ✓ |
 
-**4.4× gap, no overlap.** The shipping `opk` gate passes BOTH false events — 389
-and 118 sit inside the real-run band (92–691) — so it cannot reject them at any
-threshold. The windowed pre-filter rejects both.
+**Non-departures top out at 34; real departures bottom out at 148 — a 4.4× gap,
+no overlap**, and directionality separates independently (≤75% vs 100%).
+
+🔴 **The shipping gate cannot reject ANY of the three false events:** their `opk`
+values are 118, 299 and 389, every one inside the real-run band (92–691). This is
+not a threshold that is set wrong — there is no setting that works. The windowed
+pre-filter rejects all three.
 
 ### ⭐ WHY, in one line
 
@@ -572,6 +577,29 @@ candidate with evidence, not a validated gate.
 labelled non-departures the same way — walk, bump, door slam, tool drop — and a
 matched set of labelled slow departures at 18–25 fpm. Twenty labelled events
 would settle the floor properly.
+
+### ⚠️ 0.0e-2 THE JOG-RESET PROCEDURE IS NOT RELIABLE — and a labelled false negative
+
+Clearing a false latch by jogging is what this whole session depended on. **It
+only works if the jog is firm enough to clear `opk` 900.** A gentle jog today:
+
+```
+JOGV pos=1468 neg=1654 ratio=88 opk=381 verdict=RUN (armed)
+```
+
+`ratio=88` is strongly jog-like, but `opk=381` missed the gate, so a genuine jog
+was classified **RUN** — it cleared the old latch and immediately re-latched.
+Earlier successful jog-resets ran `opk` 1459–2974.
+
+🔴 **This is item 9's mirror image and it comes from the same overlap.** The `opk`
+gate that silences real runs (too sensitive) also **misses real jogs** (not
+sensitive enough), because one threshold is being asked to split populations that
+overlap. It is further evidence the axis cannot carry the decision alone.
+
+⚠️ **Operationally:** the only way to silence a false latch short of the 600 s
+failsafe is an aggressive jog, and a mechanic will not know that. Several of
+today's clears actually came through the ARRIVAL path (`peak 0.517/1.104`) rather
+than the jog verdict at all.
 
 ### ⛔ BLOCKED ON THE SAME GAP, AND THIS IS THE REAL ACTION ITEM
 
