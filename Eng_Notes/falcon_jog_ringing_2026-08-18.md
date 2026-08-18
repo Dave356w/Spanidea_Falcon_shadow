@@ -522,6 +522,57 @@ from the jog question:
 So the windowed test's place is a **pre-filter that rejects non-departures**, not
 a replacement for the jog verdict.
 
+### ⭐⭐ 0.0e-1 LABELLED CONFIRMATION — the pre-filter separates knocks from departures
+
+**Dave deliberately induced a false alarm by WALKING ON THE CARTOP, then handed
+the event over labelled.** This is the first ground-truth non-departure in the
+project, and it was produced on purpose to test the surviving idea above.
+
+```
+WALK burst -- LABEL: NOT a departure
+  shipping : opk=389  ratio=79%   -> RUN     <- FALSE ALARM, gate cannot reject it
+  windowed : best-block mean=34   dir=50%    <- REJECTED
+```
+
+Three labelled points now:
+
+| event | label | block mean | dir% | shipping gate |
+|---|---|---|---|---|
+| **walk on cartop** | not a departure | **34** | **50%** | RUN ✗ false alarm |
+| **hand bump** (§0.0d) | not a departure | **33** | **75%** | RUN ✗ false alarm |
+| real up runs | departure | **148–475** | **100%** | RUN ✓ |
+
+**4.4× gap, no overlap.** The shipping `opk` gate passes BOTH false events — 389
+and 118 sit inside the real-run band (92–691) — so it cannot reject them at any
+threshold. The windowed pre-filter rejects both.
+
+### ⭐ WHY, in one line
+
+The walk's individual samples are **larger than any real departure sample today**
+(`-563, +389, +373, +362`) — but they ALTERNATE, so the block mean collapses to
+34. **Amplitude says "big event"; shape says "not a departure."** That is exactly
+the discrimination `opk` is structurally unable to make, and it is why the
+pre-filter is a different instrument rather than a re-tuning.
+
+### ⭐ This also PARTLY UNBLOCKS the labelling gap below
+
+The corpus carries unexplained `RUN`-labelled bursts scoring **26, 33, 38, 61,
+66, 79, 103** — either genuine slow departures (making any floor dangerous) or
+knocks. **Both confirmed non-departures land at 33–34, squarely inside that
+cluster.** That is real evidence those low scorers are knocks rather than slow
+departures, which is the condition a floor needs in order to be safe.
+
+⚠️ **MARGIN, stated honestly.** Weakest real departure 148, highest
+non-departure 34. A floor near 90 gives ~1.6× below real runs and ~2.6× above
+knocks. Workable — but **n=3 labels**, and the failure direction if a real slow
+departure ever scores under the floor is the catastrophic one (§14.4). This is a
+candidate with evidence, not a validated gate.
+
+⬜ **Cheapest next step, no car needed beyond a few minutes:** produce more
+labelled non-departures the same way — walk, bump, door slam, tool drop — and a
+matched set of labelled slow departures at 18–25 fpm. Twenty labelled events
+would settle the floor properly.
+
 ### ⛔ BLOCKED ON THE SAME GAP, AND THIS IS THE REAL ACTION ITEM
 
 Several `RUN`-labelled bursts score low (26, 33, 38, 61, 66, 79, 103). They are
