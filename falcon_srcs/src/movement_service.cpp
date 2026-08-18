@@ -1,6 +1,48 @@
 #include "movement_service.h"
 
-#define DEFAULT_THRESHOLD_VALUE 0.40
+/*
+ * Polled departure threshold, on |acceleration_avg - zero_calib|.
+ *
+ * ⚠️ 0.40 -> 0.20, 2026-08-18, TRIAL. Revert is this one number.
+ *
+ * WHY. This path is the BACKSTOP for a missed any-motion departure, and on
+ * 2026-08-18 that backstop was needed and absent: any-motion missed 6 of 12
+ * slow up runs, `VEL_ARMED` is 0, and this threshold has -- as the comment in
+ * main.cpp says -- "never detected a departure in any hoistway run".
+ *
+ * IT NEVER FIRED BECAUSE IT CANNOT. Measured over 82 departures in the
+ * 2026-08-18 capture, the largest excursion this average reaches is **0.398**.
+ * The threshold sat just above the best case ever recorded.
+ *
+ *   T=0.40   1/82 departures ( 1.2%)   at-rest excursions over T:  1/21391
+ *   T=0.20  15/82 departures (18.3%)                              15/21391
+ *   T=0.15  39/82 departures (47.6%)                              20/21391
+ *   T=0.10  59/82 departures (72.0%)                              56/21391
+ *
+ * 0.20 is the conservative first step: it makes the backstop reachable while
+ * the at-rest exposure stays at 0.07% of samples, and those excursions sit
+ * inside the walk/bump disturbances that ALREADY latch via any-motion -- so it
+ * adds detection without adding a new false-alarm mode.
+ *
+ * ⚠️ WHAT THIS IS WORTH IS NOT 18%. As a backstop, what matters is the catch
+ * rate on the departures any-motion MISSED, and misses are plausibly the
+ * WEAKER departures, where this path is also least likely to fire. Treat 18%
+ * as an upper bound, not an expectation.
+ *
+ * ⛔ THE AT-REST FIGURES ARE CARTOP, THE NOISY CASE. The rest tail reaches
+ * 0.145 (p99.9) and 0.872 (max) only because the capture contains walks, a
+ * hand bump and undetected motion. Against genuinely quiet rest the p99 is
+ * 0.015. On a real counterweight -- where nobody walks, and the spec has the
+ * device placed BEFORE power-on -- the disturbance population that constrains
+ * this may not exist, and a lower value becomes defensible. That measurement
+ * has never been taken.
+ *
+ * 🔴 FAILURE DIRECTION IF THIS IS WRONG: too low means a FALSE departure --
+ * beacon on a stationary car, which at LATCH_FAILSAFE_MS 600 s is a ten-minute
+ * alarm (see falcon_jog_ringing_2026-08-18.md §0.0d). Watch for a latch with no
+ * car movement; revert to 0.40 if it appears.
+ */
+#define DEFAULT_THRESHOLD_VALUE 0.20
 
 /* Raw-sample arrival peak, maintained in the sampling ISR. See main.cpp. */
 extern void  arrival_peak_reset();
