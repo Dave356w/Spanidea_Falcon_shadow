@@ -507,7 +507,42 @@ static_assert(XY_CALIB_MIN_BUCKETS <= XY_CALIB_BUCKETS,
  * backstop rather than the fix".
  *
  * ⛔ SO THE THING TO WATCH ON THE CAR IS AN ALARM THAT STARTS ON A CAR THAT HAS
- * ALREADY STOPPED. If that appears, revert by setting MONITOR_REARM_QUIET to 0.
+ * ALREADY STOPPED.
+ *
+ * ⚠️ THE REVERT INSTRUCTION THAT USED TO SIT HERE WAS BACKWARDS. It said "revert
+ * by setting MONITOR_REARM_QUIET to 0". The clear condition is
+ *
+ *     elapsed >= MONITOR_REARM_MIN_MS && quiet_run() >= MONITOR_REARM_QUIET
+ *
+ * so with MONITOR_REARM_QUIET = 0 the second test is ALWAYS TRUE and the blank
+ * clears at the MONITOR_REARM_MIN_MS floor every single time -- the SHORTEST
+ * blank this code can produce, not the longest. Anyone following it during an
+ * incident would have made the symptom worse. Corrected 2026-08-19.
+ *
+ * TO REVERT to the fixed 6 s behaviour, make the early clear unreachable so
+ * MONITOR_REARM_MS governs: set MONITOR_REARM_QUIET to 255. quiet_run() would
+ * need 255 consecutive quiet samples, ~10.2 s at 25 Hz, which is longer than
+ * the 6 s cap, so the cap binds.
+ *
+ * ⚠️ AND KNOW WHAT THE REVERT COSTS. Measured 2026-08-19 across 17 stops on one
+ * car, the shortest real gap between MONITORING and the next genuine departure
+ * was 2801 ms:
+ *
+ *     blank      real departures it would DISCARD
+ *     1500 (now)   0
+ *     2500         0
+ *     4000         1
+ *     6000 (old)   1
+ *
+ * The 2026-08-07 false re-latch was at 3.5 s. A real departure was seen at
+ * 2.8 s. THOSE WINDOWS OVERLAP, so no blank duration separates them -- covering
+ * 3.5 s necessarily discards real departures. That is the whole reason this
+ * gate is rest-based rather than time-based, and it means MONITOR_REARM_QUIET
+ * is the lever to reach for, not MONITOR_REARM_MIN_MS. Raising the quiet
+ * requirement costs nothing on an ordinary stop (q reached 76-84 within ~1.5 s
+ * on every stop measured) and extends the blank only when the stop is actually
+ * ringing, which is the discrimination wanted. Sizing it needs q from a
+ * terminal-floor brake set, which is session C and has never been run.
  */
 #define MONITOR_REARM_QUIET            8     /* lateral quiet metrics = settled */
 #define MONITOR_REARM_MIN_MS           1500  /* floor; ordering + first ringing */

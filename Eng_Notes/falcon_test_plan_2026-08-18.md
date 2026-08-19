@@ -291,8 +291,31 @@ the original event. Do not jog between runs; allow the FSM to settle naturally,
 since jogging masks the condition under test.
 
 **Exit criterion.** Ten terminal stops with no alarm beginning on a car that has
-already stopped. Any instance is a regression: revert `MONITOR_REARM_QUIET` to 0
-and record the timing.
+already stopped. Any instance is a regression: **record the timing** — the
+interval from `STATE_MONITORING` to the re-latch is the number that decides what
+to change, and without it any adjustment is a guess.
+
+⚠️ **Corrected 2026-08-19: this used to say "revert `MONITOR_REARM_QUIET` to 0".
+That is backwards.** The clear condition is `elapsed >= MONITOR_REARM_MIN_MS &&
+quiet_run() >= MONITOR_REARM_QUIET`, so 0 makes the second test always true and
+the blank clears at the 1500 ms floor every time — the shortest blank the code
+can produce. To revert to the fixed 6 s, set `MONITOR_REARM_QUIET` to **255**,
+which is unreachable inside the 6 s cap.
+
+**And the revert has a measured cost.** Across 17 stops on 2026-08-19 the
+shortest gap between `MONITORING` and the next *genuine* departure was 2801 ms.
+A blank of 4000 ms or 6000 ms would have discarded one real departure; 1500 and
+2500 discard none. The 2026-08-07 false re-latch was at 3.5 s. **Real departures
+at 2.8 s and false re-latches at 3.5 s overlap, so no blank duration separates
+them** — which is why this gate is rest-based, and why `MONITOR_REARM_QUIET` is
+the lever rather than `MONITOR_REARM_MIN_MS`. Sizing it needs `q` from a
+terminal-floor brake set, which is this session.
+
+**Field report 2026-08-19:** intermittent alarms after arrival observed in
+service. Not reproduced in the 2026-08-19 capture — the one sub-6 s re-latch in
+that log (2801 ms) reads as a genuine jog (`a=` 9.70→8.08, `x=` 0.69→1.18,
+`m=0.507`, full FSM cycle to a polled arrival), not a false latch on a
+stationary car. This session is now the priority.
 
 **Note.** This is the only test in the plan checking a failure the project may
 have introduced, rather than one it inherited.
