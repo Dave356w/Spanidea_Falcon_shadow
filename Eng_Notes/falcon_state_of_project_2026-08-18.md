@@ -377,6 +377,7 @@ Recorded so they are not re-derived. Detail in
 | Windowed shape as a knock pre-filter | A confirmed 20 fpm departure scored inside the knock band. Any floor rejecting knocks also rejects it. |
 | Raise `JOG_OPP_PEAK_MMSS` | A real run was silenced at 972 against a 900 gate; real departures throw jolts of arbitrary size. |
 | Fixed polled departure threshold | Mounting-dependent by 2–3x; wrong in every mounting but the one measured. |
+| Lower `LOG_DECIMATE_N` for cruise resolution | Bench pair 2026-08-19, N=8 control vs N=2. `ov=` advance 0 → 55 over 90 s; `tk=` per line 8.00 → 3.08 against an expected 2.00; 25.0 → 20.8 Hz apparent; repeated watchdog resets. Fails at 11.8% serial duty, so the link is not the constraint — the ring is drained one sample per loop pass. |
 
 Two method notes:
 
@@ -402,17 +403,35 @@ Two method notes:
 4. The polled departure path produces no burst and no jog verdict.
 5. Cruise ceiling cannot be measured from current captures: the sample log is
    decimated and sticky-peak, and bursts are too short to isolate cruise.
-   **2026-08-19: the decimation half of this is separable and cheap.**
-   `LOG_DECIMATE_N` 8 discards seven of every eight samples from the log — it
-   prints the eighth sample, not the maximum over the eight — so a 1-in-8
-   subsample systematically under-reads a cruise ceiling. The constant is sized
-   for 9600 baud and the link now runs at 62500 (§2.2). Lowering it costs no
-   flash and is therefore not blocked by item 1. The standing warning against
-   logging faster concerns detector sample loss through ring overrun, not the
-   decimation itself: every drained sample is fed to `vel_window` and
-   `lat_monitor` before the decimation return, by explicit design. `ov=` counts
-   the overrun, so the change is verifiable rather than a judgement call.
+   **2026-08-19: lowering the decimation was tried on the bench and is
+   REFUTED.** `LOG_DECIMATE_N` 8 does discard seven of every eight samples from
+   the log — it prints the eighth sample, not the maximum over the eight — so a
+   1-in-8 subsample does systematically under-read a cruise ceiling, and the
+   constant is indeed sized for a 9600 baud budget the link left behind on
+   2026-08-13. But it costs no flash and buys nothing: at N=2 the device loses
+   ~35% of samples, its apparent rate falls from 25.0 to 20.8 Hz, and it
+   boot-loops under the watchdog, all at 11.8% serial duty. The ring is drained
+   **one sample per `loop()` pass**, so log density throttles the consumer
+   directly and the eight slots buy latency tolerance rather than throughput.
+   The cruise ceiling therefore has to come from a device-side bucket maximum
+   (session B, B4) and stays behind item 1. Full figures in the test plan §1.2.
 6. The burst corpus carries no ground-truth labels.
+
+**Closed 2026-08-19 — the §6a question the `tk=` counter was added for.** The
+counter's own comment states the reading: `tk` advancing ~12 per 6 lines means
+the publish/print path is losing samples, ~6 per 6 lines means the ISR is not
+firing and no timing from these logs can be trusted. Measured on the bench at
+N=8 over three separate 60–90 s captures: **exactly 8.00 ticks per line, min 8,
+max 8, zero spread**, with `ov=` advancing 0 and a sample period of
+39.99–40.01 ms against a nominal 40. Neither failure mode. The ISR fires
+reliably and `loop()` drains every sample it publishes, so timing measured from
+these logs at the shipping decimation is sound.
+
+Two consequences. The stale claim in the `LOG_DECIMATE_N` comment block that
+every threshold rests on 80% of the data is **wrong for the current build** and
+should be corrected in source (§2.2). And `isr_ticks`/`tk=` is marked
+"diagnostic only, remove once §6a is resolved" — it is now resolved, so removing
+it is a small credit against item 1.
 
 ---
 

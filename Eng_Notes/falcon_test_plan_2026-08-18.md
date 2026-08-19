@@ -59,7 +59,7 @@ both of which were right. Quiet gate vs cruise is item 8, folded into session D;
 any-motion reference is item 12, closed by B itself; threshold transfer is an
 exit criterion of F, not a session; and corpus labelling is G, not I.
 
-### 1.2 Added 2026-08-19 — the log decimation is no longer bound by what set it
+### 1.2 Added 2026-08-19 — lowering the log decimation is REFUTED, measured
 
 `LOG_DECIMATE_N` is 8. The comment block that sets it, immediately above the
 define in `main.cpp`, derives that 8 from holding the sample line at 47% of a
@@ -73,23 +73,50 @@ sticky, so the cruise ceiling cannot be measured" — is half caused by that 8.
 Lowering the constant costs **zero flash**, so unlike everything else in session
 B it is not behind session A.
 
-**The recorded hazard, and why it is now testable rather than assumed.** The
-standing project note against logging faster is that serial-induced sample loss
-widens `dt` between consecutive samples and *inflates* the calibration
-threshold, which is the dangerous direction and happens inside the measurement
-window. That warning stands, but its mechanism is specific: `LOG_DECIMATE_N`
-does not thin the detectors. Every drained ring sample is fed to `vel_window`
-and `lat_monitor` **before** the decimation return, and the source says so in
-terms — "LOG_DECIMATE_N thins the log, and must never thin the detector". The
-only route from log density to detector sample loss is **ring overrun**: serial
-blocking long enough that the ISR overwrites unread slots. That was plausible at
-9600 baud, with a 151 ms line against 320 ms of ring. It is much less so at
-23 ms.
+**⛔ It was tested on the bench on 2026-08-19 and it fails badly. The standing
+warning against logging faster is correct, and understates the failure.**
 
-`ov=` counts exactly that overrun, so the question is measurable rather than
-arguable. **Any decimation change must be judged on whether `ov=` advances, not
-on the line rate.** If it advances, the recorded hazard is live and the change
-is refused.
+Controlled pair, same board at rest on the bench, 40 s settle discarded then
+90 s measured, N=8 flashed first as the control:
+
+| | N=8 control | N=2 test |
+|---|---|---|
+| `ov=` advance over 90 s | **0** | **55** |
+| `tk=` per printed line | 8.00 (min 8, max 8) | **3.08** (min 2, max 4), against an expected exactly 2.00 |
+| apparent sample period | 40.01 ms → 24.99 Hz | **48.10 ms → 20.79 Hz** |
+| watchdog resets in window | none | **repeated `Reset cause: 0x8`, with full re-boot and re-calibration** |
+| serial duty | 5.7–6.2% | 11.8% |
+
+Roughly 35% of samples never reach the consumer at N=2, the apparent rate falls
+to 20.8 Hz, and the device **boot-loops under the watchdog**. This is precisely
+the `dt` widening the standing warning predicted, measured directly, plus a
+failure mode the warning did not anticipate.
+
+**Why the headroom arithmetic was wrong, and it is worth writing down.** The
+serial link is not the binding constraint — the failure occurs at 11.8% duty,
+with the link 88% idle. The ring is drained **one sample per `loop()` pass**:
+the drain function returns after processing a single sample. So the ring's eight
+slots buy latency tolerance, not throughput, and log density throttles the
+consumer directly. At N=2 every second pass carries a ~17.5 ms blocking print,
+which pushes the mean loop period past the 40 ms sample interval; the ring then
+backs up permanently rather than transiently, and depth cannot rescue a consumer
+that is slower than the producer. `wdt_reset()` lives in the same starved loop,
+which is why the watchdog fires.
+
+**What survives.** Two things. The observation that `LOG_DECIMATE_N` 8 is sized
+for a 9600 baud budget is still true and still means nobody re-derived it after
+the baud raise — it simply turns out not to be the binding constraint, so there
+is no free density there. And the detectors genuinely are fed before the
+decimation return, so the constant does not thin them *directly*; the damage at
+N=2 arrives by the indirect route above, which is worse rather than better.
+
+**Consequence for gap 5.** The decimation half of instrumentation gap 5 is
+**not** cheaply separable. A cruise ceiling has to come from B4 — a bucket
+maximum computed on the device, at the current line rate — and B4 is therefore
+back behind session A's flash recovery along with the rest of session B. Any
+future attempt to raise log density must first make the drain loop consume the
+whole ring per pass rather than one sample, and that is firmware work with its
+own replay gate, not a constant change.
 
 ---
 
@@ -164,18 +191,17 @@ items are unmeasurable until this changes.
 | B2 | Print `bz` on the periodic sample line, not only on `ACC-INT` lines | The log cannot presently establish whether the beacon was sounding at a given moment, so "the beacon did not fire" cannot be confirmed or refuted from data. |
 | B3 | Trigger a burst on the polled departure path | A departure caught by the polled path produces no burst and no jog verdict, so the backstop is invisible exactly when it matters. |
 | B4 | Capture a cruise-phase peak, distinct from the sticky arrival peak | The cruise ceiling is the denominator of the arrival gate and cannot currently be measured: the sample log is decimated and sticky, and bursts are too short to isolate cruise. |
-| B0 | Lower `LOG_DECIMATE_N` (section 1.2) | Zero flash, so it is **not** behind session A. Attacks the decimation half of gap 5 on its own. Judge on `ov=`, not on line rate. |
 
 **Does B actually need A?** The plan asserts it does, and that assertion sets
 the project's longest dependency chain — A gates B, B gates D and H. It has not
-been build-measured. B0 is free. B2 is a format string and a getter call. B4 is
+been build-measured. B2 is a format string and a getter call. B4 is
 one float and a compare, and it has a working precedent in the firmware already:
 `LateralMonitor` retires per-second bucket maxima into `bmax[]` for the
 calibration window, which is the same mechanism on a different axis. B1 and B3
 are the expensive pair. Before accepting a gate that forces the bma4 driver swap
 — whose own caution note requires re-deriving every any-motion constant on the
-bench — build B0, B2 and B4 against the existing 68 bytes and record what
-actually fits.
+bench — build B2 and B4 against the existing 68 bytes and record what actually
+fits. (B0 was struck on 2026-08-19; see section 1.2.)
 
 **Method.** Print-only where possible. B4 requires a small amount of state — a
 running peak over a bucket that retires far enough behind the current sample
@@ -460,6 +486,7 @@ population.
 | Waveform shape as a knock pre-filter | Refuted. A confirmed 20 fpm departure scored inside the knock band. |
 | Raising `JOG_OPP_PEAK_MMSS` | Refuted. A real run was silenced at 972 against a 900 gate. |
 | Further 150 fpm runs | Confirms nothing. All transients are far above threshold at that speed. |
+| Lowering `LOG_DECIMATE_N` to buy cruise resolution | Refuted on the bench 2026-08-19. At N=2 the device loses ~35% of samples, reads 20.8 Hz instead of 25, and boot-loops under the watchdog — at 11.8% serial duty. The ring is drained one sample per loop pass, so log density throttles the consumer and depth cannot compensate. Section 1.2. |
 | Endurance testing for the brownout | Closed. The failure was in the measuring apparatus. |
 
 ---
