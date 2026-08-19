@@ -665,6 +665,50 @@ against a 177-burst corpus with no labels. A labelling pass — even just markin
 each burst run/jog/knock from the session notes and the operator's own calls —
 converts the whole corpus into something a replay can actually score.
 
+## 0.0f ⭐ FIRST SECOND INSTALLATION — a 150 fpm hydro, different building, beacon worked
+
+**Dave, end of 2026-08-18, after the bench work:** a **150 fpm hydraulic
+elevator in a different building** — the first machine other than the original
+traction car ever tested. Up and down, beacon correct both directions.
+
+**Why this is worth its own section.** Readiness item 8 has said since 08-12:
+*"One shaft, one car, one building. No second installation has ever been tested,
+and item 5 says installation is a variable that matters."* This is the first
+data against that gap, and the machine is not merely a second car — a **hydro is
+a different drive class**. Its down run is valve-controlled descent under
+gravity rather than a motor under field control, so the departure and arrival
+transients are physically unlike every burst in the corpus.
+
+It also means both trial changes ran correctly on an unfamiliar machine:
+`025befd` (rest-gated re-arm blank) and `687b969` (self-calibrated polled
+threshold, learned to 0.040 here) produced no false departures and no missed
+ones in normal operation.
+
+### ⛔ WHAT IT DOES NOT ESTABLISH — three limits, stated plainly
+
+1. **UNMEASURED.** The logger had been terminated and the COM ports were gone,
+   so this is an eye-and-ear result with **no capture**. No departure margin, no
+   arrival peak, no verdict lines. It cannot be compared against anything in
+   `datasets/`, and it must not be cited as measured.
+2. **150 fpm IS THE EASY REGIME.** Every failure recorded today lived at
+   17–35 fpm, where departure ramps sit near the detection floor and arrival
+   peaks land at 1.02× the gate. At 150 fpm both transients are far above
+   threshold. Success here is the expected outcome and says nothing about the
+   slow cases that actually fail.
+3. **ITEM 8 IS NOT CLOSED, ONLY OPENED.** One successful observational run at
+   the easy speed is not coverage. Item 5 — arming margin varying 6–15 (and 3–28
+   today) *within* one mounting — is untested at this site, and the whole point
+   of a second installation is to measure whether the learned thresholds
+   transfer.
+
+⬜ **What would make this count:** repeat it with the logger running, at
+**inspection speed**, and capture `XY-Still` / `Threshold-Value` at calibration
+plus `ARM q=`/`ro=` and arrival peaks per run. That is a short visit and it
+converts the project's largest coverage gap from "never attempted" into
+measured. The self-calibrating threshold makes this especially worth doing: a
+hydro's noise floor is the first real test of whether learning it per deployment
+does anything, since the cartop rig only ever produced values at the clamp floor.
+
 ## 0. The headline
 
 **The jog verdict silences the beacon on a real, moving counterweight whenever
