@@ -311,6 +311,39 @@ when the stop is actually ringing, which no floor value can do. If terminal
 stops look the same as these, the rest-gate approach cannot discriminate and
 that is worth knowing before more effort goes into it.
 
+**⚠️ Added 2026-08-19 — the two gates are on DIFFERENT AXES, and that is a third
+reading of the same table.** `STOP_CONFIRM_MS` judges the vertical channel:
+`delta_accel`, the rolling average's displacement from `zero_calib_value`,
+against `STOP_BAND_VALUE`. The rest gate judges the lateral channel:
+`m = |Δax| + |Δay|` (`lateral.cpp:63`). They differ in axis and in KIND — the
+vertical test is a LEVEL relative to a calibrated rest point, the lateral one is
+a SAMPLE-TO-SAMPLE CHANGE. A steady lateral offset therefore reads as quiet, and
+a purely vertical oscillation is invisible to `m` entirely.
+
+So if a terminal brake set rings mostly in z, `quiet_run()` keeps climbing
+straight through the ringing and the rest gate cannot see it AT ANY THRESHOLD.
+That produces a table indistinguishable from the "terminal stops look the same"
+outcome above, with a different cause and a different fix: the gate would need a
+vertical term, not a larger `MONITOR_REARM_QUIET`. Concluding "rest-gating cannot
+discriminate" without separating these two is the error this note exists to
+prevent.
+
+**The capture already distinguishes them and no firmware change is needed.** The
+sample line carries `avg=` — the rolling average of the vertical channel, which
+is what `delta_accel` is computed from — alongside `m=` and `q=`, and
+`Zero-Calib` is printed at calibration, so `|avg - zero_calib|` reconstructs
+offline. Report it per terminal stop on the same time axis as `q`:
+
+| what the capture shows | reading |
+|---|---|
+| `q` held down through the ringing | rest-gating works; size the threshold from the table |
+| `q` climbing while `\|avg - zero_calib\|` shows excursion | the ringing is vertical and the lateral gate is blind to it |
+| neither shows excursion | the stop is genuinely not ringing, and a re-latch there has some other cause |
+
+`graph/session_c.py` does not print the vertical column yet, and the 2026-08-19
+capture is gitignored, so the change is unvalidated as written and is left for
+whoever runs the session.
+
 Run `graph/session_c.py` on the capture; it prints both the regression check and
 this table.
 
