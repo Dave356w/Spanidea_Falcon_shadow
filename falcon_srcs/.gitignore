@@ -12,3 +12,12 @@
 # inline in Eng_Notes/ with the numbers already extracted, the way the July
 # EFT captures were.
 logs/
+
+# Python bytecode from the graph/ replay tools.
+#
+# graph/__pycache__/parse_falcon_log.cpython-311.pyc was tracked and therefore
+# showed as permanently modified: a .pyc is rewritten whenever the interpreter
+# reloads the module, and the replay scripts are run constantly -- they are the
+# evidence path for every refuted approach on file. Nothing here is source.
+__pycache__/
+*.py[cod]
