@@ -68,6 +68,28 @@ draw.**
 No compile-time option to remove it currently exists. Adding one recovers both
 standby life and flash.
 
+**Added 2026-08-19 — two consequences of the logging path that were not
+recorded here.**
+
+*The sample line is decimated 8:1 for a constraint that no longer binds.*
+`LOG_DECIMATE_N` is 8 because a 145-character line took 151 ms at 9600 baud and
+one line per sample would have been 47% of the budget. The link was raised to
+62500 on 2026-08-13, putting the same line at about 23 ms. Nobody re-derived the
+decimation afterwards, and it is now roughly 6.5x more conservative than the
+budget that set it. This is half the cause of instrumentation gap 5, and
+lowering it costs no flash.
+
+*The comment block above that define is stale in a way that reads as a live
+release blocker.* It still states approximately 25% sample loss, calls it "NOT
+tolerable for shipping", warns against trusting any threshold derived at this
+rate, and prescribes a sample ring as the proper fix. Both fixes have since
+landed — the ring on 2026-08-11 and the baud raise on 2026-08-13 — and the
+warning was never retired. Read cold, the source asserts that every constant in
+section 4 rests on 80% of the data. Whether that is still true is unmeasured
+either way; what is certain is that the stated figure predates both fixes. The
+comment should be corrected or the loss re-measured, and `ov=` is the counter
+that settles it.
+
 ### 2.3 One of three departure detectors is disabled
 
 `VEL_ARMED 0`. The velocity-integral path is documented as the only one that can
@@ -311,7 +333,11 @@ Values that carry safety consequence, with derivation and evidence status.
 Ordered by consequence. Items are measured unless stated.
 
 1. **Flash headroom exhausted (68 bytes).** Blocks the TWI timeout fix and all
-   further work. §2.1.
+   further work. §2.1. **Named candidate not previously listed here
+   (2026-08-19): `RollingAvg` still allocates with `new`**, so malloc and free
+   are linked into the image. Costed at 586 bytes in the superseded 2026-08-14
+   plan (its session D4) and dropped from the 2026-08-18 plan by oversight. It
+   also defeats the stated reason the vendored Wire driver avoids `new`.
 2. **Arrival gate has no margin at low speed.** Mode of the distribution sits on
    the threshold; four measurements at 1.02–1.03x. §2.5.
 3. **Knocks and slow departures are not separable** by amplitude or waveform
@@ -376,6 +402,16 @@ Two method notes:
 4. The polled departure path produces no burst and no jog verdict.
 5. Cruise ceiling cannot be measured from current captures: the sample log is
    decimated and sticky-peak, and bursts are too short to isolate cruise.
+   **2026-08-19: the decimation half of this is separable and cheap.**
+   `LOG_DECIMATE_N` 8 discards seven of every eight samples from the log — it
+   prints the eighth sample, not the maximum over the eight — so a 1-in-8
+   subsample systematically under-reads a cruise ceiling. The constant is sized
+   for 9600 baud and the link now runs at 62500 (§2.2). Lowering it costs no
+   flash and is therefore not blocked by item 1. The standing warning against
+   logging faster concerns detector sample loss through ring overrun, not the
+   decimation itself: every drained sample is fed to `vel_window` and
+   `lat_monitor` before the decimation return, by explicit design. `ov=` counts
+   the overrun, so the change is verifiable rather than a judgement call.
 6. The burst corpus carries no ground-truth labels.
 
 ---

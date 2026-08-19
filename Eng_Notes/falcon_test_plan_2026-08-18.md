@@ -33,19 +33,63 @@ elevator outranks one needing only a bench when both are otherwise equal.
 ```
 A. flash recovery
       |
-      v
-B. instrumentation ------------------> D. arrival margin population
-      |                                E. quiet gate vs cruise
-      |                                H. any-motion reference
-      v
-C. re-arm regression check (independent of A/B, run first if car time is short)
+      +--> B. instrumentation --+--> D. arrival margin population  (items 2, 8)
+                                |
+                                +--> H. velocity departure path    (item 5)
+                                |
+                                +--> closes item 12 itself
 
-F. second installation, logged  ------> G. threshold transfer
-I. corpus labelling -----------------> J. jog verdict redesign
+G. corpus labelling -------------> J. jog verdict redesign         (item 4)
+
+C. re-arm regression check     (item 9)        no prerequisite
+E. automatic operation         (item 6)        no prerequisite
+F. second installation         (items 10, 11)  no prerequisite
+I. counterweight disturbance   (item 3)        no prerequisite
 ```
 
-Sessions C, F and I depend on nothing and can be run in any order. Everything
-else has a prerequisite.
+Sessions C, E, F, G and I depend on nothing and can be run in any order.
+Everything else has a prerequisite: B needs A, D needs A and B, H needs B, and
+J needs G. Session C remains the one to run first if car time is short.
+
+**Corrected 2026-08-19.** The diagram above previously carried session letters
+from an earlier draft: it named an E for "quiet gate vs cruise", an H for
+"any-motion reference" and a G for "threshold transfer", and showed J depending
+on a session I. None of those matched sections 2-11 or the index in section 12,
+both of which were right. Quiet gate vs cruise is item 8, folded into session D;
+any-motion reference is item 12, closed by B itself; threshold transfer is an
+exit criterion of F, not a session; and corpus labelling is G, not I.
+
+### 1.2 Added 2026-08-19 — the log decimation is no longer bound by what set it
+
+`LOG_DECIMATE_N` is 8. The comment block that sets it, immediately above the
+define in `main.cpp`, derives that 8 from holding the sample line at 47% of a
+**9600 baud** budget, at 151 ms per line. The link was raised to 62500 on
+2026-08-13 (the "SERIAL BAUD" block in the same file), which puts the same line
+at about 23 ms. The decimation is therefore roughly 6.5x more conservative than
+the constraint that chose it, and nobody re-derived it after the baud change.
+
+This matters because instrumentation gap 5 — "the sample log is decimated and
+sticky, so the cruise ceiling cannot be measured" — is half caused by that 8.
+Lowering the constant costs **zero flash**, so unlike everything else in session
+B it is not behind session A.
+
+**The recorded hazard, and why it is now testable rather than assumed.** The
+standing project note against logging faster is that serial-induced sample loss
+widens `dt` between consecutive samples and *inflates* the calibration
+threshold, which is the dangerous direction and happens inside the measurement
+window. That warning stands, but its mechanism is specific: `LOG_DECIMATE_N`
+does not thin the detectors. Every drained ring sample is fed to `vel_window`
+and `lat_monitor` **before** the decimation return, and the source says so in
+terms — "LOG_DECIMATE_N thins the log, and must never thin the detector". The
+only route from log density to detector sample loss is **ring overrun**: serial
+blocking long enough that the ISR overwrites unread slots. That was plausible at
+9600 baud, with a 151 ms line against 320 ms of ring. It is much less so at
+23 ms.
+
+`ov=` counts exactly that overrun, so the question is measurable rather than
+arguable. **Any decimation change must be judged on whether `ov=` advances, not
+on the line rate.** If it advances, the recorded hazard is live and the change
+is refused.
 
 ---
 
@@ -53,7 +97,7 @@ else has a prerequisite.
 
 **Bench. No elevator. Engineering, not testing.**
 
-**Open item:** 1.
+**Open items:** 1, 7.
 
 **Why this is first.** 68 bytes free blocks every instrumentation change in
 session B, and B gates three separate measurements. It also blocks
@@ -68,6 +112,16 @@ beacon for the duration of a recalibration.
 | Compile serial logging out of the shipping build behind a flag | unmeasured; also recovers 1.10 mA | logging is the only field diagnostic — needs a build that keeps it |
 | Replace the vendored bma4 driver with the current Bosch API | approximately 4.9 KB | new ASIC feature blob; every any-motion threshold needs re-confirming |
 | Remove `brownout_test` remnants and dead V1 paths | small | low |
+| Convert `RollingAvg` to static buffers | approximately 586 bytes | low |
+
+The `RollingAvg` row is carried over from session D4 of the superseded
+2026-08-14 plan, where it was costed at 586 bytes. It was dropped from this plan
+by oversight rather than by decision, and it is still live: `RollingAvg.h` does
+`m_avg_array = new T [m_size]`, so malloc and free are linked into the image.
+That also defeats the reason the vendored Wire driver avoids `new` — its header
+says the point was to keep malloc's 312 bytes and free's 274 out of the build.
+At roughly a third of the exit criterion and the lowest risk of the four, it
+should be attempted before the driver swap, not after.
 
 **Method.** Take the logging flag first and measure the actual saving before
 committing to the driver swap. Build both `ATmega328PB` (logging on, for test
@@ -76,6 +130,15 @@ sessions) and a production variant (logging off) from the same source.
 **Exit criterion.** Either at least 1.5 KB free — enough for `-DWIRE_TIMEOUT`
 plus session B's instrumentation — or a recorded decision to defer, naming what
 is being given up.
+
+**Verification.** The logging-off variant is not a print-only change. Removing
+the prints removes the blocking `Serial.print` that is the sole cause of ring
+overrun, so the production build's detectors see a sample population that no
+threshold on file was derived on. Capture `ov=` on the logging-on build under
+the same conditions and record the difference, or state plainly that the
+production build runs on more data than its constants were measured against.
+This is the same class of difference session B verifies for, and session A had
+no verification clause at all.
 
 **Caution.** If the driver swap is taken, every any-motion constant in the
 constants reference must be re-derived on the bench before the build goes in a
@@ -101,10 +164,23 @@ items are unmeasurable until this changes.
 | B2 | Print `bz` on the periodic sample line, not only on `ACC-INT` lines | The log cannot presently establish whether the beacon was sounding at a given moment, so "the beacon did not fire" cannot be confirmed or refuted from data. |
 | B3 | Trigger a burst on the polled departure path | A departure caught by the polled path produces no burst and no jog verdict, so the backstop is invisible exactly when it matters. |
 | B4 | Capture a cruise-phase peak, distinct from the sticky arrival peak | The cruise ceiling is the denominator of the arrival gate and cannot currently be measured: the sample log is decimated and sticky, and bursts are too short to isolate cruise. |
+| B0 | Lower `LOG_DECIMATE_N` (section 1.2) | Zero flash, so it is **not** behind session A. Attacks the decimation half of gap 5 on its own. Judge on `ov=`, not on line rate. |
+
+**Does B actually need A?** The plan asserts it does, and that assertion sets
+the project's longest dependency chain — A gates B, B gates D and H. It has not
+been build-measured. B0 is free. B2 is a format string and a getter call. B4 is
+one float and a compare, and it has a working precedent in the firmware already:
+`LateralMonitor` retires per-second bucket maxima into `bmax[]` for the
+calibration window, which is the same mechanism on a different axis. B1 and B3
+are the expensive pair. Before accepting a gate that forces the bma4 driver swap
+— whose own caution note requires re-deriving every any-motion constant on the
+bench — build B0, B2 and B4 against the existing 68 bytes and record what
+actually fits.
 
 **Method.** Print-only where possible. B4 requires a small amount of state — a
 running peak over a bucket that retires far enough behind the current sample
-that the stop transient cannot contaminate it.
+that the stop transient cannot contaminate it, and should reuse the `bmax[]`
+pattern rather than inventing a second one.
 
 **Exit criterion.** A capture from an ordinary run in which departure
 provenance, beacon state, and a cruise ceiling can all be read directly.
@@ -208,7 +284,7 @@ not carrying the load it is armed for and should be disarmed until it does.
 
 **Hydraulic elevator, second building. Depends on nothing.**
 
-**Open items:** 11, 10, 5.
+**Open items:** 11, 10, 8.
 
 **Why.** One traction car in one building supplied every logged measurement in
 the project, and the arming margin varies with installation, so installation is
