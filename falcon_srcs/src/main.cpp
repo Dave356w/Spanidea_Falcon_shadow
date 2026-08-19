@@ -861,30 +861,62 @@ void arrival_zero_set(float z)
 static volatile bool         accel_avg_primed = false;
 
 /*
- * Print one line per N published samples. At the current ~3 Hz ISR rate one
- * line per sample costs about 15% of the 9600 baud budget. Raise this when the
- * timer is fixed to 100 Hz, or serial becomes the new bottleneck.
- */
-/*
- * 1 -> 8 with the move to 25 Hz, to hold the serial load where it already was.
+ * Print one line per N published samples.
  *
- * A sample line is ~145 characters, which at 9600 baud takes ~151 ms to send.
- * One line per sample was 47% of the budget at 3.13 Hz; at 25 Hz it would be
- * 3.8x more than the link can carry. 8 gives 3.1 lines/s -- the same 47%.
+ * HISTORY. 1 -> 8 alongside the 3.13 Hz -> 25 Hz timer change, to hold the
+ * serial load where it already was. A sample line was ~145 characters, which at
+ * 9600 baud took ~151 ms to send; one line per sample was 47% of the budget at
+ * 3.13 Hz and 3.8x more than the link could carry at 25 Hz. 8 gave 3.1 lines/s,
+ * the same 47%.
  *
- * ⚠️ Serial.print() BLOCKS once the 64-byte TX buffer fills, for roughly 85 ms
- * of each line. The ISR keeps running through that (it is an interrupt), but
- * loop() does not, so a snapshot can be overwritten before it is consumed --
- * which is what ov= counts. At 3.13 Hz a 151 ms line fitted inside a 320 ms
- * period with room to spare; at 25 Hz it spans two 40 ms periods.
+ * ⚠️ THE WARNING THAT USED TO SIT HERE IS RETIRED, 2026-08-19. It stated ~25%
+ * sample loss, called that NOT tolerable for shipping, told the reader not to
+ * trust any threshold derived at this rate, and prescribed a sample ring as the
+ * proper fix. All of it predated two changes that landed within days: the ring
+ * itself (2026-08-11, see the SAMPLE RING block above) and 9600 -> 62500 baud
+ * (2026-08-13, see the SERIAL BAUD block). Neither retired the warning, so the
+ * source went on asserting that every constant in this firmware rested on 80%
+ * of the data long after that stopped being true.
  *
- * EXPECT ov= TO GROW, and read it as sample loss in the detectors, not just in
- * the log -- vel_window and lat_monitor are fed from the same snapshot. Rough
- * estimate is 2 samples lost per printed line, so ~25%. That is tolerable for
- * characterising the new rate and NOT tolerable for shipping. The proper fix is
- * a small ring buffer of samples in place of the single snapshot, so loop() can
- * drain several after a blocking print; do that before trusting any threshold
- * derived at this rate.
+ * MEASURED AT N=8. Bench at rest, three captures of 60-90 s, 2026-08-19:
+ *
+ *     tk= per printed line   8.00, min 8, max 8, zero spread
+ *     ov= advance            0 over 90 s
+ *     sample period          39.99 - 40.01 ms  (25.00 Hz)
+ *     sample line            114-124 chars -> 18.3-19.8 ms at 62500 baud
+ *     serial duty            5.7 - 6.2% of the link
+ *
+ * Exactly 8 ISR ticks per printed line with no spread means loop() drains every
+ * sample the ISR publishes: there is no sample loss at the shipping decimation.
+ * The same captures answer the Eng_Notes §6a question isr_ticks/tk= was added
+ * for -- neither failure mode it was meant to distinguish is present -- so tk=
+ * is now removable, which is a small credit against the flash headroom item.
+ *
+ * ⛔ DO NOT LOWER THIS. Tested at N=2 on the bench, 2026-08-19:
+ *
+ *     ov= advance            55 over 90 s
+ *     tk= per printed line   3.08, min 2, max 4, against an expected exactly
+ *                            2.00 -- ~35% of samples never reach the consumer
+ *     apparent rate          20.79 Hz, against a true 25
+ *     watchdog               repeated Reset cause: 0x8, with full re-boot and
+ *                            re-calibration. The device boot-loops.
+ *
+ * AND NOT FOR THE REASON THIS BLOCK USED TO GIVE. It is not a serial budget
+ * problem: N=2 fails at 11.8% duty, with the link 88% idle. The ring is drained
+ * ONE SAMPLE PER loop() PASS -- the drain returns after processing a single
+ * record -- so its eight slots buy latency tolerance, not throughput, and log
+ * density throttles the consumer directly. At N=2 every second pass carries a
+ * ~17.5 ms blocking print, the mean loop period crosses the 40 ms sample
+ * interval, and the ring backs up permanently rather than transiently. Depth
+ * cannot rescue a consumer that is slower than the producer. wdt_reset() lives
+ * in that same starved loop, which is why the watchdog fires.
+ *
+ * The old advice to "raise this when the timer is fixed to 100 Hz, or serial
+ * becomes the new bottleneck" therefore had the constraint backwards. Before
+ * any increase in log density, make the drain consume the whole ring per pass;
+ * then re-measure ov= and tk= before trusting what the denser log says.
+ *
+ * Full pair in Eng_Notes/falcon_test_plan_2026-08-18.md §1.2.
  */
 #define LOG_DECIMATE_N  8
 
