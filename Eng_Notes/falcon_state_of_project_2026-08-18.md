@@ -166,6 +166,12 @@ The ramp detector is armed and has never fired. Negative evidence is complete
 moves across a full session and 51 replayed departure bursts), but it has never
 been observed executing correctly on a drive-controlled stop.
 
+**2026-08-19 — the ramp detector's silence is explained.** Five drive-controlled
+contract-speed stops produced zero `Arrival (ramp)` lines, and the reversal gate
+in front of it failed on two of them (`g=0`) and cleared by at most one sample on
+the rest. The detector has not been shown unable to recognise a ramp; it has been
+shown rarely to run. `falcon_arrival_gate_2026-08-19.md` §4.
+
 ### 2.5 The arrival gate has no margin at low speed
 
 `ARRIVAL_PEAK_VALUE` is 0.45. Measured arrival peaks on slow up runs from a
@@ -484,7 +490,12 @@ Ordered by consequence. Items are measured unless stated.
    CRUISE CEILING half is measured — 0.060–0.080 across five logged runs, both
    directions, at 19 fpm on the cartop, against the 0.28 the gate was derived
    against.** The weakest-arrival half is NOT measured and cannot be, at
-   inspection speed: see §2.5a.
+   inspection speed: see §2.5a. **BOTH HALVES NOW MEASURED at contract speed
+   the same afternoon: cruise 0.080–0.120, arrivals 0.463–0.700 over five
+   automatic runs at 500 fpm. The gate sits at 0.97x the weakest arrival — it is
+   already below one of the five. Re-derives by the original method to ~0.236,
+   roughly half the shipped 0.45. Five samples, 51% spread; the twenty-run
+   minimum stands.** Report: `falcon_arrival_gate_2026-08-19.md`.
 3. **Knocks and slow departures are not separable** by amplitude or waveform
    shape. Sensitivity is a design trade. Four approaches refuted. §6.
 4. **Jog verdict misclassifies in both directions** — silences jolt-heavy real
@@ -492,7 +503,13 @@ Ordered by consequence. Items are measured unless stated.
    before flight.
 5. **Velocity departure path disabled**, and its threshold is above the 20 fpm
    requirement. §2.3.
-6. **Ramp detector armed with no positive evidence.** §2.4.
+6. **Ramp detector armed with no positive evidence.** §2.4. **2026-08-19: the
+   cause is now known and it is upstream of the detector.** Zero fires across
+   five drive-controlled contract-speed stops, both directions — its designed
+   condition. The reversal gate that enables it failed outright on 2 of 5
+   (`g=0`, `ro=6` and `7` against `ARM_REV_SAMPLES` 8) and opened with at most
+   one sample of margin on the other three. Read this as a marginal gate, not a
+   detector that cannot recognise ramps. Report: `falcon_arrival_gate_2026-08-19.md`.
 7. **Serial logging in the shipping build** costs 34% of idle current. §2.2.
 8. **`ARRIVAL_QUIET_MSS` conflicts with measured cruise.** May prevent quiet
    arming on faster machines; consistent with arming-margin spread. Not
@@ -512,10 +529,17 @@ Ordered by consequence. Items are measured unless stated.
     instead.
 13. **Calibration has no guard against being run before the installation has
     physically settled, and the failure is silent and in the dangerous
-    direction.** Measured 2026-08-19. New. §2.2a.
+    direction.** Measured 2026-08-19. New. §2.2a. A fourth calibration later
+    the same day clamped again at the quietest window yet (`XY-Still` 0.0465),
+    making it 3 of 4 clamped and the noise→threshold relationship monotonic
+    across all four. The single learned value remains the noisiest window and
+    the only one taken straight after handling.
 14. **`MIN_TRAVEL_MS` (3000) does not clear the departure ramp at inspection
     speed, and the arrival gate opens into the still-decaying transient.**
-    Measured 2026-08-19. New. §2.5b.
+    Measured 2026-08-19. New. §2.5b. **Narrowed the same day: at contract speed
+    it is adequate** — the cruise reading is identical at +3 s and +5 s on every
+    500 fpm run, so the ramp has decayed by `MIN_TRAVEL_MS` there. This is an
+    inspection-speed defect specifically.
 
 ---
 
@@ -561,7 +585,11 @@ Two method notes:
    with no line at all. A cartop capture held 4 real runs and 3 latch lines, and
    the polled run was dropped from the analysis entirely until the raw state
    transitions were cross-checked by hand. Any run count taken from
-   `Departure latched` undercounts silently.
+   `Departure latched` undercounts silently. **Seen a second time the same day
+   at contract speed (4 latched / 5 transitions), and that silent run produced
+   the weakest arrival of the session — the single most important measurement
+   in `falcon_arrival_gate_2026-08-19.md`. The omission is not random: it drops exactly the runs
+   the backstop caught.**
 5. Cruise ceiling cannot be measured from current captures: the sample log is
    decimated and sticky-peak, and bursts are too short to isolate cruise.
    **2026-08-19: lowering the decimation was tried on the bench and is
@@ -602,6 +630,10 @@ it is a small credit against item 1.
 `falcon_srcs/datasets/` — one file per capture, event lines only, verified to
 reproduce replay results identically to the raw logs. 387 burst records.
 
-Replay tools: `graph/arming_replay.py` (arrival arming),
+Session reports: `falcon_departure_detection_2026-08-18.md` (departure
+detection), `falcon_arrival_gate_2026-08-19.md` (arrival gate, contract speed vs inspection).
+
+Replay tools: `graph/session_d.py` (arrival gate margin per run),
+`graph/arming_replay.py` (arrival arming),
 `graph/jog_window_replay.py` (departure classification),
 `graph/calib_replay.py` (calibration window length).

@@ -344,6 +344,17 @@ The session therefore splits by regime:
 regime, sufficient to re-derive the gate. State whether the populations still
 separate.
 
+**RESULT 2026-08-19 — criterion met at contract speed, and the gate is wrong by
+about 2x.** Cruise 0.080–0.120 and arrivals 0.463–0.700 from the same five
+automatic runs at 500 fpm. Separation 4.7–6.8x, so the populations separate
+comfortably and the 1.6x cliff is not in play: a single gate still serves, its
+value is simply wrong. The gate sits at 0.97x the weakest arrival. Re-derived by
+the original method it lands near 0.236. Today's weakest, 0.463, reproduces the
+0.460 on file to within 0.003 — the first independent reproduction of the number
+the whole derivation rests on. **Five samples, 51% spread, same trip producing
+0.470 and 0.700: the twenty-run minimum stands and 0.236 is arithmetic, not a
+validated constant.** Full report: `falcon_arrival_gate_2026-08-19.md`.
+
 ⚠️ **"From the same regime" is now the hard part, and it is not a formality.**
 The cruise ceiling is an inspection-speed measurement and the weak arrival is an
 automatic-operation one, so they are not from the same regime and cannot simply
@@ -379,6 +390,14 @@ deceleration, which only a drive-controlled stop produces.
 **Method.** Automatic runs, both directions, several floors, at two speeds
 including the machine's rated speed. Record every `FSM: Arrival (ramp)` line
 with its block statistics, and every automatic stop that did not produce one.
+
+**PARTIALLY EXECUTED 2026-08-19**, as a by-product of session D's contract-speed
+runs. Five automatic stops at 500 fpm, both directions: **zero `Arrival (ramp)`
+lines.** The reason is upstream — the reversal gate failed outright on 2 of 5
+(`g=0`, `ro=6` and `7` against `ARM_REV_SAMPLES` 8) and cleared by at most one
+sample on the other three. So the detector is not carrying the load it is armed
+for, but the finding to act on is the gate, not the detector. Fixing
+`ARM_REV_SAMPLES` is a corpus question, not a car one. `falcon_arrival_gate_2026-08-19.md` §4.
 
 **Exit criterion.** The detector fires on drive-controlled stops and declines
 inspection stops in the same session. If it fires on no automatic stop, it is
