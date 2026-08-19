@@ -73,6 +73,16 @@ accstat_re = re.compile(r"ACC-STAT\s+s=0x([0-9A-Fa-f]+)\s+pin=(\d+)\s+n=(\d+)")
 # Latched-FSM lifecycle lines (roadmap item 8).
 LATCH_RE = (
     ("departure", re.compile(r"FSM:\s*Departure latched")),
+    # A departure caught by the POLLED path prints nothing at all:
+    # "FSM: Departure latched (any-motion)" lives inside
+    # if (any_motion_pending) in movement_service.cpp, so the polled
+    # backstop enters MOVEMENT_DETECTED silently -- no line, no burst, no
+    # jog verdict. Observed live 2026-08-19: a capture held 4 real runs and
+    # only 3 "Departure latched" lines, and the polled run was dropped from
+    # the analysis entirely. Track the state transition so a silent
+    # departure still opens a run. This is instrumentation gap 4 / item B3;
+    # it is a WORKAROUND in the parser, not a fix in the firmware.
+    ("dep_move",  re.compile(r"FSM:\s*Transitioned to STATE_MOVEMENT_DETECTED")),
     ("arr_int",   re.compile(r"FSM:\s*Arrival \(any-motion\), edges (\d+)")),
     ("arr_poll",  re.compile(r"FSM:\s*Arrival \(polled\), (?:delta|peak) (-?\d+\.?\d*)")),
     # Ramp verdict: a release only when armed; unarmed it logs and the run
@@ -177,8 +187,16 @@ class Capture(object):
             # --- new-format lines the old parser mistook for corruption -----
             m = accint_re.search(s)
             if m:
+                # 4th element: sample index at parse time.
+                #
+                # t= RESTARTS AT ZERO ON EVERY BOOT, so a capture holding more
+                # than one boot overlaps in t and any value-only filter silently
+                # mixes them. Measured 2026-08-19: one capture had boot 1 at
+                # t=6946..388546 and boot 3 at t=6946..381976 -- near-total
+                # overlap. Index is monotonic across the whole file, so run
+                # windows are bounded by index and only then compared on t.
                 self.edges.append((int(m.group(2)), int(m.group(3)),
-                                   int(m.group(4))))
+                                   int(m.group(4)), len(self.t_ms)))
                 continue
 
             if accstat_re.search(s):
@@ -551,7 +569,7 @@ def report_runs(cap):
     that is what differs between speeds and what the 2-edge clustering rule
     is sensitive to.
     """
-    if not any(k == "departure" for _, k, _ in cap.latch):
+    if not any(k in ("departure", "dep_move") for _, k, _ in cap.latch):
         return          # pre-item-8 log, or no trip captured
 
     calib = None
@@ -574,7 +592,16 @@ def report_runs(cap):
         t = at(idx)
         if kind == "departure":
             open_run = {"start": t, "release": None, "detail": None,
-                        "ramp_obs": [], "i0": idx, "i1": None}
+                        "ramp_obs": [], "i0": idx, "i1": None,
+                        "via": "any-motion"}
+        elif kind == "dep_move":
+            # Normal runs print the departure line and THEN transition, so a
+            # run is already open here and this is the follow-on. If nothing is
+            # open, the departure was silent -- the polled backstop.
+            if open_run is None:
+                open_run = {"start": t, "release": None, "detail": None,
+                            "ramp_obs": [], "i0": idx, "i1": None,
+                            "via": "POLLED (silent)"}
         elif kind == "ramp_obs" and open_run:
             # Unarmed ramp verdict: informational, does not close the run.
             open_run["ramp_obs"].append((t, detail))
@@ -631,9 +658,10 @@ def report_runs(cap):
         # every other state, so edges raised during MOVEMENT_DETECTED or
         # DECELERATING must not be included or the clustering analysis will not
         # match what the firmware actually saw.
+        i0, i1 = r.get("i0"), r.get("i1")
         span = [e for e in cap.edges
-                if t0 is not None and e[0] >= t0 and (t1 is None or e[0] <= t1)
-                and e[1] == 4]
+                if i0 is not None and len(e) > 3 and e[3] >= i0
+                and (i1 is None or e[3] <= i1) and e[1] == 4]
         quiet = [e for e in span if e[2] == 0]
         loud = len(span) - len(quiet)
 
@@ -671,12 +699,30 @@ def report_runs(cap):
                 cru_gap = d if cru_gap is None or d < cru_gap else cru_gap
 
         # peak polled delta split the same way
+        def in_run(lo_t, hi_t):
+            """Sample indices inside THIS run whose t falls in [lo_t, hi_t].
+
+            Index-bounded first. See the note on cap.edges: t is not unique
+            across boots, so a t-only filter can pull samples from a different
+            boot entirely.
+            """
+            out = []
+            if i0 is None:
+                return out
+            hi_i = i1 if i1 is not None else len(cap.t_ms) - 1
+            for k in range(max(0, i0), min(hi_i + 1, len(cap.t_ms))):
+                t = cap.t_ms[k]
+                if t is None:
+                    continue
+                if (lo_t is None or t >= lo_t) and (hi_t is None or t <= hi_t):
+                    out.append(k)
+            return out
+
         def peak_between(lo, hi):
             best = 0.0
-            for t, av in zip(cap.t_ms, cap.avg):
-                if t is None or av is None or lo is None or hi is None:
-                    continue
-                if lo <= t <= hi:
+            for k in in_run(lo, hi):
+                av = cap.avg[k]
+                if av is not None:
                     best = max(best, abs(av - calib))
             return best
 
@@ -690,10 +736,9 @@ def report_runs(cap):
         # from the CRUISE window only.
         def field_between(vals, lo, hi):
             best = None
-            for t, v in zip(cap.t_ms, vals):
-                if t is None or v is None or lo is None or hi is None:
-                    continue
-                if lo <= t <= hi:
+            for k in in_run(lo, hi):
+                v = vals[k] if k < len(vals) else None
+                if v is not None:
                     best = v if best is None else max(best, v)
             return best
 
@@ -702,13 +747,18 @@ def report_runs(cap):
 
         # peak polled delta during the run
         peak = 0.0
-        for t, av in zip(cap.t_ms, cap.avg):
-            if t is None or av is None or t0 is None:
-                continue
-            if t >= t0 and (t1 is None or t <= t1):
+        for k in in_run(t0, t1):
+            av = cap.avg[k]
+            if av is not None:
                 peak = max(peak, abs(av - calib))
 
-        print("    run %d  held %-8s  released by %-18s" % (i, held, how))
+        via = r.get("via", "?")
+        print("    run %d  held %-8s  released by %-18s  departed via %s"
+              % (i, held, how, via))
+        if via.startswith("POLLED"):
+            print("           ** SILENT DEPARTURE: no latch line, no burst,"
+                  " no jog verdict. Reconstructed from the state"
+                  " transition. Item B3. **")
         for w in warn:
             print("           %s" % w)
         print("           edges %d quiet / %d buzzer   closest quiet pair %s"

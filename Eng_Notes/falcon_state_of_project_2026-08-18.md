@@ -178,6 +178,94 @@ a weakest arrival of 0.713. The weakest-arrival figure is now 0.460, so the
 derivation no longer holds and the gate is not the middle of the current
 populations.
 
+### 2.5a The weak-arrival population does not exist at inspection speed
+
+**Added 2026-08-19.**
+
+Six logged runs at 19 fpm on the cartop, deliberately including one stop made as
+soft as the machine would allow:
+
+| run | dir | cruise ceiling | arrival peak | separation | `ARM q/ro` | departed |
+|---|---|---|---|---|---|---|
+| 2 | down | 0.080 | 1.360 | 17.0x | 255/8 | any-motion |
+| 3 | up | 0.070 | 3.730 | 53.3x | **6/11** | any-motion |
+| 4 | up | 0.060 | 2.250 | 37.5x | 20/10 | **polled, silent** |
+| 5 | down | 0.060 | 1.430 | 23.8x | 255/8 | any-motion |
+| 6 | down | 0.070 | 2.410 | 34.4x | 255/7 | any-motion (softest stop) |
+
+**The deliberate soft stop produced a HARDER arrival than two ordinary ones.**
+2.410 against 1.360 and 1.430. The weakest arrival of the session came from an
+ordinary stop, and the whole population sits at 1.360–3.730 — a factor of three
+above the 0.460 weakest arrival on file, which is the number that makes this
+item urgent.
+
+**Why, per the site.** Soft stops are only achievable on **automatic operation
+at contract speed** — 150 fpm on hydraulic, 300–500 fpm on traction. On
+inspection the brake sets from motion and the arrival transient is set by brake
+mechanics, not by how gently the approach is made. That is why trying to stop
+softly on inspection does not produce a weak arrival and can produce a harder
+one.
+
+**Consequence: the weak-arrival population is an automatic-operation
+phenomenon.** The 0.460 and 0.713 figures the gate was derived from are almost
+certainly drive-controlled stops. No number of inspection runs will reproduce
+them, so the arrival half of the gate cannot be characterised on inspection at
+all.
+
+**This also narrows a dismissal that has been too broad.** The plan refuses
+further contract-speed work twice — "all transients are far above threshold at
+that speed" and "the failures live at inspection speed". That reasoning is
+correct for DEPARTURES: a missed 20 fpm departure is an inspection-speed
+failure, and contract speed cannot exhibit it. It was then applied as a blanket
+rule, and it has been keeping the project out of the only regime where the
+ARRIVAL gate's weak tail exists. Two different failure modes, two different
+regimes, one dismissal covering both.
+
+### 2.5b MIN_TRAVEL_MS does not clear the departure ramp at inspection speed
+
+**Added 2026-08-19. Open item 14.**
+
+`MIN_TRAVEL_MS` is 3000 (`movement_service.h`) and gates arrival detection at
+`movement_service.cpp` — `if (!arrival_seen && (current_time -
+movement_start_timer) > MIN_TRAVEL_MS)`. Its stated purpose, in the comment
+directly above it, is that it "keeps the departure transient itself from
+satisfying any" of the arrival tests.
+
+At 19 fpm it does not do that. Cruise ceiling measured from the same five runs,
+varying only how much of the run start is excluded:
+
+| run | dir | +3 s (`MIN_TRAVEL_MS`) | +5 s | +8 s |
+|---|---|---|---|---|
+| 2 | down | 0.080 | 0.080 | 0.080 |
+| 3 | up | **0.150** | 0.100 | 0.070 |
+| 4 | up | **0.100** | 0.060 | 0.060 |
+| 5 | down | **0.080** | 0.060 | 0.060 |
+
+On three of four runs the value taken at +3 s is inflated, and on every run the
+peak within that window occurs between +3.1 s and +3.8 s — i.e. on the window
+boundary itself, which is the signature of a transient still decaying rather
+than a level being measured. The ramp is not clear until roughly +5 to +8 s, so
+the gate opens 2–5 s early.
+
+**The consequence is measurable, not theoretical.** Run 3 armed with
+`ARM q=6` against `ARRIVAL_ARM_SAMPLES` of 5 — a six-sample quiet stretch that
+then broke. Settled cruise on that run is 0.070, less than half of
+`ARRIVAL_QUIET_MSS` (0.15), so cruise cannot have broken the stretch. The only
+point where that run's deviation reaches 0.15 is the ramp tail at +3.2 s. The
+arrival collector armed on a lull inside the still-decaying departure ramp and
+immediately lost the stretch. `main.cpp` already warns about this class of
+failure — "a departure ramp is never quiet, so counting cannot begin until the
+departure is over and cruise has been observed" — citing a run that alarmed for
+85 s over a car stationary for 78 of them.
+
+**Trap for anyone measuring cruise.** A ceiling taken from a window opening at
+`MIN_TRAVEL_MS` is a ramp measurement wearing a cruise label. Read at +3 s these
+runs produce a spurious direction dependence (up appearing to be twice down) and
+a spurious agreement between the up ceiling and `ARRIVAL_QUIET_MSS` at 0.150.
+Both dissolve at +8 s. `graph/session_d.py` opens its window at +8 s for this
+reason; `graph/parse_falcon_log.py` still uses +3 s to match the firmware, and
+its GATE line should be read with that in mind.
+
 ### 2.6 A false latch is a ten-minute alarm
 
 `LATCH_FAILSAFE_MS` is 600000. This was raised from 240 s deliberately, on the
@@ -392,7 +480,11 @@ Ordered by consequence. Items are measured unless stated.
    plan (its session D4) and dropped from the 2026-08-18 plan by oversight. It
    also defeats the stated reason the vendored Wire driver avoids `new`.
 2. **Arrival gate has no margin at low speed.** Mode of the distribution sits on
-   the threshold; four measurements at 1.02–1.03x. §2.5.
+   the threshold; four measurements at 1.02–1.03x. §2.5. **2026-08-19: the
+   CRUISE CEILING half is measured — 0.060–0.080 across five logged runs, both
+   directions, at 19 fpm on the cartop, against the 0.28 the gate was derived
+   against.** The weakest-arrival half is NOT measured and cannot be, at
+   inspection speed: see §2.5a.
 3. **Knocks and slow departures are not separable** by amplitude or waveform
    shape. Sensitivity is a design trade. Four approaches refuted. §6.
 4. **Jog verdict misclassifies in both directions** — silences jolt-heavy real
@@ -420,7 +512,10 @@ Ordered by consequence. Items are measured unless stated.
     instead.
 13. **Calibration has no guard against being run before the installation has
     physically settled, and the failure is silent and in the dangerous
-    direction.** Measured 2026-08-19. New.
+    direction.** Measured 2026-08-19. New. §2.2a.
+14. **`MIN_TRAVEL_MS` (3000) does not clear the departure ramp at inspection
+    speed, and the arrival gate opens into the still-decaying transient.**
+    Measured 2026-08-19. New. §2.5b.
 
 ---
 
@@ -460,6 +555,13 @@ Two method notes:
 3. Lateral `m` does not reveal slow travel — it reads at rest levels during a
    20 fpm run — so a missed departure leaves almost no trace.
 4. The polled departure path produces no burst and no jog verdict.
+   **Confirmed live 2026-08-19, and it is worse than "no burst": the path
+   prints NOTHING.** `FSM: Departure latched (any-motion)` sits inside
+   `if (any_motion_pending)`, so a polled departure enters MOVEMENT_DETECTED
+   with no line at all. A cartop capture held 4 real runs and 3 latch lines, and
+   the polled run was dropped from the analysis entirely until the raw state
+   transitions were cross-checked by hand. Any run count taken from
+   `Departure latched` undercounts silently.
 5. Cruise ceiling cannot be measured from current captures: the sample log is
    decimated and sticky-peak, and bursts are too short to isolate cruise.
    **2026-08-19: lowering the decimation was tried on the bench and is

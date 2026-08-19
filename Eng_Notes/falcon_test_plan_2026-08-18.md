@@ -320,14 +320,38 @@ never been measured in the slow regime, and the two attempts made from existing
 captures were both invalid — sticky peak in one case, stop contamination in the
 other. B4 exists to supply it.
 
-**Method.** Softest stops the machine can produce, both directions, from both
-terminals, at inspection speed. Twenty runs minimum. The weakest arrival is the
-number the whole approach rests on and it has moved by a factor of three across
-five previous runs, so a small sample will mislead.
+**Method — REVISED 2026-08-19, the original was not executable.** It asked for
+"the softest stops the machine can produce ... at inspection speed". Per the
+site those are mutually exclusive: **soft stops are only achievable on automatic
+operation at contract speed** — 150 fpm hydraulic, 300–500 fpm traction. On
+inspection the brake sets from motion and the arrival transient is set by brake
+mechanics, not by the approach. Six inspection runs on 2026-08-19 confirmed it:
+the deliberate soft stop produced a *harder* arrival (2.410) than two ordinary
+ones (1.360, 1.430), and the whole population sat at 3x the 0.460 weakest
+arrival on file. State doc §2.5a.
+
+The session therefore splits by regime:
+
+- **Cruise ceiling — DONE at inspection speed.** 0.060–0.080 across five logged
+  runs, both directions, 19 fpm. Read `cp=` with a window opening at +8 s, not
+  `MIN_TRAVEL_MS`; see §2.5b for why, and use `graph/session_d.py`.
+- **Weakest arrival — needs AUTOMATIC OPERATION AT CONTRACT SPEED**, and
+  belongs with session E rather than here. Twenty runs minimum still applies:
+  the weakest arrival is the number the whole approach rests on and it has
+  moved by a factor of three across five previous runs.
 
 **Exit criterion.** A weakest-arrival figure and a cruise ceiling from the same
 regime, sufficient to re-derive the gate. State whether the populations still
 separate.
+
+⚠️ **"From the same regime" is now the hard part, and it is not a formality.**
+The cruise ceiling is an inspection-speed measurement and the weak arrival is an
+automatic-operation one, so they are not from the same regime and cannot simply
+be divided. Either re-measure cruise at contract speed during the automatic runs
+— `cp=` prints on every sample line, so this costs nothing extra — or state
+plainly that the gate is being derived across two regimes and why that is
+acceptable. Do not quietly pair the 0.060–0.080 inspection ceiling with an
+automatic-operation arrival and report the ratio as a margin.
 
 **Anticipated outcome worth planning for.** If the separation is below roughly
 1.6x, no single gate serves this direction and position, and the arrival path
@@ -557,7 +581,7 @@ items 5 and 12 behind session A. Section 3.
 | Waveform-shape replacement for `opk` | Refuted across 177 bursts. A jog's departure is a real departure. |
 | Waveform shape as a knock pre-filter | Refuted. A confirmed 20 fpm departure scored inside the knock band. |
 | Raising `JOG_OPP_PEAK_MMSS` | Refuted. A real run was silenced at 972 against a 900 gate. |
-| Further 150 fpm runs | Confirms nothing. All transients are far above threshold at that speed. |
+| Further 150 fpm runs **for departure characterisation** | Confirms nothing. All transients are far above threshold at that speed. ⚠️ Narrowed 2026-08-19: this holds for DEPARTURES only. It was being applied as a blanket rule and was keeping the project out of the only regime where the arrival gate's weak tail exists — soft stops need automatic operation at contract speed. State doc §2.5a. |
 | Lowering `LOG_DECIMATE_N` to buy cruise resolution | Refuted on the bench 2026-08-19. At N=2 the device loses ~35% of samples, reads 20.8 Hz instead of 25, and boot-loops under the watchdog — at 11.8% serial duty. The ring is drained one sample per loop pass, so log density throttles the consumer and depth cannot compensate. Section 1.2. |
 | Endurance testing for the brownout | Closed. The failure was in the measuring apparatus. |
 
