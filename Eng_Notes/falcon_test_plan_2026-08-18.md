@@ -31,13 +31,15 @@ elevator outranks one needing only a bench when both are otherwise equal.
 ### 1.1 Dependency structure
 
 ```
+B2, B4  DELIVERED 2026-08-19, no flash recovery needed  (commit 0cacf29)
+   |
+   +--> D. arrival margin population  (items 2, 8)   UNBLOCKED -- car only
+
 A. flash recovery
       |
-      +--> B. instrumentation --+--> D. arrival margin population  (items 2, 8)
-                                |
-                                +--> H. velocity departure path    (item 5)
-                                |
-                                +--> closes item 12 itself
+      +--> B1, B3 --+--> H. velocity departure path   (item 5)
+                    |
+                    +--> item 12, any-motion latched reference
 
 G. corpus labelling -------------> J. jog verdict redesign         (item 4)
 
@@ -47,9 +49,11 @@ F. second installation         (items 10, 11)  no prerequisite
 I. counterweight disturbance   (item 3)        no prerequisite
 ```
 
-Sessions C, E, F, G and I depend on nothing and can be run in any order.
-Everything else has a prerequisite: B needs A, D needs A and B, H needs B, and
-J needs G. Session C remains the one to run first if car time is short.
+Sessions C, D, E, F, G and I now depend on no firmware work and can be run in
+any order. What remains behind session A is B1 and B3, and through them H and
+open item 12. J needs G. Session C remains the one to run first if car time is
+short; **session D is the one that changed** — its instrumentation prerequisite
+was B4, which is delivered, so it is now purely a car session.
 
 **Corrected 2026-08-19.** The diagram above previously carried session letters
 from an earlier draft: it named an E for "quiet gate vs cruise", an H for
@@ -175,9 +179,11 @@ car. A different feature blob is different ASIC firmware.
 
 ## 3. Session B — instrumentation
 
-**Bench. Depends on A.**
+**Bench. B2 and B4 are DONE (2026-08-19) and did not need A. B1 and B3 remain,
+and those are what still depend on A.**
 
 **Open items:** enables 2, 8, 12; closes instrumentation gaps 1, 2, 4, 5.
+Gaps 2 and 5 are now closed by B2 and B4; gaps 1 and 4 remain with B1 and B3.
 
 **Why.** The log currently cannot report the project's most dangerous failure.
 A departure latched at the start of travel and one latched at the stop produce
@@ -185,34 +191,80 @@ identical lines, so a missed departure has to be reconstructed by hand from
 lateral noise — which, at 20 fpm, is indistinguishable from rest. Three open
 items are unmeasurable until this changes.
 
-| # | Change | Why it is needed |
-|---|---|---|
-| B1 | Record and print whether the latch followed a departure or a stop | The signature of a missed departure. Without it, the failure is invisible in the log and was only found because an operator was watching. |
-| B2 | Print `bz` on the periodic sample line, not only on `ACC-INT` lines | The log cannot presently establish whether the beacon was sounding at a given moment, so "the beacon did not fire" cannot be confirmed or refuted from data. |
-| B3 | Trigger a burst on the polled departure path | A departure caught by the polled path produces no burst and no jog verdict, so the backstop is invisible exactly when it matters. |
-| B4 | Capture a cruise-phase peak, distinct from the sticky arrival peak | The cruise ceiling is the denominator of the arrival gate and cannot currently be measured: the sample log is decimated and sticky, and bursts are too short to isolate cruise. |
+| # | Status | Change | Why it is needed |
+|---|---|---|---|
+| B1 | outstanding | Record and print whether the latch followed a departure or a stop | The signature of a missed departure. Without it, the failure is invisible in the log and was only found because an operator was watching. |
+| B2 | **done** | Print `bz` on the periodic sample line, not only on `ACC-INT` lines | The log cannot presently establish whether the beacon was sounding at a given moment, so "the beacon did not fire" cannot be confirmed or refuted from data. |
+| B3 | outstanding | Trigger a burst on the polled departure path | A departure caught by the polled path produces no burst and no jog verdict, so the backstop is invisible exactly when it matters. |
+| B4 | **done** | Capture a cruise-phase peak, distinct from the sticky arrival peak | The cruise ceiling is the denominator of the arrival gate and cannot currently be measured: the sample log is decimated and sticky, and bursts are too short to isolate cruise. |
 
-**Does B actually need A?** The plan asserts it does, and that assertion sets
-the project's longest dependency chain — A gates B, B gates D and H. It has not
-been build-measured. B2 is a format string and a getter call. B4 is
-one float and a compare, and it has a working precedent in the firmware already:
-`LateralMonitor` retires per-second bucket maxima into `bmax[]` for the
-calibration window, which is the same mechanism on a different axis. B1 and B3
-are the expensive pair. Before accepting a gate that forces the bma4 driver swap
-— whose own caution note requires re-deriving every any-motion constant on the
-bench — build B2 and B4 against the existing 68 bytes and record what actually
-fits. (B0 was struck on 2026-08-19; see section 1.2.)
+**Does B actually need A? Answered 2026-08-19: not for B2 and B4.** The plan
+asserted the gate rather than measuring it, and that assertion set the project's
+longest dependency chain — A gates B, B gates D and H. Measured against the
+existing 68 bytes free:
 
-**Method.** Print-only where possible. B4 requires a small amount of state — a
-running peak over a bucket that retires far enough behind the current sample
-that the stop transient cannot contaminate it, and should reuse the `bmax[]`
-pattern rather than inventing a second one.
+| variant | flash | free | vs baseline |
+|---|---|---|---|
+| baseline `26e38df` | 32188 | 68 | — |
+| B2 only | 32212 | 44 | +24 |
+| B4 only | 32228 | 28 | +40 |
+| B2 + B4 | 32254 | 2 | +66 |
+| `tk=` removed | 32128 | 128 | −60 |
+| **B2 + B4, `tk=` removed** | **32194** | **62** | **+6** |
+
+Both fit without A even before the `tk=` credit. With it — justified because
+§6a is now resolved on measurement and the counter was marked
+remove-once-resolved — the pair costs a net 6 bytes and leaves 62 free, within
+6 bytes of the previous headroom. RAM went 1366 → 1364. Shipped in `0cacf29`.
+
+**B4 needed no new state at all.** This plan budgeted for "a running peak over a
+bucket that retires far enough behind the current sample"; `arr_peak_cur` and
+`arr_peak_prev` already *are* that, maintained for the arrival gate on a 1 s
+alternating bucket. `pk=` prints `max(cur, prev)`, which is exactly why it
+cannot report a cruise ceiling — at a stop the open bucket already holds the
+arrival transient. `arr_peak_prev` alone lags one full bucket, so when the stop
+lands in the open bucket the retired one still carries the pre-stop value. B4
+was printing, not machinery.
+
+**B1 and B3 remain the expensive pair and are unmeasured.** They are the reason
+session A may still be forced, and B1 is the more important of the two — it is
+the signature of the failure this plan calls the most dangerous. Measure them
+the same way before accepting any gate that forces the bma4 driver swap, whose
+own caution note requires re-deriving every any-motion constant on the bench.
+(B0 was struck on 2026-08-19; see section 1.2.)
+
+**Method.** Print-only where possible. B4 turned out to need no state — see
+above. B1 and B3 have not been attempted; B3 in particular touches the polled
+departure path rather than the log, so it is the one most likely to cost real
+flash.
 
 **Exit criterion.** A capture from an ordinary run in which departure
-provenance, beacon state, and a cruise ceiling can all be read directly.
+provenance, beacon state, and a cruise ceiling can all be read directly. **Two
+of the three are now available** — `bz=` and `cp=` print on every periodic
+sample line. Departure provenance still needs B1.
 
 **Verification.** No behavioural change. Confirm identical FSM transitions on a
 replayed bench run before and after.
+
+**Verification result for B2/B4, 2026-08-19.** Bench, 90 s steady plus a full
+boot-from-reset capture:
+
+| check | result |
+|---|---|
+| `bz=`/`cp=` present | 281/281 sample lines |
+| `tk=` removed from the log | 0 lines |
+| `bz=` with the beacon silent | 0 on every line |
+| invariant `pk >= cp` | 401/401 lines, 0 violations |
+| `cp=` live, not stuck | range 0.02 – 0.14 |
+| `ov=` advance in steady state | **0** — flat at 38 over 363 lines; the pre-change control settled at 38 too |
+| sample rate | 25.00 Hz |
+| FSM transitions | identical to the pre-change control over the range both captures cover; MONITORING reached; re-arm blank settled 1605 ms against 1589 ms on the control |
+| reboots in window | none |
+
+⚠️ **`cp=` is only meaningful during cruise.** It separates from `pk=` only
+when there is a stop transient for it to lag behind; at rest the two track, as
+they did throughout this bench capture. The cruise ceiling itself is a car
+measurement and belongs to session D.
 
 ---
 
@@ -249,7 +301,11 @@ have introduced, rather than one it inherited.
 
 ## 5. Session D — arrival margin population
 
-**Car. Depends on B.**
+**Car. UNBLOCKED 2026-08-19 — no firmware prerequisite remains.** Its
+instrumentation dependency was B4, the cruise ceiling, which is delivered and
+bench-verified in `0cacf29`; `cp=` now prints on every periodic sample line.
+Read `cp=` during cruise, not at the stop — that is the whole point of it
+lagging a bucket behind `pk=`.
 
 **Open items:** 2, 8.
 
@@ -463,17 +519,23 @@ population.
 | Open item | Session | Blocked by |
 |---|---|---|
 | 1 flash headroom | A | — |
-| 2 arrival gate margin | D | A, B |
+| 2 arrival gate margin | D | — (was A, B; cleared by B4) |
 | 3 knock/departure separability | I | — |
 | 4 jog verdict | J | G |
-| 5 velocity path disabled | H | B |
+| 5 velocity path disabled | H | B1/B3, and so A |
 | 6 ramp detector unevidenced | E | — |
 | 7 logging in shipping build | A | — |
-| 8 quiet gate vs cruise | D | A, B |
+| 8 quiet gate vs cruise | D | — (was A, B; cleared by B4) |
 | 9 re-arm regression | C | — |
 | 10 z threshold unproven | F | — |
 | 11 installation coverage | F | — |
-| 12 any-motion latched reference | B | A |
+| 12 any-motion latched reference | B1 | A |
+
+**Changed 2026-08-19.** B2 and B4 were built and measured against the existing
+68 bytes rather than assumed to need session A. Both fit; with the `tk=` credit
+the pair costs a net 6 bytes. That clears items 2 and 8 entirely and makes
+session D runnable on car time alone. B1 and B3 are unmeasured and still carry
+items 5 and 12 behind session A. Section 3.
 
 ---
 
