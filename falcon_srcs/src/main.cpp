@@ -175,28 +175,27 @@ static volatile uint8_t      ring_tail = 0;   /* loop reads  */
 static volatile uint16_t     sample_overrun = 0;
 
 /*
- * Free-running count of sensor reads attempted, incremented on every entry to
- * read_acceleration_mss() regardless of what happens afterwards.
+ * §6a RESOLVED 2026-08-19, and the isr_ticks/tk= counter removed with it.
  *
- * This exists to diagnose the gap described in Eng_Notes §6a: printed samples
- * arrive in bursts of ~6 followed by a gap of exactly 6 sample periods, while
- * ov= sits at 6 under every condition. Because ov= only counts snapshots the
- * ISR overwrote before loop() printed them, it cannot distinguish "the ISR
- * never ran" from "the ISR ran and the print path dropped it".
+ * tk= existed to separate two failures ov= alone could not: "the ISR never ran"
+ * from "the ISR ran and the print path dropped the sample". Its reading was
+ * that ~12 ticks per 6 printed lines meant the publish path was losing samples,
+ * and ~6 per 6 lines meant the timer itself was stalling -- in which case no
+ * timing measured from these logs could be trusted.
  *
- * tk= closes that gap. Compare its growth against the number of lines printed:
+ * Measured on the bench across three captures of 60-90 s at the shipping
+ * decimation: exactly 8.00 ticks per printed line, min 8, max 8, zero spread,
+ * with ov= advancing 0 and a sample period of 39.99-40.01 ms. Neither failure
+ * mode. The ISR fires reliably and loop() drains every sample it publishes.
  *
- *   tk advances ~12 while 6 lines print  -> ISR is firing; the publish/print
- *                                           path is losing samples, and ov=
- *                                           is failing to count them
- *   tk advances ~6 while 6 lines print   -> the ISR itself is not firing, and
- *                                           the timer stalls for ~2 s at a
- *                                           time. No timing measured from
- *                                           these logs can be trusted
+ * The counter was marked "diagnostic only, remove once §6a is resolved", so it
+ * is gone. That is 60 bytes of flash, which is what pays for bz= and cp= on the
+ * sample line. ov= remains, and is still both the liveness indicator and the
+ * overrun counter -- see the LOG_DECIMATE_N block for why it must be watched
+ * before any change to log density.
  *
- * Diagnostic only. Remove once §6a is resolved.
+ * Eng_Notes/falcon_state_of_project_2026-08-18.md §7.
  */
-static volatile uint16_t     isr_ticks = 0;
 
 /*
  * Sensor read failures. err_run is consecutive (cleared by any good read) and
@@ -914,7 +913,11 @@ static volatile bool         accel_avg_primed = false;
  * The old advice to "raise this when the timer is fixed to 100 Hz, or serial
  * becomes the new bottleneck" therefore had the constraint backwards. Before
  * any increase in log density, make the drain consume the whole ring per pass;
- * then re-measure ov= and tk= before trusting what the denser log says.
+ * then re-measure before trusting what the denser log says. ov= is the counter
+ * that settles it. tk= was the other half of that measurement and was removed
+ * on the same day (see the §6a block above); reinstate it temporarily -- it is
+ * ~60 bytes -- rather than judging a density change on ov= alone, because ov=
+ * counts overruns and tk= is what proves the ISR was firing underneath them.
  *
  * Full pair in Eng_Notes/falcon_test_plan_2026-08-18.md §1.2.
  */
@@ -1586,8 +1589,6 @@ void read_acceleration_mss()
     uint32_t read_start;
     uint16_t rslt;
 
-    isr_ticks++;
-
     read_start = micros();
     rslt = bma456.getAcceleration(&x, &y, &z);
 
@@ -2014,7 +2015,6 @@ void emit_sample_log()
     static uint8_t  decimate = 0;
     sample_log_t    s;
     uint16_t        overrun;
-    uint16_t        ticks;
     uint16_t        err_total;
 
     /*
@@ -2036,7 +2036,6 @@ void emit_sample_log()
     ring_tail = (uint8_t)((ring_tail + 1) >= SAMPLE_RING_N ? 0 : ring_tail + 1);
 
     overrun   = sample_overrun;
-    ticks     = isr_ticks;
     err_total = sensor_err_total;
 
     /*
@@ -2096,8 +2095,6 @@ void emit_sample_log()
     Serial.print(s.read_us);
     Serial.print(F(" ov="));
     Serial.print(overrun);
-    Serial.print(F(" tk="));
-    Serial.print(ticks);
     Serial.print(F(" im="));
     Serial.print(acc_int_count);
 
@@ -2146,6 +2143,41 @@ void emit_sample_log()
      */
     Serial.print(F(" pk="));
     Serial.print(arrival_peak_get(), 2);
+
+    /*
+     * B2 -- beacon state on the PERIODIC line, not only on ACC-INT lines.
+     *
+     * Without this the log cannot establish whether the beacon was sounding at
+     * a given moment, so "the beacon did not fire" can be neither confirmed nor
+     * refuted from a capture. bz= already prints on ACC-INT lines; those are
+     * edge-triggered and absent for exactly the runs where the question
+     * matters.
+     */
+    Serial.print(F(" bz="));
+    Serial.print(get_buzzer_status() ? 1 : 0);
+
+    /*
+     * B4 -- the RETIRED arrival bucket, printed separately from pk=.
+     *
+     * pk= is max(arr_peak_cur, arr_peak_prev), a 1-2 s sliding window, so at
+     * the moment of a stop it ALREADY carries the arrival transient and cannot
+     * report the cruise ceiling. arr_peak_prev alone lags the current sample by
+     * one full bucket, so when the stop lands in the open bucket the retired
+     * one still holds the pre-stop value.
+     *
+     * That is the cruise ceiling the arrival gate's denominator needs, and the
+     * reason it could not be read before: ARRIVAL_PEAK_VALUE was derived
+     * against a worst cruise of 0.28 that has never been re-measured in the
+     * slow regime. Read cp= during cruise, not at the stop.
+     *
+     * No new state -- the buckets already exist for the arrival gate. This is
+     * printing, not machinery.
+     */
+    Serial.print(F(" cp="));
+    noInterrupts();
+    float cp_r = arr_peak_prev;
+    interrupts();
+    Serial.print(cp_r, 2);
 
     if (err_total) {
         Serial.print(F(" et="));
