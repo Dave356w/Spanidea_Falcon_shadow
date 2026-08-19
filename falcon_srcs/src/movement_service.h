@@ -545,7 +545,33 @@ static_assert(XY_CALIB_MIN_BUCKETS <= XY_CALIB_BUCKETS,
  * terminal-floor brake set, which is session C and has never been run.
  */
 #define MONITOR_REARM_QUIET            8     /* lateral quiet metrics = settled */
-#define MONITOR_REARM_MIN_MS           1500  /* floor; ordering + first ringing */
+/*
+ * 1500 -> 2500, 2026-08-19, on a field report of intermittent alarms starting
+ * after arrival. THIS IS A HEDGE, NOT A FIX, and it is important that whoever
+ * reads this next knows the difference.
+ *
+ * WHAT IT BUYS. A second more coverage against a re-latch on a car that has
+ * already stopped.
+ *
+ * WHAT IT COSTS. Nothing measured. Across 17 stops on 2026-08-19 the shortest
+ * gap between MONITORING and the next GENUINE departure was 2801 ms, so a
+ * 2500 ms floor discards none of them. 4000 would have discarded one.
+ *
+ * WHAT IT DOES NOT DO. The recorded false re-latch (2026-08-07, terminal-floor
+ * brake set, 73 s alarm on a stationary car) was at 3.5 s. This floor is below
+ * that and does not cover it. It cannot be raised to cover it either: a real
+ * departure was observed at 2.8 s and the false re-latch at 3.5 s, so THE TWO
+ * POPULATIONS OVERLAP and no floor value separates them. Anything covering
+ * 3.5 s discards real departures, and a discarded departure means the beacon
+ * stays silent over a moving car -- the worse of the two failures.
+ *
+ * THE LEVER THAT ACTUALLY DISCRIMINATES is MONITOR_REARM_QUIET, not this floor:
+ * it extends the blank only when the stop is genuinely ringing. On every
+ * ordinary stop measured, quiet_run() reached 76-84 within ~1.5 s, so raising
+ * the quiet requirement is nearly free on a normal arrival. Sizing it needs
+ * quiet_run() through a terminal-floor brake set -- session C, never run.
+ */
+#define MONITOR_REARM_MIN_MS           2500  /* floor; ordering + first ringing */
 
 
 enum MotionStates
