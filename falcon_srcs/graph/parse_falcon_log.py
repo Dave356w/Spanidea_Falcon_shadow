@@ -47,6 +47,22 @@ xym_re = re.compile(r"\sm=(-?\d+\.?\d*)\s+q=(\d+)")
 # Windowed raw arrival peak. This is what the FSM actually decides an arrival
 # on, and reading it back is what exposes the arming defect below.
 pk_re = re.compile(r"\spk=(\d+\.?\d*)")
+
+# Session D reference values, from the firmware and the test plan.
+#   ARRIVAL_PEAK_VALUE is movement_service.h:236 -- the gate itself.
+#   SEPARATION_MIN is the plan's design threshold: below it, no single
+#   gate serves this direction and position and the arrival path needs a
+#   second axis rather than a retune.
+ARRIVAL_PEAK_VALUE = 0.45
+SEPARATION_MIN = 1.6
+# Added 2026-08-19 with B2/B4 (commit 0cacf29).
+#   cp= is the RETIRED arrival bucket -- arr_peak_prev alone, lagging pk= by
+#      one full 1 s bucket. pk= is max(cur, prev) and therefore already
+#      carries the arrival transient at a stop; cp= is what reports the
+#      CRUISE ceiling. Read it during cruise, never at the stop.
+#   bz= is beacon state, now on the periodic line and not only on ACC-INT.
+cp_re = re.compile(r"\scp=(\d+\.?\d*)")
+bz_re = re.compile(r"\sbz=(\d+)")
 xycal_re = re.compile(r"XY:\s*calib\s+b=(\d+)\s+peak=(-?\d+\.?\d*)\s+mv=(\d+)")
 xystill_re = re.compile(r"XY-Still-Value\s*:\s*(-?\d+\.?\d*)")
 
@@ -99,6 +115,8 @@ class Capture(object):
         self.xy_m = []           # lateral metric per sample, None if absent
         self.xy_q = []           # quiet run per sample
         self.pk = []             # windowed raw arrival peak, None if absent
+        self.cp = []             # retired bucket = cruise ceiling, None if absent
+        self.bz = []             # beacon state per sample, None if absent
         self.boots = 0           # 'Device Booted' markers seen
         self.xy_still = None     # learned threshold, m/s^2
         self.xy_calib = None     # (buckets, peak, moved)
@@ -131,6 +149,10 @@ class Capture(object):
                 self.xy_q.append(int(xy.group(2)) if xy else None)
                 pkm = pk_re.search(s)
                 self.pk.append(float(pkm.group(1)) if pkm else None)
+                cpm = cp_re.search(s)
+                self.cp.append(float(cpm.group(1)) if cpm else None)
+                bzm = bz_re.search(s)
+                self.bz.append(int(bzm.group(1)) if bzm else None)
                 continue
 
             m = old_re.search(s) or old_gonly_re.search(s)
@@ -148,6 +170,8 @@ class Capture(object):
                 self.xy_m.append(None)
                 self.xy_q.append(None)
                 self.pk.append(None)
+                self.cp.append(None)
+                self.bz.append(None)
                 continue
 
             # --- new-format lines the old parser mistook for corruption -----
@@ -656,6 +680,26 @@ def report_runs(cap):
                     best = max(best, abs(av - calib))
             return best
 
+        # SESSION D -- the two halves of the arrival gate, from the fields
+        # B2/B4 added on 2026-08-19.
+        #
+        # cp= is the RETIRED arrival bucket, so it lags pk= by one full 1 s
+        # bucket. That lag is the whole point: pk= is max(cur, prev) and has
+        # already absorbed the arrival transient by the time the car stops,
+        # which is why the cruise ceiling could never be read from it. Take cp=
+        # from the CRUISE window only.
+        def field_between(vals, lo, hi):
+            best = None
+            for t, v in zip(cap.t_ms, vals):
+                if t is None or v is None or lo is None or hi is None:
+                    continue
+                if lo <= t <= hi:
+                    best = v if best is None else max(best, v)
+            return best
+
+        cruise_ceiling = field_between(cap.cp, cru_lo, cru_hi)
+        arrival_peak = field_between(cap.pk, cru_hi, t1)
+
         # peak polled delta during the run
         peak = 0.0
         for t, av in zip(cap.t_ms, cap.avg):
@@ -683,6 +727,26 @@ def report_runs(cap):
             print("           ARRIVAL %d quiet edges  peak delta %.3f  (cruise peak %.3f)"
                   % (len(arr_edges), peak_between(cru_hi, t1),
                      peak_between(cru_lo, cru_hi)))
+
+        # --- session D: gate margin ---------------------------------------
+        if cruise_ceiling is not None or arrival_peak is not None:
+            cc = "%.3f" % cruise_ceiling if cruise_ceiling is not None else "n/a"
+            ap = "%.3f" % arrival_peak if arrival_peak is not None else "n/a"
+            print("           GATE    cruise ceiling cp=%s   arrival peak pk=%s"
+                  "   (gate %.2f)" % (cc, ap, ARRIVAL_PEAK_VALUE))
+            if arrival_peak is not None:
+                x = arrival_peak / ARRIVAL_PEAK_VALUE
+                flag = "  <-- ON THE GATE" if x < 1.10 else ""
+                print("                   arrival is %.2fx the gate%s" % (x, flag))
+            if cruise_ceiling and arrival_peak is not None and cruise_ceiling > 0:
+                sep = arrival_peak / cruise_ceiling
+                if sep < SEPARATION_MIN:
+                    note = ("  <-- BELOW %.1fx: no single gate serves this"
+                            " direction and position. Second axis, not a new"
+                            " constant." % SEPARATION_MIN)
+                else:
+                    note = ""
+                print("                   separation %.2fx%s" % (sep, note))
 
     # cruise edge rate: quiet edges while alarming, per minute
     tot_quiet = sum(1 for e in cap.edges if e[2] == 0 and e[1] == 4)
