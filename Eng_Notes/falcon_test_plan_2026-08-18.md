@@ -387,12 +387,22 @@ chance of one.
   `0.200000`, which indicates clamping rather than measurement.
 - per run: departure provenance, `ARM q=` and `ro=`, arrival peak, verdict.
 - at least three separate calibrations, re-seating the device between them.
+  ⚠️ **Let the device settle before each one.** On 2026-08-19 this exact
+  procedure was run on the cartop and the calibration taken immediately after
+  handling produced a spurious "learned" threshold of 0.069354 — 1.73x the
+  floor, derived from the installer's residual motion rather than the mounting,
+  with `mv=` reading 0 and nothing else flagging it. Run this session
+  unsettled and it will manufacture the very result criterion 2 is looking
+  for. State doc §2.2a, open item 13.
 
 **Exit criteria.**
 
 1. Whether calibration-derived thresholds transfer, or whether the constants are
    specific to the original installation.
-2. Whether `Threshold-Value` exceeds the clamp floor on any mounting.
+2. Whether `Threshold-Value` exceeds the clamp floor on any mounting **from a
+   settled window**. A value above the floor is not on its own evidence that
+   learning works — pair it with `XY-Still` and the `XY: bmax` spread to show
+   the window was quiet. See open item 13.
 3. An arming-margin spread for a second installation, comparable against the
    3–28 recorded on one mounting at the first.
 

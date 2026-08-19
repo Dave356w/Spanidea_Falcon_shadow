@@ -90,6 +90,59 @@ either way; what is certain is that the stated figure predates both fixes. The
 comment should be corrected or the loss re-measured, and `ov=` is the counter
 that settles it.
 
+### 2.2a Calibration can be poisoned by an unsettled mounting, silently
+
+**Added 2026-08-19. Open item 13.**
+
+Three calibrations taken on the cartop, device re-seated between each:
+
+| # | reset | max XY bucket | `XY-Still` | `Zero-Calib` | `Threshold-Value` | |
+|---|---|---|---|---|---|---|
+| 1 | 0x7 | 0.0550 | 0.0750 | 9.708342 | **0.069354** | learned |
+| 2 | 0x4 | 0.0430 | 0.0570 | 9.746478 | 0.040000 | clamped to floor |
+| 3 | 0x4 | 0.0480 | 0.0540 | 9.741517 | 0.040000 | clamped to floor |
+
+Calibration 1 was taken immediately after the device was handled onto the
+cartop. It is the noisiest window on every metric available, and its
+`Zero-Calib` sits 0.038 off the other two, which says the unit was not yet in
+its settled orientation.
+
+**The mechanism is not in doubt.** `Z_THRESH_MARGIN` is 1.50, so the derived
+threshold is 1.5x the *measured rest spread*: a noisier window produces a higher
+threshold by construction. Back-computing, calibration 1 measured a rest spread
+of ~0.046 against under 0.027 for the two settled ones.
+
+**The direction is the dangerous one.** The source says it plainly — "too high
+-> the backstop is dead again, which is the state this replaces" — and
+`Z_THRESH_MIN` is documented as sitting *below the weakest departure seen*. A
+threshold learned at 1.73x that floor moves toward a dead backstop, not away
+from it. So the one value on file that ever cleared the clamp did so by learning
+the installer's hands, and a reader who sees only "per-deployment learning
+finally produced a value" draws exactly the wrong conclusion.
+
+**Nothing caught it.** `mv=` read 0 on all three. The degraded-calibration flag
+does not distinguish the poisoned window from the two clean ones, so there is no
+runtime signal and no log signal beyond comparing `XY-Still` across calibrations
+that were never previously compared.
+
+**This is a near-miss of a failure already on file.** `Z_CAL_SETTLE_MS` (1500 ms)
+exists because an unconverged 32-sample average once inflated the spread to 2.26
+and clamped to `Z_THRESH_MAX`, killing the backstop outright. That settle window
+handles the *filter's* convergence. It does not handle the *installation*
+settling, which is what happened here, and the two have been conflated.
+
+**Consequences.**
+
+1. Any commissioning procedure must require the device to settle before
+   calibration, and that requirement does not currently exist anywhere.
+2. A `Threshold-Value` above the clamp floor is **not** by itself evidence that
+   per-deployment learning works. It has to be paired with evidence the window
+   was quiet.
+3. Candidate fixes, none measured: reject a calibration whose bucket spread
+   exceeds the others by some factor; require two consecutive agreeing
+   calibrations; or extend `Z_CAL_SETTLE_MS` to cover physical settling, which
+   costs window time inside an already 6 s calibration.
+
 ### 2.3 One of three departure detectors is disabled
 
 `VEL_ARMED 0`. The velocity-integral path is documented as the only one that can
@@ -355,13 +408,19 @@ Ordered by consequence. Items are measured unless stated.
 9. **Re-arm correction may have re-opened the 2026-08-07 stationary-car alarm.**
    Not observed in 24 runs; not ruled out.
 10. **Self-calibrated z threshold is unproven.** Clamps to floor in both
-    mountings tested.
+    mountings tested. **2026-08-19, three calibrations on the cartop with the
+    device re-seated between them: 2 clamped to `Z_THRESH_MIN`, 1 "learned" at
+    0.069354.** That is the first value on file above the floor, and it is not
+    evidence that learning works — see item 13. The item stands as written.
 11. **Single-installation coverage.** One logged installation; one unlogged
     second machine.
 12. **Any-motion uses a latched reference.** Documented as permitting silent
     death of departure detection, with nothing checking it. No confirmed
     instance; the 2026-08-18 misses were explained by §2.2 of the test report
     instead.
+13. **Calibration has no guard against being run before the installation has
+    physically settled, and the failure is silent and in the dangerous
+    direction.** Measured 2026-08-19. New.
 
 ---
 
