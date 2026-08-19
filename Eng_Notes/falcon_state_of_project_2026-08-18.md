@@ -166,11 +166,13 @@ The ramp detector is armed and has never fired. Negative evidence is complete
 moves across a full session and 51 replayed departure bursts), but it has never
 been observed executing correctly on a drive-controlled stop.
 
-**2026-08-19 — the ramp detector's silence is explained.** Five drive-controlled
-contract-speed stops produced zero `Arrival (ramp)` lines, and the reversal gate
-in front of it failed on two of them (`g=0`) and cleared by at most one sample on
-the rest. The detector has not been shown unable to recognise a ramp; it has been
-shown rarely to run. `falcon_arrival_gate_2026-08-19.md` §4.
+**2026-08-19 — the ramp detector has positive evidence and this subsection is
+half retired.** It latched on 9 of 9 drive-controlled contract-speed stops and
+0 of 8 inspection stops. `FSM: Arrival (ramp)` never prints because the polled
+path triggers first, not because the detector declines; the line it actually
+emits is `RAMP latched`. The remaining armed-path-without-evidence concern in
+this subsection applies to the other path, not the ramp.
+`falcon_arrival_gate_2026-08-19.md` §4.
 
 ### 2.5 The arrival gate has no margin at low speed
 
@@ -503,13 +505,16 @@ Ordered by consequence. Items are measured unless stated.
    before flight.
 5. **Velocity departure path disabled**, and its threshold is above the 20 fpm
    requirement. §2.3.
-6. **Ramp detector armed with no positive evidence.** §2.4. **2026-08-19: the
-   cause is now known and it is upstream of the detector.** Zero fires across
-   five drive-controlled contract-speed stops, both directions — its designed
-   condition. The reversal gate that enables it failed outright on 2 of 5
-   (`g=0`, `ro=6` and `7` against `ARM_REV_SAMPLES` 8) and opened with at most
-   one sample of margin on the other three. Read this as a marginal gate, not a
-   detector that cannot recognise ramps. Report: `falcon_arrival_gate_2026-08-19.md`.
+6. **Ramp detector armed with no positive evidence — RESOLVED 2026-08-19,
+   positively.** §2.4. It latched on **9 of 9** drive-controlled contract-speed
+   stops (`dir=100`, mean 571–610 mm/s²) and **0 of 8** inspection stops, which
+   is session E's exit criterion in full. An earlier reading the same day
+   concluded the opposite by counting `FSM: Arrival (ramp)`, which is zero
+   because the polled path wins the race and the FSM has already transitioned —
+   the detector emits `RAMP latched`. Do not lower `ARM_REV_SAMPLES` on this:
+   the three runs showing `g=0` at ARM time latched anyway, and the constant
+   also gates the peak collector, so loosening it is the false-release
+   direction. Report: `falcon_arrival_gate_2026-08-19.md` §4.
 7. **Serial logging in the shipping build** costs 34% of idle current. §2.2.
 8. **`ARRIVAL_QUIET_MSS` conflicts with measured cruise.** May prevent quiet
    arming on faster machines; consistent with arming-margin spread. Not

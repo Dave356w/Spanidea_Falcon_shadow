@@ -391,13 +391,19 @@ deceleration, which only a drive-controlled stop produces.
 including the machine's rated speed. Record every `FSM: Arrival (ramp)` line
 with its block statistics, and every automatic stop that did not produce one.
 
-**PARTIALLY EXECUTED 2026-08-19**, as a by-product of session D's contract-speed
-runs. Five automatic stops at 500 fpm, both directions: **zero `Arrival (ramp)`
-lines.** The reason is upstream — the reversal gate failed outright on 2 of 5
-(`g=0`, `ro=6` and `7` against `ARM_REV_SAMPLES` 8) and cleared by at most one
-sample on the other three. So the detector is not carrying the load it is armed
-for, but the finding to act on is the gate, not the detector. Fixing
-`ARM_REV_SAMPLES` is a corpus question, not a car one. `falcon_arrival_gate_2026-08-19.md` §4.
+**EXIT CRITERION MET 2026-08-19**, as a by-product of session D's
+contract-speed runs. **`RAMP latched` on 9 of 9 automatic stops at 500 fpm,
+both directions, `dir=100` throughout — and 0 of 8 inspection stops.** That is
+this session's criterion in full: fires on drive-controlled stops, declines
+inspection stops, same session.
+
+⚠️ Count `RAMP latched`, **not** `FSM: Arrival (ramp)`. The latter is zero
+because the polled path triggers first and the FSM has already moved to
+DECELERATING before the ramp verdict lands. An earlier pass the same day counted
+the wrong string and concluded the detector never runs. Do **not** lower
+`ARM_REV_SAMPLES` to "fix" it — the runs showing `g=0` at ARM time latched
+anyway, and that constant also gates the peak collector, so loosening it is the
+false-release direction. `falcon_arrival_gate_2026-08-19.md` §4.
 
 **Exit criterion.** The detector fires on drive-controlled stops and declines
 inspection stops in the same session. If it fires on no automatic stop, it is
