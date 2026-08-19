@@ -285,6 +285,35 @@ Twenty-four runs have shown no instance. Those were not terminal-floor stops,
 which is the condition that produced the original failure, so the risk is not
 yet addressed.
 
+**⚠️ Added 2026-08-19 — the rest gate is currently INERT, and this session is
+what sizes it.** `MONITOR_REARM_QUIET` is 8, and measured across 20 stops that
+day `quiet_run()` was ALREADY at or above 8 at the moment `STATE_MONITORING` was
+entered on 13 of them. So the quiet condition contributes nothing on an ordinary
+stop and the blank is purely `MONITOR_REARM_MIN_MS` — which is why the settle
+figure was a flat 1507–1605 ms before the floor moved, and a flat ~2556 ms
+after. The gate is not gating.
+
+Time from MONITORING until `quiet_run()` first reaches each threshold, ordinary
+stops, 2026-08-19:
+
+| threshold | reached at |
+|---|---|
+| 8 | 0 ms on 13 of 20 |
+| 16 | 0 ms on 10 of 20 |
+| 32 | 0–1934 ms |
+| 64 | 0–7045 ms |
+| 128 | 1589–18890 ms, 3 never |
+
+**The number this session must produce is the same table for TERMINAL stops.**
+If a ringing terminal brake set holds `quiet_run()` down materially longer than
+these, the threshold that separates them is the fix — it extends the blank only
+when the stop is actually ringing, which no floor value can do. If terminal
+stops look the same as these, the rest-gate approach cannot discriminate and
+that is worth knowing before more effort goes into it.
+
+Run `graph/session_c.py` on the capture; it prints both the regression check and
+this table.
+
 **Method.** Terminal-floor stops, both terminals, logger running. At least ten.
 Include the single-floor terminal approach, which is the geometry that produced
 the original event. Do not jog between runs; allow the FSM to settle naturally,
