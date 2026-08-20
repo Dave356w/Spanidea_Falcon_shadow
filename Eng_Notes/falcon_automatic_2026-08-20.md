@@ -38,27 +38,44 @@ run here also carries a departure burst, which is emitted only inside the
 any-motion branch. Both paths fired on all of them. See
 `falcon_cartop_2026-08-20.md` §2.
 
-## 2. 🔴 Run 10 — both arming gates at minimum on the same run
+## 2. ⚠️ Run 10 — the peak collector armed by zero margin
+
+☠️ **CORRECTED before this note was an hour old. Two claims in the first draft
+were wrong and are retracted:**
+
+**(a) "`g=0` means the reversal path was unavailable." No.** `g=` is sampled when
+the ARM line prints, at the arrival. On all four `g=0` runs the ramp gate opened
+shortly afterwards and **the ramp latched anyway** — 480, 471, 503, 497, all at
+`dir=100`. `g=0` means "not open *yet* at that instant", not "never opened".
+
+**(b) "the ramp detector shares `arr_armed` with the peak collector." No** — it
+has had its own independent gate since 2026-08-12. `main.cpp` at `ramp_gate`
+says so explicitly: the peak collector keeps the quiet-OR-reversal union, the
+ramp detector gets `ramp_gate`, which is **reversal-only**, because "a sign
+reversal against the departure means the departure ramp has ENDED". That was
+built precisely because the union could arm on a slow departure's own opening
+samples and release the beacon on a moving car. The architecture is sounder than
+the first draft described.
+
+**What survives, and it is still the finding of the session:**
 
 ```
 #10  polled  ml=8651  arrival 0.468 (1.04×)  q=5  ro=7  g=0
 ```
 
-- quiet armed at **exactly 5 against a requirement of 5** — zero margin
-- the reversal path was **unavailable**, `ro=7` against 8
+- the peak collector armed at **exactly 5 against a requirement of 5** — zero
+  margin, and it happened on **3 of 11 runs** (`q` = 5, 5, 5)
 - the arrival then cleared by **4%**
 
-**Arming rested on a single sample of a single path, with no backup.** One
-sample lost to buzzer phase and nothing arms — which switches off *both* the
-peak collector and the ramp detector for the whole stop, and the beacon then
-holds over a stationary car until `LATCH_FAILSAFE_MS`. That is the 85-second
-false-beacon condition of `falcon_cab_automatic_2026-08-12.md` §4.2, and it came
-within one sample on an ordinary service run.
+**One sample lost to buzzer phase and the peak collector does not arm on those
+three runs.** The ramp detector is independent and did fire on every run, so the
+beacon is not left with nothing — but the ramp always latched *after* the peak
+had already released (§5), so it has never actually been the thing that saved a
+run. On a run where the peak collector fails to arm, whether the ramp releases
+in time is untested.
 
-**The two gates exist as independent insurance for each other.** Across eleven
-runs quiet hit its floor three times and reversal was unavailable four times.
-That is not a thin tail — **a majority of runs had one gate or the other at or
-below its minimum**, and run 10 had both.
+`ro` ranged 4–13 across the eleven, so the reversal gate's own timing is also
+variable — but it opened on all eleven eventually.
 
 ## 3. 🟢 Session C's table — and the rest gate is NOT inert
 
