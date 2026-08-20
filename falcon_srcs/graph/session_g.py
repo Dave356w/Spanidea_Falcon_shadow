@@ -47,6 +47,13 @@ RE_PEAK      = re.compile(r'peak\s+([0-9.]+)')
 RE_RESET     = re.compile(r'^Reset cause')
 
 LATCH_ANYMOTION = 'FSM: Departure latched'
+
+# B1 (2026-08-20) makes the path explicit: "FSM: Departure latched (polled)
+# ml=.. q=.. dq=.. td=..". Captures before that carry "(any-motion)" only,
+# because the polled path printed nothing at all -- which is why dep_path
+# INFERS "polled/silent" from a MOVING transition with no latch line. Keep both
+# readings: prefer what the device states, fall back to the inference.
+RE_LATCH_PATH = re.compile(r'^FSM: Departure latched \((any-motion|polled|velocity|unknown)\)')
 TO_MOVING       = 'Transitioned to STATE_MOVING'
 TO_DECEL        = 'Transitioned to STATE_DECELERATING'
 FAILSAFE        = 'FSM: FAILSAFE'
@@ -67,6 +74,7 @@ class Run(object):
         self.boot     = boot
         self.idx      = idx
         self.latched   = False
+        self.stated_path = None   # B1: what the device itself said, when it says
         self.pre_latch = False   # capture predates the latched FSM entirely
         self.burst    = False
         self.jogv     = None
@@ -95,7 +103,8 @@ class Run(object):
             'log':          self.log,
             'boot':         self.boot,
             'run':          self.idx,
-            'dep_path':     ('any-motion' if self.latched
+            'dep_path':     (self.stated_path if self.stated_path
+                             else 'any-motion' if self.latched
                              else ('pre-latch-build' if self.pre_latch
                                    else 'polled/silent')),
             'has_burst':    'y' if self.burst else 'n',
@@ -127,6 +136,7 @@ def parse_log(path):
     cur         = None
     last_t      = None
     latch_armed = False          # latch line seen, MOVING not yet reached
+    latch_path_seen = None       # B1: the path that line named, if any
 
     with open(path, 'r', errors='replace') as fh:
         for line in fh:
@@ -156,6 +166,8 @@ def parse_log(path):
             if line.startswith(LATCH_ANYMOTION):
                 latch_armed = True
                 stats['latched'] += 1
+                m = RE_LATCH_PATH.match(line)
+                latch_path_seen = m.group(1) if m else None
                 continue
 
             if TO_MOVING in line:
@@ -163,7 +175,9 @@ def parse_log(path):
                 idx += 1
                 cur = Run(name, boot, idx)
                 cur.latched = latch_armed
+                cur.stated_path = latch_path_seen
                 latch_armed = False
+                latch_path_seen = None
                 runs.append(cur)
                 continue
 
@@ -227,6 +241,15 @@ def census(all_runs, totals, files):
     latched   = sum(1 for r in all_runs if r.latched)
     pre_latch = sum(1 for r in all_runs if r.pre_latch)
     silent    = n - latched - pre_latch
+
+    # B1 (2026-08-20) made the path explicit, so count what the row resolved to
+    # rather than the two ad-hoc counters. "polled/silent" remains an INFERENCE
+    # -- a MOVING transition with no latch line at all -- and is only reachable
+    # in captures that predate B1.
+    paths = {}
+    for r in all_runs:
+        k = r.row()['dep_path']
+        paths[k] = paths.get(k, 0) + 1
     bursts   = sum(1 for r in all_runs if r.burst)
     no_burst = n - bursts
 
@@ -235,12 +258,16 @@ def census(all_runs, totals, files):
     print('  departures (MOVING)   %d' % n)
     print('')
     print('DEPARTURE PATH -- what triggered the latch')
-    print('  any-motion            %4d   %s' % (latched, pct(latched, n)))
-    print('  polled / SILENT       %4d   %s   <- true B3: capture has latch'
-          % (silent, pct(silent, n)))
+    for k in ('any-motion', 'polled', 'velocity', 'unknown'):
+        if paths.get(k):
+            print('  %-21s %4d   %s' % (k, paths[k], pct(paths[k], n)))
+    print('  %-21s %4d   %s   <- true B3: capture has latch'
+          % ('polled/silent', paths.get('polled/silent', 0),
+             pct(paths.get('polled/silent', 0), n)))
     print('                                       lines, this departure had none')
-    print('  pre-latch build       %4d   %s   <- capture has NO latch line at'
-          % (pre_latch, pct(pre_latch, n)))
+    print('  %-21s %4d   %s   <- capture has NO latch line at'
+          % ('pre-latch-build', paths.get('pre-latch-build', 0),
+             pct(paths.get('pre-latch-build', 0), n)))
     print('                                       all; predates the latched FSM')
     print('')
     print('BURST COVERAGE -- what can carry a shape rule at all')

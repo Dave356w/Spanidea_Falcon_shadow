@@ -228,7 +228,7 @@ items are unmeasurable until this changes.
 
 | # | Status | Change | Why it is needed |
 |---|---|---|---|
-| B1 | outstanding | Record and print whether the latch followed a departure or a stop | The signature of a missed departure. Without it, the failure is invisible in the log and was only found because an operator was watching. |
+| B1 | **done 2026-08-20** | Record and print whether the latch followed a departure or a stop | The signature of a missed departure. Without it, the failure is invisible in the log and was only found because an operator was watching. **Shipped as `FSM: Departure latched (path) ml= q= dq= td=`, +350 bytes, 356 free — `falcon_b1_2026-08-20.md`. Found a false polled departure on a stationary bench, 3 boots of 4, on its first boot. The `dq`/`td` half is unexercised.** |
 | B2 | **done** | Print `bz` on the periodic sample line, not only on `ACC-INT` lines | The log cannot presently establish whether the beacon was sounding at a given moment, so "the beacon did not fire" cannot be confirmed or refuted from data. |
 | B3 | outstanding | Trigger a burst on the polled departure path | A departure caught by the polled path produces no burst and no jog verdict, so the backstop is invisible exactly when it matters. |
 | B4 | **done** | Capture a cruise-phase peak, distinct from the sticky arrival peak | The cruise ceiling is the denominator of the arrival gate and cannot currently be measured: the sample log is decimated and sticky, and bursts are too short to isolate cruise. |
@@ -743,7 +743,7 @@ population.
 | 9 re-arm regression | C | — |
 | 10 z threshold unproven | F | — |
 | 11 installation coverage | F | — |
-| 12 any-motion latched reference | B1 | A |
+| 12 any-motion latched reference | B1 | ✅ B1 done 2026-08-20; §3 |
 
 **Changed 2026-08-19.** B2 and B4 were built and measured against the existing
 68 bytes rather than assumed to need session A. Both fit; with the `tk=` credit

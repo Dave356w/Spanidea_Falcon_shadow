@@ -638,6 +638,46 @@ class MovementService {
     uint32_t stop_confirm_timer;   /* start of the settled-at-1g window   */
     uint32_t monitor_entered_ms;   /* when STATE_MONITORING was entered   */
     bool     rearm_cleared;        /* settled seen -> blank ended early    */
+
+    /*
+     * B1 -- tell a departure latched at the START of travel from one latched
+     * at the STOP. Test plan §3; instrumentation gap 1.
+     *
+     * THE FAILURE. At 17-35 fpm the beacon did not sound during travel: the
+     * departure edge was discarded and the latch happened instead at the brake,
+     * leaving the beacon asserting over a car that had already arrived until
+     * LATCH_FAILSAFE_MS. Both cases print the same line today, so the failure
+     * had to be reconstructed by hand and was only found because an operator
+     * was watching.
+     *
+     * WHY NOT THE OBVIOUS SIGNALS. Cruise is invisible on this device by
+     * construction -- constant velocity reads 1 g -- and gap 3 records that
+     * lateral m sits at rest levels through a 20 fpm run, so neither "was it
+     * moving before the latch" nor quiet_run() alone can separate the two.
+     * Time in MONITORING cannot either: a missed departure leaves the FSM in
+     * MONITORING for the whole trip, so the elapsed time is park + travel.
+     *
+     * WHAT DOES SEPARATE THEM is what was thrown away earlier in the same
+     * MONITORING episode. That is how the 2026-08-18 session identified the
+     * failure by hand: 4 of the 6 missed runs carried an "any-motion ignored,
+     * re-arm blanking" line for their departure edge. Counting those discards
+     * and timestamping the last one turns that reconstruction into one field-
+     * readable line:
+     *
+     *   dq=0                  no edge was discarded; this latch is the first
+     *                         motion evidence of the episode -> DEPARTURE
+     *   dq>=1, td seconds ago an edge was discarded and the latch came much
+     *                         later -> the discarded edge was the departure and
+     *                         THIS LATCH IS THE STOP
+     *
+     * td is milliseconds since the last discard, or -1 when there was none.
+     */
+    uint8_t  blank_discards;       /* edges the re-arm blank ate, this episode */
+    uint32_t last_discard_ms;      /* when the last one was eaten              */
+    uint8_t  latch_path;           /* what latched: 0 none 1 any-motion
+                                      2 polled 3 velocity. First setter wins,
+                                      because the polled branch falls through
+                                      into the other two in the same pass. */
     uint8_t  arrival_edge_count;   /* any-motion edges inside the window  */
     uint32_t arrival_edge_first;   /* timestamp of the first of them      */
 

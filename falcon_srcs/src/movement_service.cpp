@@ -148,6 +148,9 @@ MovementService::MovementService(RollingAvg<float, 32> *acc_avg)
     stop_confirm_timer = 0;
     monitor_entered_ms = 0;
     rearm_cleared      = false;
+    blank_discards     = 0;
+    last_discard_ms    = 0;
+    latch_path         = 0;
     arrival_edge_count = 0;
     arrival_edge_first = 0;
     vel_departure      = 0.0f;
@@ -287,6 +290,8 @@ void MovementService::notify_any_motion(uint32_t edge_ms)
      */
     if (!rearm_cleared &&
         (int32_t)(edge_ms - monitor_entered_ms) < (int32_t)MONITOR_REARM_MS) {
+        blank_discards++;
+        last_discard_ms = edge_ms;
         FLOG.print(F("FSM: any-motion ignored, re-arm blanking t="));
         FLOG.print((int32_t)(edge_ms - monitor_entered_ms));
         FLOG.print(F(" q="));
@@ -558,6 +563,9 @@ void MovementService::fsm_run()
             monitor_entered_ms = millis();
             any_motion_pending = false;
             rearm_cleared      = false;
+            blank_discards     = 0;
+            last_discard_ms    = 0;
+            latch_path         = 0;
 
             /*
              * Clear the window for the same reason MONITOR_REARM_MS exists:
@@ -606,6 +614,7 @@ void MovementService::fsm_run()
          */
 
         if (delta_accel > threshold_value) {
+            if (!latch_path) latch_path = 2;
             start_timer = millis();
             set_state(STATE_MOVEMENT_DETECTED);
         }
@@ -623,7 +632,7 @@ void MovementService::fsm_run()
          */
         if (any_motion_pending) {
             any_motion_pending = false;
-            FLOG.print(F("FSM: Departure latched (any-motion) \r\n"));
+            if (!latch_path) latch_path = 1;
             burst_trigger(BURST_POST_DEP, 0);
             vel_departure = vel_window.valid() ? vel_window.w() : 0.0f;
             start_timer = millis();
@@ -666,6 +675,7 @@ void MovementService::fsm_run()
                 FLOG.print(vel_window.coverage_ms());
 #if VEL_ARMED
                 FLOG.print(F(" LATCH\r\n"));
+                if (!latch_path) latch_path = 3;
                 start_timer = millis();
                 set_state(STATE_MOVEMENT_DETECTED);
 #else
@@ -687,6 +697,32 @@ void MovementService::fsm_run()
         if (last_state != MotionStates::STATE_MOVEMENT_DETECTED) {
             FLOG.print(F("FSM: Transitioned to STATE_MOVEMENT_DETECTED \r\n"));
             last_state = MotionStates::STATE_MOVEMENT_DETECTED;
+
+            /*
+             * B1. One line per latch, whatever caught it -- the polled path
+             * used to enter this state printing NOTHING (gap 4), so any run
+             * count taken from "Departure latched" silently undercounted.
+             * Emitted here rather than at the three sites because this is the
+             * single choke point every path passes through exactly once.
+             * See the blank_discards block in the header for how to read it.
+             */
+            FLOG.print(F("FSM: Departure latched ("));
+            FLOG.print(latch_path == 1 ? F("any-motion") :
+                       latch_path == 2 ? F("polled") :
+                       latch_path == 3 ? F("velocity") : F("unknown"));
+            FLOG.print(F(") ml="));
+            FLOG.print(millis() - monitor_entered_ms);
+            FLOG.print(F(" q="));
+            FLOG.print(lat_monitor.quiet_run());
+            FLOG.print(F(" dq="));
+            FLOG.print(blank_discards);
+            FLOG.print(F(" td="));
+            if (blank_discards) {
+                FLOG.print((int32_t)(millis() - last_discard_ms));
+            } else {
+                FLOG.print(-1);
+            }
+            FLOG.print(F("\r\n"));
         }
 
         /*
