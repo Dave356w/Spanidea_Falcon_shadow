@@ -145,15 +145,20 @@ dismiss it either.
 ## 6. What must happen before this car is trusted again
 
 1. ⛔ **No further reliance on the beacon on this installation.**
-2. **Re-derive the arrival gate against measured cruise, accepting that the two
-   populations overlap.** A single peak threshold cannot do it. The candidates
-   that remain are ones that use something other than magnitude — the ramp
-   detector's sustained one-signed test is the obvious one, and it fired
-   correctly on 11/11 stops today while never being the releasing path.
-3. **Consider whether the peak detector should release at all** on machines
-   where cruise reaches the gate, or whether release should require the ramp
-   verdict. That is a design decision with a missed-departure cost on the other
-   side, and it needs replay against the full corpus first.
+2. ⛔ **The ramp detector is NOT the answer — replayed and refuted the same day**
+   (`falcon_ramp_priority_2026-08-20.md`). Giving it priority changes nothing:
+   it lands **1.1–9.8 s after** the peak and never once first in 105 runs, so a
+   priority rule falls through to the peak anyway. On *this* release its verdict
+   was **+9798 ms** — the worst on file.
+3. **Requiring ramp confirmation (a veto) does prevent it**, and refuses to
+   release on **100% of inspection stops** — 79 runs with zero ramp verdicts,
+   where the detector correctly declines a brake set. It trades silence-while-
+   moving for a position lie, so it is only viable if the firmware can tell
+   automatic operation from inspection at runtime. **`g=` is not that
+   discriminator.** That is the open question.
+3a. ⬜ **No candidate currently survives.** Gate retune, reversal-only arming,
+   ramp-priority and ramp-veto are all refuted or cost more than they buy. Say
+   so plainly rather than reaching for the next threshold.
 4. ⬜ The `q=5` starvation (§2 of `falcon_automatic_2026-08-20.md`) is the other
    half of this: the peak collector armed on the minimum, mid-travel, because
    cruise never supplies quiet samples. **Arming earlier than the design intends
