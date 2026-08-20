@@ -540,7 +540,7 @@ Values that carry safety consequence, with derivation and evidence status.
 |---|---|---|---|
 | `ARRIVAL_PEAK_VALUE` | 0.45 | geometric middle of cruise 0.28 / arrival 0.713 | derivation stale; **weakest arrival now 0.465 at 1.03× (19 fpm up into floor level, cartop 2026-08-20)**, and the soft-mode floor moved 0.573 → 0.465 |
 | `ARRIVAL_QUIET_MSS` | 0.15 | stated as above cruise max 0.0875 | 🔴 **cruise measured at 0.29 on a 224 s 18 fpm run (2026-08-20)** — 3.3× the stated max, ~2× the gate, and at the SLOWEST speed, so cruise content is not a function of speed. The quiet path armed anyway only because it counts the LATERAL channel while `cp` is vertical. `falcon_cartop_2026-08-20.md` §6a.1 |
-| `ARRIVAL_ARM_SAMPLES` | 5 | 200 ms at 25 Hz | — |
+| `ARRIVAL_ARM_SAMPLES` | 5 | 200 ms at 25 Hz | 🔴 **`q` hit exactly 5 on 3 of 11 contract-speed runs (2026-08-20), and on run 10 the reversal path was simultaneously unavailable (`g=0 ro=7`) — arming rested on one sample of one path with no backup.** Cruise on that mounting never advances the counter at all (lateral 0.134–0.649 vs a 0.06 still threshold), so all five samples come from post-stop ringdown. `falcon_automatic_2026-08-20.md` §2, §4 |
 | `JOG_OPP_RATIO_PCT` | 33 | geometric mean of measured populations | populations now known to overlap — measured 2026-08-20 at runs 0–58 vs jogs 44–99 |
 | `JOG_OPP_PEAK_MMSS` | 900 | as above | 🔴 **the gap has closed from both sides.** Real runs 11–972; jogs now reach down to **937** (cartop, 2026-08-20) against a previous floor of 1366. A real run and a jog are 35 counts apart. Scored 1 false JOG / 63 labelled runs. `falcon_cartop_2026-08-20.md` §5a |
 | `RAMP_FLOOR_MMSS` | 300 | arrival decelerations | rejects slow departures; correct for its own use |

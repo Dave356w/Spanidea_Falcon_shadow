@@ -746,7 +746,7 @@ population.
 | 6 ramp detector unevidenced | E | — |
 | 7 logging in shipping build | A | ✅ A run 2026-08-20; `FALCON_LOG` + two production envs, §2 |
 | 8 quiet gate vs cruise | D | — (was A, B; cleared by B4) |
-| 9 re-arm regression | C | ⚠️ **a second re-arm defect found and fixed on the bench 2026-08-20** — the polled path was never blanked at all (`falcon_b1_2026-08-20.md` §2.3). C is still needed: it tests the opposite direction, whether the shortened blank re-opened the 08-07 stationary-car alarm. |
+| 9 re-arm regression | C | ⚠️ bench 2026-08-20 found and fixed a second defect (the polled path was never blanked). **C's TABLE now exists — 11 automatic stops at contract speed, `falcon_automatic_2026-08-20.md` §3: the rest gate is NOT inert, it was inert only on the inspection population it had been measured against. No re-latch in 11 stops (null result, not a clean bill).** |
 | 10 z threshold unproven | F | — |
 | 11 installation coverage | F | — |
 | 12 any-motion latched reference | B1 | ✅ B1 done 2026-08-20; §3 |
