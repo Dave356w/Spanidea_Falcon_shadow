@@ -596,6 +596,32 @@ static volatile bool     arr_hit       = false;
  * to 396) is what pushed the peak gate up, not the jogs.
  */
 /*
+ * ⚠️ THE DERIVATION ABOVE IS SUPERSEDED -- corrected 2026-08-20 against the
+ * labelled corpus (falcon_corpus_labelled_2026-08-20.md; labels and their
+ * per-record evidence in falcon_srcs/datasets/session_g_labels.csv).
+ *
+ * "No overlap on either axis" was true of 12 events from one evening. Scored
+ * against 63 labelled real departures and 17 labelled jogs:
+ *
+ *   real departures  n=63  ratio 0-58   opk 11-562, plus ONE at 972
+ *   jogs             n=17  ratio 44-99  opk 381-4154
+ *
+ * THE REAL-DEPARTURE CEILING IS 562, NOT THE 396/440 THIS COMMENT DERIVED
+ * FROM -- 42% higher, and that is the number to reason from. The populations
+ * OVERLAP on 381-972; there is no gap for this gate to split. Both axes fail
+ * separately (ratio overlaps 44-58), so the AND is doing the work.
+ *
+ * Measured error rate at these gates: 1 false JOG in 63 real departures (the
+ * 972, a genuine run silenced) and 1 miss in 17 jogs (a gentle jog at 381).
+ *
+ * ⛔ DO NOT RAISE THIS TO ~1000 to clear the 972. It scores better on the
+ * corpus as it stands and that is the trap: the labelled ceiling has moved
+ * every time data was added -- 440 (08-11) -> 562 (08-12 automatic, labelled)
+ * -> 972 (08-18). Fitting the gate to a sample maximum is the refuted
+ * approach, not a new one. Lowering it is worse: catching the 381 jog costs
+ * four silenced runs, and 381 sits inside the hand-bump population (118-389).
+ */
+/*
  * ARMED 2026-08-11, Dave's decision after the concern was raised and
  * reaffirmed: evidence base is 15/15 but one day, one car, one mounting
  * deep. A JOG verdict now silences the alarm ~4 s after the latch via
