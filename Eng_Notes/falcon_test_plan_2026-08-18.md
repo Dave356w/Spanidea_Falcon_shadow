@@ -589,6 +589,14 @@ Three findings the plan did not anticipate:
 labelled with confidence. If that count is low, the conclusion is that future
 rules need purpose-collected labelled data rather than retrospective labelling.
 
+**✅ RUN 2026-08-20 — `Eng_Notes/falcon_corpus_labelled_2026-08-20.md`.** 87 of
+273 records labelled with named evidence (66 run / 17 jog / 4 disturbance), 84 of
+them carrying a burst. Contrary to the expectation above the set **was**
+scoreable, and the shipping gate is measured for the first time against labels
+that do not come from the gate itself. Both conclusions hold at once: item 4 is
+closed as a measurement, and the collection pivot still stands because the
+gentle-jog end of the population has exactly one member.
+
 **Caution.** Do not label from the `JOGV verdict=` field. It is `opk`
 -thresholded by definition, so a rule scored against it will report a perfect
 separation that means nothing.
@@ -658,8 +666,12 @@ decides whether the current thresholds are conservative, correct, or too loose.
 **Open item:** 4.
 
 **Why.** The verdict misclassifies in both directions from a single cause: `opk`
-populations overlap. Real jolt-heavy departures reach 972–2974 and are silenced;
-gentle jogs reach 381 and are missed. `opk` is nonetheless on the correct axis,
+populations overlap. ⚠️ **Corrected 2026-08-20:** the "972–2974" written here was
+wrong — **2974 is a jog**, the upper endpoint of the 08-18 note §3.4's jog-clear
+range, and the only evidenced silenced real run is the one at 972. Scored against
+the labelled corpus the verdict runs **1 false JOG in 63 labelled runs and 1 miss
+in 17 labelled jogs** (`falcon_corpus_labelled_2026-08-20.md` §4.1); gentle jogs
+reach 381 and are missed. `opk` is nonetheless on the correct axis,
 because the reversal following a movement is the only thing distinguishing a jog
 from a run — a jog's departure is a real departure.
 
@@ -685,7 +697,7 @@ population.
 | 1 flash headroom | A | — |
 | 2 arrival gate margin | D | — (was A, B; cleared by B4) |
 | 3 knock/departure separability | I | — |
-| 4 jog verdict | J | G |
+| 4 jog verdict | J | ✅ G run 2026-08-20; scored, not retuned — see §8 |
 | 5 velocity path disabled | H | B1/B3, and so A |
 | 6 ramp detector unevidenced | E | — |
 | 7 logging in shipping build | A | — |

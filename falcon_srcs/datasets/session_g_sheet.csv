@@ -1,0 +1,274 @@
+log,boot,run,dep_path,has_burst,edges,t_first_ms,t_last_ms,span_ms,jogv_verdict,jogv_opk,jogv_ratio,jogv_pos,jogv_neg,end_path,arr_peak,buzzer_edges,label,basis
+260806-151739.log,1,1,pre-latch-build,n,0,,,,,,,,,decel-no-cause-logged,,0,,
+260807-091217.log,1,1,pre-latch-build,n,2,24494,25362,868,,,,,,decel-no-cause-logged,,1,,
+260807-091217.log,1,2,pre-latch-build,n,2,51511,59949,8438,,,,,,decel-no-cause-logged,,0,,
+260807-092651.log,1,1,pre-latch-build,n,1,61620,61620,0,,,,,,log-ended-mid-run,,0,,
+260807-101856.log,1,1,pre-latch-build,n,0,,,,,,,,,decel-no-cause-logged,,0,,
+260807-101856.log,1,2,pre-latch-build,n,1,121274,121274,0,,,,,,decel-no-cause-logged,,0,,
+260807-102954.log,1,1,pre-latch-build,n,0,,,,,,,,,decel-no-cause-logged,,0,,
+260807-122022.log,1,1,any-motion,n,3,1991540,2042249,50709,,,,,,arrival-any-motion,,0,,
+260807-122022.log,1,2,any-motion,n,6,2053455,2074902,21447,,,,,,arrival-any-motion,,3,,
+260807-122022.log,1,3,any-motion,n,3,2087960,2089074,1114,,,,,,arrival-any-motion,,1,,
+260807-122022.log,1,4,any-motion,n,3,2103263,2105278,2015,,,,,,arrival-polled,,1,,
+260807-122022.log,1,5,any-motion,n,2,2236596,2237743,1147,,,,,,arrival-any-motion,,0,,
+260807-122022.log,1,6,any-motion,n,2,2360836,2362015,1179,,,,,,arrival-any-motion,,0,,
+260807-122022.log,1,7,any-motion,n,2,2398126,2398928,802,,,,,,arrival-any-motion,,0,,
+260807-122022.log,1,8,any-motion,n,8,2406760,2485682,78922,,,,,,arrival-any-motion,,4,,
+260807-123553.log,1,1,any-motion,n,8,87916,154435,66519,,,,,,arrival-polled,,6,,
+260807-123553.log,1,2,any-motion,n,4,255082,314966,59884,,,,,,arrival-polled,,1,,
+260807-123553.log,2,3,any-motion,n,5,99024,103071,4047,,,,,,arrival-any-motion,,2,,
+260807-123553.log,2,4,any-motion,n,2,128352,129368,1016,,,,,,arrival-any-motion,,0,,
+260807-123553.log,2,5,any-motion,n,1,110526,110526,0,,,,,,log-ended-mid-run,,0,,
+260807-123553.log,3,6,any-motion,n,2,145473,145571,98,,,,,,arrival-any-motion,,0,,
+260807-123553.log,3,7,any-motion,n,7,218611,270024,51413,,,,,,arrival-any-motion,,3,,
+260807-123553.log,3,8,any-motion,n,4,500809,528138,27329,,,,,,arrival-polled,,2,,
+260807-123553.log,3,9,any-motion,n,7,780222,794034,13812,,,,,,arrival-polled,,5,,
+260807-123553.log,3,10,any-motion,n,7,961511,967081,5570,,,,,,arrival-any-motion,,4,,
+260807-123553.log,3,11,any-motion,n,3,1011695,1013628,1933,,,,,,arrival-polled,,2,,
+260807-123553.log,4,12,any-motion,n,3,123502,130973,7471,,,,,,arrival-polled,,0,,
+260807-123553.log,4,13,any-motion,n,5,238829,273039,34210,,,,,,arrival-polled,,3,,
+260807-123553.log,4,14,any-motion,n,5,421855,454574,32719,,,,,,arrival-any-motion,,2,,
+260807-123553.log,4,15,any-motion,n,5,556531,583630,27099,,,,,,arrival-polled,,4,,
+260807-123553.log,4,16,any-motion,n,1,1864499,1864499,0,,,,,,arrival-polled,,0,,
+260807-123553.log,4,17,any-motion,n,4,1881653,1902936,21283,,,,,,arrival-polled,,2,,
+260807-123553.log,4,18,any-motion,n,2,1935032,1935572,540,,,,,,arrival-polled,,1,,
+260807-123553.log,4,19,any-motion,n,1,1963819,1963819,0,,,,,,arrival-polled,,0,,
+260807-123553.log,4,20,any-motion,n,2,1984872,2002599,17727,,,,,,arrival-polled,,1,,
+260807-123553.log,4,21,any-motion,n,2,2020261,2021277,1016,,,,,,arrival-polled,,1,,
+260807-123553.log,4,22,any-motion,n,3,2046296,2047590,1294,,,,,,arrival-polled,,3,,
+260807-123553.log,4,23,any-motion,n,3,2322006,2347073,25067,,,,,,arrival-any-motion,,1,,
+260807-123553.log,4,24,any-motion,n,3,2416918,2532540,115622,,,,,,log-ended-mid-run,,1,,
+260810-095551.log,1,1,any-motion,n,4,41730,178733,137003,,,,,,log-ended-mid-run,,1,,
+260810-095551.log,1,2,any-motion,n,3,179765,77938,,,,,,,log-ended-mid-run,,0,,
+260810-095551.log,2,3,any-motion,n,1,78544,78544,0,,,,,,log-ended-mid-run,,0,,
+260810-112554.log,1,1,any-motion,n,3,88768,284966,196198,,,,,,arrival-polled,,1,,
+260810-112554.log,1,2,any-motion,n,4,485457,528220,42763,,,,,,arrival-polled,,2,,
+260810-121155.log,1,1,any-motion,n,3,2899804,3112910,213106,,,,,,arrival-polled,,1,,
+260810-121155.log,1,2,any-motion,n,13,3243278,3364847,121569,,,,,,arrival-polled,,7,,
+260810-121155.log,1,3,any-motion,n,12,3691986,3742105,50119,,,,,,arrival-any-motion,,6,,
+260810-123559.log,1,1,any-motion,n,11,276283,409092,132809,,,,,,arrival-any-motion,,7,,
+260810-124643.log,1,1,any-motion,n,1,149651,149651,0,,,,,,arrival-polled,1.796,1,,
+260810-124643.log,1,2,any-motion,n,2,369131,385925,16794,,,,,,arrival-polled,1.583,1,,
+260810-125922.log,1,1,any-motion,n,2,84099,112984,28885,,,,,,arrival-polled,1.630,0,,
+260810-125922.log,1,2,any-motion,n,8,350781,467943,117162,,,,,,arrival-any-motion,1.848,3,,
+260810-130833.log,1,1,any-motion,n,5,67665,89112,21447,,,,,,arrival-polled,0.713,3,run,"falcon_signature_2026-08-11.md §1 table row ""22 s run | 0.18 | 0.713""; arrival peak 0.713"
+260810-130833.log,1,2,any-motion,n,2,143982,170131,26149,,,,,,arrival-polled,1.413,1,run,"falcon_signature_2026-08-11.md §1 table row ""27 s run | 0.28 | 1.413""; arrival peak 1.413"
+260811-104022.log,1,1,any-motion,n,4,93306,189562,96256,,,,,,arrival-polled,1.731,2,,
+260811-105851.log,1,1,any-motion,n,4,81608,105906,24298,,,,,,arrival-polled,0.529,2,,
+260811-110231.log,1,1,any-motion,y,3,93700,132743,39043,,,,,,arrival-polled,0.511,1,,
+260811-110231.log,1,2,any-motion,y,2,245334,255459,10125,,,,,,arrival-polled,1.769,1,,
+260811-110231.log,1,3,any-motion,n,1,407175,407175,0,,,,,,arrival-polled,1.985,0,,
+260811-112033.log,1,1,any-motion,y,2,55787,56524,737,,,,,,arrival-polled,1.616,1,,
+260811-113148.log,1,1,any-motion,n,3,215220,216907,1687,,,,,,arrival-polled,3.865,0,,
+260811-113554.log,1,1,any-motion,y,1,223477,223477,0,,,,,,arrival-polled,1.690,0,,
+260811-113554.log,1,2,any-motion,y,1,305545,305545,0,,,,,,arrival-polled,1.217,1,,
+260811-115311.log,1,1,any-motion,y,2,156303,203964,47661,,,,,,arrival-polled,2.372,2,,
+260811-115311.log,1,2,any-motion,y,2,289849,289931,82,,,,,,log-ended-mid-run,,1,,
+260811-122214.log,1,1,any-motion,y,1,115097,115097,0,,,,,,arrival-polled,1.148,0,,
+260811-122214.log,1,2,any-motion,y,4,320241,362299,42058,,,,,,arrival-polled,0.451,2,,
+260811-122214.log,1,3,any-motion,y,2,549306,608829,59523,,,,,,arrival-polled,1.661,1,,
+260811-122214.log,1,4,any-motion,y,3,845643,847364,1721,,,,,,arrival-polled,1.568,0,,
+260811-122214.log,1,5,any-motion,y,1,948551,948551,0,,,,,,arrival-polled,0.451,0,,
+260811-134652.log,1,1,any-motion,y,4,162660,180256,17596,,,,,,arrival-any-motion,0.527,1,run,falcon_350fpm_automatic_2026-08-11.md §1 run 1 up FSM peak 0.527; note names this log as runs 1-3
+260811-134652.log,1,2,any-motion,y,3,430522,445464,14942,,,,,,arrival-polled,0.454,1,run,falcon_350fpm_automatic_2026-08-11.md §1 run 2 down FSM peak 0.454
+260811-134652.log,1,3,any-motion,y,2,622149,637190,15041,,,,,,arrival-polled,0.471,0,run,"falcon_350fpm_automatic_2026-08-11.md §2 plateau table ""run 3 dep (up, uncommanded car call)""; third of runs 1-3 in this log"
+260811-140425.log,1,1,any-motion,y,3,84279,101679,17400,,,,,,arrival-polled,0.465,1,run,falcon_350fpm_automatic_2026-08-11.md §1 run 4 down FSM peak 0.465; note names this log as runs 4-5
+260811-140425.log,1,2,any-motion,y,3,145178,160579,15401,,,,,,arrival-polled,0.508,0,run,falcon_350fpm_automatic_2026-08-11.md §1 run 5 up FSM peak 0.508
+260811-144408.log,1,1,any-motion,y,0,,,,RUN,221,17,221,1254,failsafe,,0,disturbance,"falcon_jog_verdict_2026-08-11.md §1 row 1 ""handling bump (bench)"" pos=221 neg=1254"
+260811-144408.log,1,2,any-motion,y,1,309198,309198,0,RUN,1986,46,6689,14263,failsafe,,1,jog,"falcon_jog_verdict_2026-08-11.md §1 row 2 ""1 s jog"" pos=6689 neg=14263"
+260811-144408.log,1,3,any-motion,y,1,580829,580829,0,JOG,3194,61,9025,5584,failsafe,,0,jog,"falcon_jog_verdict_2026-08-11.md §1 row 3 ""~1 s jog + release"" pos=9025 neg=5584"
+260811-144408.log,1,4,any-motion,y,1,874823,874823,0,JOG,3026,80,8686,7034,failsafe,,0,jog,"falcon_jog_verdict_2026-08-11.md §1 row 4 ""brief jog up"" pos=8686 neg=7034"
+260811-144408.log,1,5,any-motion,y,1,1128660,1128660,0,RUN,111,0,0,7100,arrival-polled,2.575,0,run,"falcon_jog_verdict_2026-08-11.md §1 row 5 ""slow departure, down"" pos=0 neg=7100"
+260811-144408.log,1,6,any-motion,y,1,1167491,1167491,0,RUN,396,12,1145,8867,arrival-polled,2.182,0,run,"falcon_jog_verdict_2026-08-11.md §1 row 6 ""slow departure, down"" pos=1145 neg=8867"
+260811-144408.log,1,7,any-motion,y,1,1193082,1193082,0,RUN,338,20,6189,1276,arrival-polled,1.012,1,run,"falcon_jog_verdict_2026-08-11.md §1 row 7 ""slow departure, up"" pos=6189 neg=1276"
+260811-144408.log,1,8,any-motion,y,3,1260896,91619,,JOG,1914,95,8914,8529,log-ended-mid-run,,0,jog,"falcon_jog_verdict_2026-08-11.md §1 row 8 ""shortest blip jog"" pos=8914 neg=8529"
+260811-144408.log,2,9,any-motion,y,1,92602,92602,0,RUN,440,12,1154,9558,arrival-polled,0.933,0,run,"falcon_jog_verdict_2026-08-11.md §1 row 9 ""100 fpm departure, down (gap probe, after retune)"" pos=1154 neg=9558"
+260811-144408.log,2,10,any-motion,y,2,285769,286785,1016,JOG,3467,98,19668,19416,failsafe,,1,jog,"falcon_jog_verdict_2026-08-11.md §6.1 row 10 ""2 s medium jog"" ratio 98 opk 3467"
+260811-144408.log,2,11,any-motion,y,4,538771,665124,126353,RUN,251,39,3219,1281,arrival-polled,4.391,1,run,"falcon_jog_verdict_2026-08-11.md §6.1 row 11 ""27 fpm departure, up"" ratio 39 opk 251"
+260811-144408.log,2,12,any-motion,y,1,753451,753451,0,RUN,98,0,0,2130,arrival-polled,1.215,0,run,"falcon_jog_verdict_2026-08-11.md §6.1 row 12 ""27 fpm departure, down"" ratio 0 opk 98"
+260811-152209.log,1,1,any-motion,y,2,50905,67747,16842,RUN,137,0,11952,0,arrival-polled,0.579,0,run,"falcon_jog_verdict_2026-08-11.md §6.1 row 13 ""125 fpm departure, up"" ratio 0 opk 137"
+260811-152209.log,1,2,any-motion,y,1,100761,100761,0,RUN,260,15,260,1716,arrival-polled,4.014,0,run,"falcon_jog_verdict_2026-08-11.md §6.1 row 14 ""hard-stop run departure, down"" ratio 15 opk 260"
+260811-152209.log,1,3,any-motion,y,3,147931,203227,55296,RUN,214,1,214,12368,arrival-polled,0.573,1,run,"falcon_jog_verdict_2026-08-11.md §6.1 row 15 ""125 fpm departure, down"" ratio 1 opk 214"
+260811-152209.log,1,4,any-motion,y,1,364609,364609,0,RUN,99,0,11815,0,log-ended-mid-run,,0,unknown,"FOURTH JOGV in this log (pos=11815 neg=0 ratio=0 opk=99, log line 97); §6.1 stops at row 15 and no note describes it. See session note §3."
+260811-154018.log,1,1,any-motion,y,1,133136,133136,0,JOG,1366,88,5637,6379,jog-verdict-release,,1,jog,falcon_jog_verdict_2026-08-11.md §7 table jog 1 ratio 88 opk 1366
+260811-154018.log,1,2,any-motion,y,2,189431,190480,1049,JOG,3508,82,9502,7875,jog-verdict-release,,0,jog,falcon_jog_verdict_2026-08-11.md §7 table jog 2 ratio 82 opk 3508
+260811-154018.log,1,3,any-motion,y,2,210305,211320,1015,JOG,4154,65,7634,11695,jog-verdict-release,,1,jog,falcon_jog_verdict_2026-08-11.md §7 table jog 3 ratio 65 opk 4154
+260811-154018.log,1,4,any-motion,y,1,231161,231161,0,JOG,1811,44,17812,7869,jog-verdict-release,,1,jog,falcon_jog_verdict_2026-08-11.md §7 table jog 4 ratio 44 opk 1811
+260811-154018.log,1,5,any-motion,y,1,268959,268959,0,JOG,4154,97,13046,12713,jog-verdict-release,,1,jog,falcon_jog_verdict_2026-08-11.md §7 table jog 5 ratio 97 opk 4154
+260812-095101.log,1,1,any-motion,y,1,100007,100007,0,RUN,99,0,0,2143,arrival-polled,2.164,0,run,"falcon_cartop_2026-08-12.md §2 run 1 ""17 fpm down"" jog verdict RUN 0/99 arrival peak 2.164"
+260812-095101.log,2,2,any-motion,y,4,70434,86376,15942,RUN,283,15,3846,596,arrival-polled,1.975,1,run,"falcon_cartop_2026-08-12.md §2 ""Two further alarm cycles in the first log were Dave repositioning the car""; §3 ""Real departures this session ran opk 68-283"" (this record opk=283)"
+260812-095101.log,2,3,any-motion,y,2,130695,130760,65,RUN,97,0,1861,0,arrival-polled,1.258,1,run,"falcon_cartop_2026-08-12.md §2 ""Two further alarm cycles in the first log were Dave repositioning the car"" (second of the two)"
+260812-104647.log,1,1,any-motion,y,5,41549,123011,81462,RUN,68,0,0,4599,arrival-polled,2.571,1,run,"falcon_cartop_2026-08-12.md §2 run 2 ""56 fpm down"" RUN 0/68 arrival peak 2.571"
+260812-104647.log,1,2,any-motion,y,2,195788,205307,9519,RUN,121,0,6428,0,arrival-polled,0.965,1,run,"falcon_cartop_2026-08-12.md §2 run 3 ""58 fpm up"" RUN 0/121 arrival peak 0.965"
+260812-104647.log,1,3,any-motion,y,2,353239,354222,983,JOG,2225,69,16858,11769,jog-verdict-release,,1,jog,falcon_cartop_2026-08-12.md §3 jog 1 ratio 69 opk 2225
+260812-104647.log,3,4,any-motion,y,2,48775,49938,1163,JOG,1592,52,14819,7806,jog-verdict-release,,1,jog,falcon_cartop_2026-08-12.md §3 jog 2 ratio 52 opk 1592
+260812-104647.log,4,5,any-motion,y,3,125108,126959,1851,JOG,1773,79,11800,14875,jog-verdict-release,,1,jog,falcon_cartop_2026-08-12.md §3 jog 3 ratio 79 opk 1773
+260812-104647.log,4,6,any-motion,y,3,160366,162430,2064,JOG,2116,99,16133,16029,jog-verdict-release,,1,jog,falcon_cartop_2026-08-12.md §3 jog 4 (reverse) ratio 99 opk 2116
+260812-104647.log,4,7,any-motion,y,2,225574,234422,8848,RUN,130,0,5518,0,arrival-polled,0.758,0,run,"falcon_cartop_2026-08-12.md §2 run 4 ""56 fpm up"" arrival peak 0.758"
+260812-104647.log,4,8,any-motion,y,2,374554,399572,25018,RUN,65,0,6824,0,arrival-polled,1.245,1,run,"falcon_cartop_2026-08-12.md §2 run 5 ""57 fpm up"" arrival peak 1.245"
+260812-104647.log,4,9,any-motion,y,1,556761,556761,0,RUN,180,2,6935,180,arrival-polled,1.943,0,unknown,no note row; §2 accounts for 5 runs + 2 repositioning moves and all seven are matched to other records in this pair of logs
+260812-112254.log,1,1,any-motion,y,2,121536,132038,10502,RUN,39,0,0,31792,arrival-polled,0.477,0,run,"falcon_cab_automatic_2026-08-12.md §1 table row ""300 down"" arrival peak 0.477"
+260812-112254.log,1,2,any-motion,y,3,255967,266567,10600,RUN,46,0,29511,0,arrival-polled,0.457,0,run,"falcon_cab_automatic_2026-08-12.md §1 table row ""300 up"" arrival peak 0.457"
+260812-112254.log,2,3,any-motion,y,2,73547,84066,10519,RUN,39,0,0,32497,arrival-polled,0.544,0,run,"falcon_cab_automatic_2026-08-12.md §1 table row ""300 down"" arrival peak 0.544"
+260812-112254.log,2,4,any-motion,y,2,248578,248971,393,RUN,53,0,30767,0,arrival-polled,0.465,1,run,"falcon_cab_automatic_2026-08-12.md §1 table row ""1 floor (terminal->intermediate, up)"" arrival peak 0.465"
+260812-112254.log,3,5,any-motion,y,5,60489,67108,6619,RUN,94,0,0,30296,arrival-polled,0.458,0,run,falcon_cab_automatic_2026-08-12.md §4.2/§4.3 the single-floor intermediate->bottom-terminal run that alarmed 85 s over a car stationary for 78 of them; released by the 0.458 disturbance at t=144.6 s
+260812-112254.log,4,6,any-motion,y,2,62898,63668,770,RUN,69,0,30935,0,arrival-polled,0.454,0,unknown,"boot 3, before the ARM instrument landed; no note section names these four records"
+260812-112254.log,4,7,any-motion,y,4,96403,133169,36766,RUN,88,0,0,30928,arrival-polled,0.480,1,unknown,"boot 3, before the ARM instrument landed; no note section names these four records"
+260812-112254.log,4,8,any-motion,y,2,192135,192872,737,RUN,68,0,0,30576,arrival-any-motion,0.516,0,unknown,"boot 3, before the ARM instrument landed; no note section names these four records"
+260812-112254.log,4,9,any-motion,y,2,273891,284377,10486,RUN,129,0,30116,0,arrival-polled,0.480,0,unknown,"boot 3, before the ARM instrument landed; no note section names these four records"
+260812-112254.log,6,10,any-motion,y,4,31080,35930,4850,RUN,31,0,0,32131,arrival-any-motion,0.477,1,run,"falcon_cab_automatic_2026-08-12.md §8 descent table row ""4->3"" arrival peak 0.477"
+260812-112254.log,6,11,any-motion,y,2,109330,110460,1130,RUN,562,1,562,31524,arrival-any-motion,0.464,0,run,"falcon_cab_automatic_2026-08-12.md §8 descent table row ""3->2"" arrival peak 0.464"
+260812-112254.log,6,12,any-motion,y,2,152305,152731,426,RUN,209,1,387,31146,arrival-any-motion,0.498,0,run,"falcon_cab_automatic_2026-08-12.md §8 descent table row ""2->1 terminal"" arrival peak 0.498"
+260812-112254.log,6,13,any-motion,y,3,233717,244367,10650,RUN,111,0,29543,0,arrival-polled,0.463,0,run,"falcon_cab_automatic_2026-08-12.md §8 heading ""The descent: 4 runs, all clean"" and §7 addendum ""Four automatic single-floor runs""; fourth q=5 record in this boot, the table lists only three. WEAKEST label in this file."
+260812-112254.log,7,14,any-motion,y,3,167985,170164,2179,RUN,43,0,0,31055,arrival-any-motion,0.476,1,run,"falcon_cab_automatic_2026-08-12.md §12 table row ""4->3"" q=36 arrival peak 0.476"
+260812-112254.log,7,15,any-motion,y,4,186892,191086,4194,RUN,330,1,558,30284,arrival-any-motion,0.544,1,run,"falcon_cab_automatic_2026-08-12.md §12 table row ""3->2"" q=18 arrival peak 0.544"
+260812-112254.log,7,16,any-motion,y,2,210845,211337,492,RUN,238,1,429,29240,arrival-any-motion,0.488,0,run,"falcon_cab_automatic_2026-08-12.md §12 table row ""2->1"" q=9 arrival peak 0.488"
+260812-112254.log,7,17,any-motion,y,2,231489,232341,852,RUN,57,0,29470,0,arrival-any-motion,0.504,0,run,"falcon_cab_automatic_2026-08-12.md §12 table row ""1->2"" q=8 arrival peak 0.504"
+260812-112254.log,7,18,polled/silent,n,2,251084,252133,1049,,,,,,arrival-any-motion,0.460,0,run,"falcon_cab_automatic_2026-08-12.md §12 table row ""2->3"" q=16 arrival peak 0.460"
+260812-112254.log,7,19,any-motion,y,2,272105,274137,2032,RUN,82,0,28716,0,arrival-polled,0.456,1,run,"falcon_cab_automatic_2026-08-12.md §12 table row ""3->4"" q=38 arrival peak 0.456"
+260812-112254.log,7,20,any-motion,y,2,437354,443908,6554,RUN,41,0,0,31932,arrival-polled,0.472,0,run,"falcon_cab_automatic_2026-08-12.md §15 table row ""4->2, two floors (has cruise)"" q=119"
+260812-112254.log,7,21,any-motion,y,2,475250,478199,2949,RUN,275,1,514,27662,arrival-polled,0.490,0,run,"falcon_cab_automatic_2026-08-12.md §15/§16 bottom-terminal single-floor set q={8,8,8,9,9}; this record q=8"
+260812-112254.log,7,22,any-motion,y,2,508706,509132,426,RUN,43,0,31643,0,arrival-polled,0.466,1,run,"falcon_cab_automatic_2026-08-12.md §15/§16 bottom-terminal single-floor set q={8,8,8,9,9}; this record q=8"
+260812-112254.log,7,23,any-motion,y,2,529989,530759,770,RUN,40,0,0,31044,arrival-any-motion,0.509,0,run,"falcon_cab_automatic_2026-08-12.md §15/§16 bottom-terminal single-floor set q={8,8,8,9,9}; this record q=9"
+260812-112254.log,7,24,any-motion,y,2,577028,587579,10551,RUN,78,0,29695,0,arrival-polled,0.490,0,unknown,q=186; no note table carries this value
+260812-112254.log,7,25,any-motion,y,2,781910,788676,6766,RUN,46,0,0,31694,arrival-polled,0.469,1,unknown,q=125; no note table carries this value
+260812-112254.log,8,26,any-motion,y,1,67256,67256,0,JOG,1781,75,18219,23992,jog-verdict-release,,0,unknown,q=13 and no arrival peak; no note table carries it
+260812-112254.log,9,27,any-motion,y,3,50102,53379,3277,RUN,212,1,422,29732,arrival-any-motion,0.478,0,run,"falcon_cab_automatic_2026-08-12.md §16 remount table ""tested mounting"" 2->1 down q=6"
+260812-112254.log,9,28,any-motion,y,2,92733,93503,770,RUN,31,0,30245,0,arrival-any-motion,0.501,0,run,"falcon_cab_automatic_2026-08-12.md §16 remount table ""tested mounting"" 1->2 up q=10"
+260812-112254.log,9,29,any-motion,y,3,110936,115212,4276,RUN,53,0,0,25362,arrival-polled,0.503,2,run,"falcon_cab_automatic_2026-08-12.md §16 remount table ""tested mounting"" 2->1 down q=5"
+260812-112254.log,9,30,any-motion,y,2,154238,154632,394,RUN,46,0,29235,0,arrival-any-motion,0.456,0,run,"falcon_cab_automatic_2026-08-12.md §16 remount table ""tested mounting"" 1->2 up q=11"
+260812-112254.log,9,31,any-motion,y,2,171687,175128,3441,RUN,57,0,0,26647,arrival-polled,0.492,0,run,"falcon_cab_automatic_2026-08-12.md §16 remount table ""tested mounting"" 2->1 down q=5"
+260812-112254.log,9,32,any-motion,y,2,373866,384532,10666,RUN,61,0,31152,0,arrival-polled,0.468,0,unknown,q=188; no note table carries this value
+260812-112254.log,10,33,any-motion,y,4,52609,62013,9404,RUN,16,0,0,30651,arrival-polled,0.525,0,run,"falcon_cab_automatic_2026-08-12.md §22 table row ""4->2 control"" q=123 arrival peak 0.525"
+260812-112254.log,10,34,any-motion,y,3,87261,91275,4014,RUN,194,1,351,28543,arrival-any-motion,0.497,0,run,"falcon_cab_automatic_2026-08-12.md §22 table row ""2->1"" q=6 arrival peak 0.497"
+260812-112254.log,10,35,any-motion,y,3,142131,155975,13844,RUN,69,0,29899,0,arrival-polled,0.508,0,unknown,q=193; no note table carries this value
+260812-140913.log,1,1,any-motion,y,3,92536,107806,15270,RUN,16,0,0,32467,arrival-polled,0.470,1,run,"falcon_ramp_armed_2026-08-12.md §3 table run 1 ""4->1 down"" JOGV opk 16 arrival peak 0.470"
+260812-140913.log,1,2,any-motion,y,2,271319,272203,884,RUN,36,0,33795,0,arrival-any-motion,0.617,0,run,"falcon_ramp_armed_2026-08-12.md §3 table run 2 ""1->2 up"" JOGV opk 36 arrival peak 0.617"
+260812-140913.log,3,3,any-motion,y,3,158416,161939,3523,RUN,21,0,33886,0,arrival-any-motion,0.457,1,run,"falcon_ramp_armed_2026-08-12.md §3 table run 3 ""1->2 up"" JOGV opk 21 arrival peak 0.457"
+260812-140913.log,3,4,any-motion,y,2,180240,181059,819,RUN,124,0,0,33055,arrival-polled,0.713,1,run,"falcon_ramp_armed_2026-08-12.md §3 table run 4 ""2->1 down"" JOGV opk 124 arrival peak 0.713"
+260812-140913.log,4,5,any-motion,y,2,32423,45072,12649,RUN,17,0,32590,0,arrival-polled,0.530,1,unknown,no note section names this record
+260812-140913.log,4,6,any-motion,y,1,149651,149651,0,JOG,1974,60,18643,11253,jog-verdict-release,,0,unknown,"no note section names this record (JOGV JOG ratio 60 opk 1974, but no note describes a jog in this log)"
+260812-140913.log,4,7,any-motion,y,1,583335,583335,0,RUN,533,5,533,9134,arrival-polled,4.637,0,unknown,no note section names this record (arrival peak 4.637)
+260812-140913.log,4,8,any-motion,y,0,,,,RUN,173,48,498,1034,arrival-polled,4.102,0,unknown,no note section names this record (arrival peak 4.102)
+260812-140913.log,5,9,any-motion,y,3,218038,230653,12615,RUN,38,0,0,31354,arrival-polled,0.493,1,run,"falcon_ramp_armed_2026-08-12.md §6a run 5 ""4->1 down, automatic, 15.7 s"" opk 38 arrival peak 0.493"
+260812-140913.log,5,10,any-motion,y,2,565608,566837,1229,RUN,12,0,32406,0,arrival-polled,0.481,0,run,"falcon_ramp_armed_2026-08-12.md §5a table run 6 ""1->2 up"" opk 12 arrival peak 0.481"
+260812-140913.log,5,11,any-motion,y,2,586301,587104,803,RUN,17,0,0,33999,arrival-polled,0.468,1,run,"falcon_ramp_armed_2026-08-12.md §5a table run 7 ""2->1 down"" opk 17 arrival peak 0.468"
+260812-140913.log,5,12,any-motion,y,2,904609,917274,12665,RUN,9,0,34941,0,arrival-polled,0.468,0,unknown,"no note row; §5b covers runs 9-12 but tabulates only 9, 10 and 11"
+260812-140913.log,6,13,any-motion,y,2,193839,206389,12550,RUN,38,0,0,32878,arrival-polled,0.494,0,run,"falcon_ramp_armed_2026-08-12.md §5b table run 9 ""4->1 down"" arrival peak 0.494"
+260812-140913.log,7,14,any-motion,y,2,78430,79265,835,RUN,11,0,33717,0,arrival-any-motion,0.551,0,run,"falcon_ramp_armed_2026-08-12.md §5b table run 10 ""1->2 up"" arrival peak 0.551"
+260812-140913.log,7,15,any-motion,y,3,97009,100532,3523,RUN,40,0,0,33415,arrival-any-motion,0.544,0,run,"falcon_ramp_armed_2026-08-12.md §5b table run 11 ""2->1 down"" arrival peak 0.544"
+260812-140913.log,7,16,any-motion,y,2,359579,372178,12599,RUN,4,0,34296,0,arrival-polled,0.464,1,unknown,no note row
+260812-140913.log,7,17,any-motion,y,2,481443,481820,377,RUN,53,0,0,33732,arrival-any-motion,0.486,0,unknown,no note row
+260813-103846.log,2,1,any-motion,y,2,183025,193822,10797,RUN,64,0,0,36849,arrival-polled,0.545,0,run,"falcon_500fpm_ui_2026-08-13.md §5 table run 1 ""8->1 down"" opk 64 arrival peak 0.545"
+260813-103846.log,2,2,any-motion,y,3,380780,391495,10715,RUN,73,0,34784,0,arrival-polled,0.486,0,run,"falcon_500fpm_ui_2026-08-13.md §5 table run 2 ""1->8 up"" opk 73 arrival peak 0.486"
+260813-103846.log,2,3,any-motion,y,2,894058,895188,1130,RUN,65,0,0,29094,arrival-polled,0.527,0,unknown,"no note row; §5 is headed ""four runs"" but tabulates three"
+260813-110300.log,1,1,any-motion,y,4,172736,185466,12730,RUN,217,0,217,35222,arrival-polled,0.561,1,run,"falcon_500fpm_ui_2026-08-13.md §5 table run 3 ""8->1 down"" opk 217 arrival peak 0.561"
+260813-110300.log,1,2,any-motion,y,2,283394,294109,10715,RUN,49,0,38219,0,arrival-polled,0.463,1,,
+260813-110300.log,1,3,any-motion,y,1,383254,383254,0,JOG,2418,89,11901,13296,jog-verdict-release,,0,,
+260813-110300.log,1,4,any-motion,y,2,397934,398917,983,JOG,2185,88,14719,16635,jog-verdict-release,,1,,
+260813-110300.log,1,5,any-motion,y,1,414269,414269,0,RUN,54,0,0,4700,arrival-polled,1.634,0,,
+260813-110300.log,1,6,any-motion,y,1,442777,442777,0,RUN,108,0,0,4488,arrival-polled,3.881,0,,
+260813-110300.log,1,7,any-motion,y,3,484851,487194,2343,RUN,42,0,0,28592,arrival-any-motion,0.501,0,,
+260813-110300.log,1,8,any-motion,y,2,507199,507658,459,RUN,312,1,29822,547,arrival-any-motion,0.492,0,,
+260813-110300.log,1,9,any-motion,y,2,983498,983810,312,RUN,109,0,0,27448,arrival-any-motion,0.467,0,,
+260813-110300.log,4,10,any-motion,y,3,98238,101269,3031,RUN,313,1,31348,538,arrival-polled,0.511,0,,
+260813-110300.log,4,11,any-motion,y,4,170606,179830,9224,RUN,112,0,0,36500,arrival-any-motion,0.489,0,,
+260813-110300.log,4,12,any-motion,y,2,204619,213843,9224,RUN,48,0,36862,0,arrival-polled,0.508,0,,
+260818-105317.log,2,1,any-motion,y,3,77709,89407,11698,RUN,63,0,2508,0,arrival-any-motion,2.209,0,,
+260818-105317.log,2,2,any-motion,y,1,230031,230031,0,JOG,2390,77,9521,7413,jog-verdict-release,,0,,
+260818-105317.log,2,3,any-motion,y,2,525271,534478,9207,RUN,58,0,0,2337,arrival-polled,2.093,0,,
+260818-105317.log,2,4,any-motion,y,2,563216,564019,803,RUN,153,8,1879,153,arrival-polled,1.050,1,,
+260818-105317.log,2,5,any-motion,y,1,577142,577142,0,JOG,1933,71,8911,6358,jog-verdict-release,,0,,
+260818-105317.log,2,6,any-motion,y,2,624164,629194,5030,RUN,51,0,0,3069,arrival-polled,2.905,0,,
+260818-105317.log,2,7,any-motion,y,2,707706,708345,639,RUN,66,0,0,2513,arrival-polled,1.185,1,,
+260818-105317.log,2,8,any-motion,y,1,924237,924237,0,RUN,53,0,2138,0,arrival-polled,1.613,0,,
+260818-105317.log,2,9,any-motion,y,1,951943,951943,0,JOG,1684,78,6470,5068,jog-verdict-release,,0,,
+260818-105317.log,2,10,any-motion,y,2,982269,983040,771,JOG,1859,64,7358,11348,jog-verdict-release,,1,,
+260818-105317.log,2,11,any-motion,y,2,1009451,1009893,442,JOG,1457,68,8136,5561,jog-verdict-release,,0,,
+260818-105317.log,2,12,any-motion,y,2,1323597,1323646,49,RUN,85,0,2636,0,arrival-any-motion,1.717,0,,
+260818-105317.log,2,13,any-motion,y,2,1358610,1359396,786,RUN,38,0,0,3740,arrival-any-motion,2.453,0,,
+260818-105317.log,2,14,any-motion,y,1,1377796,1377796,0,JOG,1717,54,5160,9401,jog-verdict-release,,0,,
+260818-105317.log,2,15,any-motion,y,1,1513455,1513455,0,RUN,128,0,0,3117,arrival-polled,1.812,0,,
+260818-105317.log,2,16,any-motion,y,1,1540653,1540653,0,RUN,94,0,1914,0,arrival-polled,1.957,0,,
+260818-105317.log,2,17,any-motion,y,0,,,,JOG,1301,48,11086,5384,jog-verdict-release,,0,,
+260818-105317.log,2,18,any-motion,y,3,1625849,1629929,4080,RUN,82,0,0,2879,arrival-any-motion,2.249,0,,
+260818-105317.log,2,19,any-motion,y,2,1646379,1647263,884,JOG,2379,70,7632,10894,jog-verdict-release,,1,,
+260818-105317.log,2,20,any-motion,y,3,1918746,1921171,2425,RUN,357,99,3308,3279,arrival-polled,2.188,0,,
+260818-105317.log,2,21,any-motion,y,2,1947107,1947631,524,JOG,1214,88,8756,7788,jog-verdict-release,,0,,
+260818-105317.log,2,22,any-motion,y,1,2029731,2029731,0,RUN,119,0,0,1277,arrival-polled,2.923,0,,
+260818-105317.log,2,23,any-motion,y,2,2063220,2063613,393,RUN,455,43,1836,4207,arrival-any-motion,2.511,0,,
+260818-105317.log,2,24,any-motion,y,2,2569404,2569814,410,JOG,1368,75,6084,8098,jog-verdict-release,,0,,
+260818-105317.log,2,25,any-motion,y,1,2654109,2654109,0,JOG,1449,64,5011,7735,jog-verdict-release,,1,,
+260818-105317.log,2,26,any-motion,y,1,2675982,2675982,0,JOG,2423,82,6091,7377,jog-verdict-release,,1,,
+260818-105317.log,2,27,any-motion,y,3,3036200,3056107,19907,RUN,129,0,11306,0,arrival-polled,0.522,1,,
+260818-105317.log,2,28,any-motion,y,2,3157786,3180576,22790,RUN,243,86,832,962,arrival-polled,1.207,0,,
+260818-105317.log,2,29,any-motion,y,3,3266969,3268919,1950,JOG,1049,69,4824,6916,jog-verdict-release,,0,,
+260818-105317.log,2,30,any-motion,y,2,3322429,3323183,754,RUN,471,62,2335,3742,arrival-any-motion,1.866,0,,
+260818-105317.log,2,31,any-motion,y,1,3377840,3377840,0,RUN,199,63,868,554,arrival-polled,2.058,1,,
+260818-105317.log,2,32,any-motion,y,2,3402956,3409149,6193,RUN,184,96,877,846,arrival-polled,1.964,0,,
+260818-105317.log,2,33,any-motion,y,3,3423977,3426222,2245,RUN,256,85,747,877,arrival-any-motion,1.550,0,,
+260818-105317.log,2,34,any-motion,y,2,3442180,3446374,4194,RUN,142,0,0,1798,arrival-polled,0.478,1,,
+260818-105317.log,2,35,any-motion,y,3,3479076,3564912,85836,RUN,664,97,4924,5064,arrival-polled,2.110,1,,
+260818-105317.log,2,36,any-motion,y,3,3729817,3762929,33112,RUN,88,0,0,8599,arrival-polled,0.499,1,,
+260818-105317.log,2,37,any-motion,y,2,4058218,4064149,5931,RUN,146,0,0,1738,arrival-polled,2.040,2,,
+260818-105317.log,2,38,any-motion,y,2,4241424,4288462,47038,RUN,131,0,7042,0,arrival-polled,0.510,1,,
+260818-105317.log,2,39,any-motion,y,2,4384751,4387897,3146,RUN,164,2,164,7060,arrival-polled,0.461,0,,
+260818-105317.log,2,40,any-motion,y,2,4405411,4408410,2999,RUN,111,0,0,6137,arrival-polled,0.506,1,,
+260818-105317.log,2,41,any-motion,y,2,4425007,4426153,1146,JOG,2706,64,22305,14330,jog-verdict-release,,1,,
+260818-105317.log,2,42,any-motion,y,2,4446683,4447174,491,RUN,92,0,0,6630,arrival-any-motion,0.460,0,,
+260818-105317.log,2,43,any-motion,y,2,4465901,4467228,1327,RUN,102,0,0,7503,arrival-any-motion,1.144,0,,
+260818-105317.log,2,44,any-motion,y,2,4486955,4487561,606,JOG,972,58,8597,5043,jog-verdict-release,,0,run,"falcon_state_of_project_2026-08-18.md §6 and falcon_test_plan_2026-08-18.md §13 refuted table: ""A real run was silenced at 972 against a 900 gate""; opk=972 is unique in the corpus. THIS RECORD IS A FALSE JOG."
+260818-105317.log,2,45,any-motion,y,2,4510367,4510990,623,JOG,1206,43,10982,4829,jog-verdict-release,,0,,
+260818-105317.log,2,46,any-motion,y,4,4655726,4659298,3572,RUN,98,0,0,5639,arrival-polled,1.844,1,,
+260818-105317.log,2,47,any-motion,y,3,4677779,4680663,2884,RUN,49,0,0,5614,arrival-polled,0.462,0,,
+260818-105317.log,2,48,any-motion,y,3,4697833,4699062,1229,JOG,1459,73,10208,7544,jog-verdict-release,,0,jog,"falcon_departure_detection_2026-08-18.md §3.4 ""Successful jog-clears in the same session ran opk 1459-2974""; opk=1459 is the lower endpoint and unique in the corpus"
+260818-105317.log,2,49,any-motion,y,2,5092294,5093294,1000,JOG,2420,98,18012,17727,jog-verdict-release,,1,,
+260818-105317.log,2,50,any-motion,y,2,5113774,5114691,917,JOG,2306,89,12969,11588,jog-verdict-release,,0,,
+260818-105317.log,2,51,any-motion,y,3,5559205,5572182,12977,RUN,80,0,10470,0,arrival-polled,4.579,1,,
+260818-105317.log,2,52,polled/silent,n,4,5583798,5588467,4669,,,,,,arrival-polled,0.474,1,,
+260818-105317.log,4,53,any-motion,y,3,32882,34914,2032,JOG,2341,80,16019,19815,jog-verdict-release,,1,,
+260818-105317.log,4,54,any-motion,y,2,44367,46350,1983,RUN,374,82,3893,4694,arrival-polled,0.480,1,,
+260818-105317.log,4,55,any-motion,y,2,56705,59179,2474,RUN,325,54,3625,1969,arrival-polled,2.985,1,,
+260818-105317.log,4,56,any-motion,y,4,70811,73744,2933,RUN,409,69,3894,5629,arrival-polled,0.632,1,,
+260818-105317.log,4,57,any-motion,y,2,83460,85852,2392,RUN,144,0,4651,0,arrival-polled,0.495,0,,
+260818-105317.log,4,58,any-motion,y,3,96911,98910,1999,JOG,2974,92,17788,19282,jog-verdict-release,,1,jog,"falcon_departure_detection_2026-08-18.md §3.4 ""Successful jog-clears in the same session ran opk 1459-2974""; opk=2974 is the upper endpoint and unique in the corpus"
+260818-105317.log,4,59,any-motion,y,3,110067,111525,1458,JOG,2833,72,19400,14102,jog-verdict-release,,1,,
+260818-105317.log,4,60,any-motion,y,4,120700,125976,5276,RUN,122,0,3329,0,arrival-polled,1.175,3,,
+260818-105317.log,4,61,any-motion,y,3,136855,138805,1950,RUN,662,69,5884,8483,arrival-any-motion,1.053,1,,
+260818-105317.log,4,62,any-motion,y,3,148144,150454,2310,RUN,150,0,0,4915,arrival-polled,1.137,1,,
+260818-105317.log,4,63,any-motion,y,3,160743,165232,4489,RUN,160,3,160,5082,arrival-polled,0.828,1,,
+260818-105317.log,4,64,any-motion,y,1,175439,175439,0,RUN,189,4,189,4072,arrival-polled,2.535,0,,
+260818-105317.log,4,65,any-motion,y,3,190988,195084,4096,RUN,125,0,0,6365,arrival-polled,1.132,1,,
+260818-105317.log,4,66,any-motion,y,3,205324,206962,1638,RUN,408,56,2880,5123,arrival-polled,0.652,0,,
+260818-105317.log,4,67,any-motion,y,1,461111,461111,0,RUN,118,0,0,0,arrival-polled,2.479,0,disturbance,"falcon_departure_detection_2026-08-18.md §3.3 table row ""Hand bump"" block mean 33 dir 75%; opk 118 independently matches graph/jog_window_replay.py header"
+260818-105317.log,4,68,any-motion,y,3,769933,778518,8585,RUN,691,92,4198,4532,arrival-polled,0.526,0,,
+260818-105317.log,4,69,any-motion,y,2,787202,788201,999,JOG,1055,80,5330,6645,jog-verdict-release,,1,,
+260818-105317.log,4,70,any-motion,y,3,1236762,1241284,4522,RUN,95,0,0,3924,arrival-any-motion,1.580,0,,
+260818-105317.log,4,71,any-motion,y,3,1376288,1404960,28672,RUN,859,95,7438,7133,arrival-polled,1.106,1,,
+260818-105317.log,4,72,any-motion,y,0,,,,RUN,494,94,1999,2120,arrival-polled,0.494,0,,
+260818-105317.log,4,73,any-motion,y,4,1454555,1503297,48742,RUN,389,79,3093,3871,arrival-any-motion,1.053,0,disturbance,"falcon_departure_detection_2026-08-18.md §3.3 table row ""Walking on cartop"" block mean 34 dir 50%"
+260818-105317.log,4,74,any-motion,y,1,1750122,1750122,0,RUN,547,71,2020,2807,arrival-polled,0.589,0,,
+260818-105317.log,4,75,any-motion,y,2,1774813,1796407,21594,RUN,381,88,1468,1654,arrival-polled,1.104,0,jog,"falcon_departure_detection_2026-08-18.md §3.4 ""A deliberate jog produced ratio=88 opk=381, below the 900 gate, and was classified RUN"""
+260818-105317.log,4,76,any-motion,y,1,1863548,1863548,0,RUN,299,74,707,955,arrival-polled,0.517,0,disturbance,"falcon_departure_detection_2026-08-18.md §3.3 table row ""Walking on cartop"" block mean 14 dir 58%"
+260818-105317.log,4,77,any-motion,y,3,2072756,2076426,3670,RUN,149,0,4014,0,arrival-any-motion,0.753,0,run,"falcon_departure_detection_2026-08-18.md §3.3 table row ""20 fpm down"" block mean 199 dir 92%"
+260818-105317.log,4,78,any-motion,y,2,2087337,2091057,3720,RUN,188,54,342,188,arrival-polled,0.939,1,run,"falcon_departure_detection_2026-08-18.md §3.3 table row ""20 fpm down"" block mean 45 dir 75%"
+260818-105317.log,4,79,any-motion,y,3,2101411,2106621,5210,RUN,170,17,1820,327,arrival-any-motion,0.678,0,run,"falcon_departure_detection_2026-08-18.md §3.3 table row ""20 fpm down"" block mean 160 dir 92%"
+260818-105317.log,4,80,any-motion,y,2,2351169,2352168,999,JOG,1313,86,6255,5412,jog-verdict-release,,1,,
+260818-105317.log,4,81,any-motion,y,2,2374369,2379513,5144,RUN,116,0,0,166,arrival-polled,1.755,1,,
+260818-105317.log,4,82,polled/silent,n,4,2391834,2394914,3080,,,,,,log-ended-mid-run,,1,,
+260818-133242.log,1,1,any-motion,y,1,291848,291848,0,RUN,136,0,1634,0,arrival-polled,2.212,0,,
+260818-133242.log,1,2,any-motion,y,1,316129,316129,0,RUN,109,0,0,2132,arrival-polled,1.525,1,,
+260818-133242.log,2,3,any-motion,y,4,86835,101122,14287,RUN,81,0,1565,0,arrival-polled,0.560,3,,
+260818-133242.log,2,4,any-motion,y,0,,,,RUN,79,0,823,0,arrival-polled,1.835,0,,
+260818-133242.log,2,5,any-motion,y,3,252100,257081,4981,RUN,97,0,1399,0,arrival-polled,1.883,2,,
+260818-133242.log,2,6,any-motion,y,2,270385,271941,1556,RUN,104,0,1350,0,arrival-polled,2.596,2,,
+260818-133242.log,2,7,any-motion,y,2,286769,287227,458,RUN,87,0,1380,0,arrival-any-motion,1.357,0,,
+260818-133242.log,2,8,any-motion,y,1,304529,304529,0,JOG,1968,82,11075,13406,jog-verdict-release,,0,,
+260818-133242.log,2,9,any-motion,y,2,323092,323223,131,RUN,78,0,1134,0,arrival-polled,2.259,2,,
+260818-133242.log,2,10,any-motion,y,1,341704,341704,0,RUN,77,0,1075,0,arrival-polled,1.617,0,,
+260818-133242.log,3,11,any-motion,y,3,121995,123912,1917,JOG,1743,97,11276,11036,jog-verdict-release,,1,,
+260818-133242.log,4,12,any-motion,y,2,181026,183189,2163,JOG,2078,98,6205,6297,jog-verdict-release,,0,,
+260818-133242.log,4,13,any-motion,y,2,194674,195854,1180,RUN,262,87,1514,1738,arrival-polled,2.155,1,,
+260818-133242.log,4,14,any-motion,y,3,326287,329105,2818,RUN,134,0,1551,0,arrival-polled,1.708,2,,
+260818-133242.log,4,15,any-motion,n,3,5455,53428,47973,,,,,,log-ended-mid-run,,0,,
+260818-133242.log,5,16,any-motion,y,2,53723,55181,1458,RUN,121,0,1233,0,log-ended-mid-run,,2,,

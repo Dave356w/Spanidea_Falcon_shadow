@@ -458,7 +458,7 @@ Values that carry safety consequence, with derivation and evidence status.
 | `ARRIVAL_QUIET_MSS` | 0.15 | stated as above cruise max 0.0875 | conflicts with later cruise of 0.23–0.28 |
 | `ARRIVAL_ARM_SAMPLES` | 5 | 200 ms at 25 Hz | — |
 | `JOG_OPP_RATIO_PCT` | 33 | geometric mean of measured populations | populations now known to overlap |
-| `JOG_OPP_PEAK_MMSS` | 900 | as above | real runs observed at 972–2974 |
+| `JOG_OPP_PEAK_MMSS` | 900 | as above | ⚠️ corrected 2026-08-20: real runs observed at 11–972, **2974 is a jog** (08-18 §3.4 jog-clear range). Scored 1 false JOG / 63 labelled runs |
 | `RAMP_FLOOR_MMSS` | 300 | arrival decelerations | rejects slow departures; correct for its own use |
 | `LATCH_FAILSAFE_MS` | 600000 | deliberate, 240 s constraint void | ten-minute false alarms |
 | `STOP_CONFIRM_MS` | 5000 | primary defence against premature silence | — |
@@ -558,7 +558,7 @@ Recorded so they are not re-derived. Detail in
 | Retune `ANYMOTION_THRESHOLD` | A hand bump (0.136 m/s²) exceeds a real 18 fpm departure (0.116). No value satisfies both directions. |
 | Replace `opk` with windowed waveform shape | Complete overlap across 177 bursts. A jog's departure is a real departure; only the reversal differs, which `opk` already measures. |
 | Windowed shape as a knock pre-filter | A confirmed 20 fpm departure scored inside the knock band. Any floor rejecting knocks also rejects it. |
-| Raise `JOG_OPP_PEAK_MMSS` | A real run was silenced at 972 against a 900 gate; real departures throw jolts of arbitrary size. |
+| Raise `JOG_OPP_PEAK_MMSS` | A real run was silenced at 972 against a 900 gate; real departures throw jolts of arbitrary size. **Quantified 2026-08-20 on labelled data** (`falcon_corpus_labelled_2026-08-20.md` §4.3): a gate of 973 scores strictly better on the corpus as it stands — but the labelled run ceiling moved 440 → 562 → 972 across three additions of data, so fitting the gate to a sample maximum is what the refutation is about. Still refuted. |
 | Fixed polled departure threshold | Mounting-dependent by 2–3x; wrong in every mounting but the one measured. |
 | Lower `LOG_DECIMATE_N` for cruise resolution | Bench pair 2026-08-19, N=8 control vs N=2. `ov=` advance 0 → 55 over 90 s; `tk=` per line 8.00 → 3.08 against an expected 2.00; 25.0 → 20.8 Hz apparent; repeated watchdog resets. Fails at 11.8% serial duty, so the link is not the constraint — the ring is drained one sample per loop pass. |
 

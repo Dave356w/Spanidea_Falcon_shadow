@@ -331,15 +331,98 @@ def census(all_runs, totals, files):
             print('  %-24s %5d %7d' % (k, tot, bst))
 
 
+def load_labels(path):
+    """
+    Read a labels file: log,run,label,basis. Keyed on (log, run) because those
+    are the two columns the worksheet exposes and a human can transcribe. The
+    file is the durable artefact -- the worksheet is regenerated from it, so
+    re-running the census never loses a label.
+    """
+    labels = {}
+    with open(path, newline='', encoding='utf-8') as fh:
+        for row in csv.DictReader(fh):
+            log = (row.get('log') or '').strip()
+            run = (row.get('run') or '').strip()
+            if not log or not run:
+                continue
+            labels[(log, run)] = ((row.get('label') or '').strip(),
+                                  (row.get('basis') or '').strip())
+    return labels
+
+
+def label_census(all_runs, labels):
+    """Report the exit criterion: counts per label, with named evidence."""
+    order = ['run', 'jog', 'disturbance', 'unknown']
+    counts = dict((k, 0) for k in order)
+    other  = {}
+    no_basis = []
+    labelled_keys = set()
+
+    for r in all_runs:
+        key = (r.log, str(r.idx))
+        lab, basis = labels.get(key, ('', ''))
+        if not lab:
+            continue
+        labelled_keys.add(key)
+        if lab in counts:
+            counts[lab] += 1
+        else:
+            other[lab] = other.get(lab, 0) + 1
+        if not basis:
+            no_basis.append('%s r%s' % (r.log, r.idx))
+
+    total = len(all_runs)
+    named = counts['run'] + counts['jog'] + counts['disturbance']
+
+    print('')
+    print('LABEL CENSUS -- the session exit criterion')
+    for k in order:
+        print('  %-14s %5d   %5.1f%%' % (k, counts[k], 100.0 * counts[k] / total))
+    for k, v in sorted(other.items()):
+        print('  %-14s %5d   (not one of the four valid labels)' % (k, v))
+    print('  %-14s %5d   %5.1f%%   <- no label row at all' %
+          ('unlabelled', total - len(labelled_keys),
+           100.0 * (total - len(labelled_keys)) / total))
+    print('  %-14s %5d   %5.1f%%   <- run/jog/disturbance with named evidence' %
+          ('SCOREABLE', named, 100.0 * named / total))
+
+    if no_basis:
+        print('')
+        print('  ⚠️  labelled with NO basis -- not admissible, fix or drop:')
+        for n in no_basis:
+            print('       %s' % n)
+
+    stray = sorted(set(labels) - labelled_keys)
+    if stray:
+        print('')
+        print('  ⚠️  label rows matching no record (typo in log or run?):')
+        for lg, rn in stray:
+            print('       %s r%s' % (lg, rn))
+
+
 def main():
+    # The census prints non-ASCII warning marks. On Windows the console
+    # defaults to cp1252 and the first one aborts the run, so force UTF-8.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding='utf-8')
+        except (AttributeError, ValueError):
+            pass
+
     args  = [a for a in sys.argv[1:] if not a.startswith('--')]
     sheet = None
-    if '--worksheet' in sys.argv:
-        i = sys.argv.index('--worksheet')
-        if i + 1 < len(sys.argv):
-            sheet = sys.argv[i + 1]
-            if sheet in args:
-                args.remove(sheet)
+    labels_path = None
+    for flag in ('--worksheet', '--labels'):
+        if flag in sys.argv:
+            i = sys.argv.index(flag)
+            if i + 1 < len(sys.argv):
+                val = sys.argv[i + 1]
+                if val in args:
+                    args.remove(val)
+                if flag == '--worksheet':
+                    sheet = val
+                else:
+                    labels_path = val
 
     if args:
         files = []
@@ -362,14 +445,24 @@ def main():
 
     census(all_runs, totals, files)
 
+    labels = load_labels(labels_path) if labels_path else {}
+    if labels:
+        label_census(all_runs, labels)
+
     if sheet:
-        with open(sheet, 'w', newline='') as fh:
+        with open(sheet, 'w', newline='', encoding='utf-8') as fh:
             w = csv.DictWriter(fh, fieldnames=FIELDS)
             w.writeheader()
             for r in all_runs:
-                w.writerow(r.row())
+                row = r.row()
+                lab, basis = labels.get((r.log, str(r.idx)), ('', ''))
+                row['label'] = lab
+                row['basis'] = basis
+                w.writerow(row)
         print('')
-        print('worksheet: %s  (%d rows, label/basis blank)' % (sheet, len(all_runs)))
+        print('worksheet: %s  (%d rows, %d labelled)' %
+              (sheet, len(all_runs), sum(1 for r in all_runs
+                                         if (r.log, str(r.idx)) in labels)))
 
     return 0
 
