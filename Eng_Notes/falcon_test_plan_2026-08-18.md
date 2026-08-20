@@ -305,7 +305,13 @@ measurement and belongs to session D.
 
 ## 4. Session C — re-arm regression check
 
-**Car. Depends on nothing. Run first if car time is limited.**
+**Car, AUTOMATIC OPERATION. Depends on nothing. Run first if car time is limited.**
+
+⚠️ **Not runnable on inspection — established 2026-08-20.** The failure is a
+terminal-floor brake set on the controller's *extended slowdown profile*, and
+inspection is below leveling speed so no such transition occurs. A cartop
+inspection session that afternoon produced five runs and five jogs but could
+not address item 9. `falcon_cartop_2026-08-20.md`.
 
 **Open item:** 9.
 

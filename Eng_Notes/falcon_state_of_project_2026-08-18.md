@@ -538,11 +538,11 @@ Values that carry safety consequence, with derivation and evidence status.
 
 | Constant | Value | Basis | Status |
 |---|---|---|---|
-| `ARRIVAL_PEAK_VALUE` | 0.45 | geometric middle of cruise 0.28 / arrival 0.713 | derivation stale; weakest arrival now 0.460 |
+| `ARRIVAL_PEAK_VALUE` | 0.45 | geometric middle of cruise 0.28 / arrival 0.713 | derivation stale; **weakest arrival now 0.465 at 1.03× (19 fpm up into floor level, cartop 2026-08-20)**, and the soft-mode floor moved 0.573 → 0.465 |
 | `ARRIVAL_QUIET_MSS` | 0.15 | stated as above cruise max 0.0875 | conflicts with later cruise of 0.23–0.28 |
 | `ARRIVAL_ARM_SAMPLES` | 5 | 200 ms at 25 Hz | — |
 | `JOG_OPP_RATIO_PCT` | 33 | geometric mean of measured populations | populations now known to overlap — measured 2026-08-20 at runs 0–58 vs jogs 44–99 |
-| `JOG_OPP_PEAK_MMSS` | 900 | as above | ⚠️ corrected 2026-08-20: real runs observed at 11–972, **2974 is a jog** (08-18 §3.4 jog-clear range). Scored 1 false JOG / 63 labelled runs |
+| `JOG_OPP_PEAK_MMSS` | 900 | as above | 🔴 **the gap has closed from both sides.** Real runs 11–972; jogs now reach down to **937** (cartop, 2026-08-20) against a previous floor of 1366. A real run and a jog are 35 counts apart. Scored 1 false JOG / 63 labelled runs. `falcon_cartop_2026-08-20.md` §5a |
 | `RAMP_FLOOR_MMSS` | 300 | arrival decelerations | rejects slow departures; correct for its own use |
 | `LATCH_FAILSAFE_MS` | 600000 | deliberate, 240 s constraint void | ten-minute false alarms |
 | `STOP_CONFIRM_MS` | 5000 | primary defence against premature silence | — |
