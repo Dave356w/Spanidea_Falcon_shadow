@@ -28,6 +28,7 @@ ACC-STAT s=0x4B3 pin=0 n=1 sk=0
 ACC-STAT s=0x4CD pin=0 n=1 sk=1
 ACC-STAT s=0x4B6 pin=0 n=1 sk=0
 ACC-STAT s=0x4B8 pin=0 n=1 sk=0
+  Voltage value : 2545  (settling, ignored)
 ACC-STAT s=0x422 pin=0 n=1 sk=0
 ACC-STAT s=0x3FF pin=0 n=1 sk=1
 ACC-STAT s=0x3F5 pin=0 n=1 sk=2
@@ -40,6 +41,7 @@ ACC-STAT s=0x3E3 pin=0 n=1 sk=1
 ACC-STAT s=0x3E1 pin=0 n=1 sk=2
 ACC-STAT s=0x3DA pin=0 n=1 sk=1
 ACC-STAT s=0x3DF pin=0 n=1 sk=2
+Device Booted 
 Reset cause: 0x6
 ACC-INT n=1 t=5324 st=7 bz=0 pin=0
 FSM: Performing Self Calibration 
@@ -84,6 +86,7 @@ ACC-STAT s=0x40 pin=0 n=4 sk=0
 FSM: Arrival (polled), peak 0.545
 ARM q=182 a=1 v=1 g=1 ro=10
 FSM: Transitioned to STATE_DECELERATING 
+RAMP latched mean=600 dir=100
 BURST k=arr pre=20 n=80 signed_mmss=-58 2 42 -87 -212 -116 -18 17 23 36 137 214 412 452 466 545 539 579 602 671 697 596 502 526 610 602 569 501 456 491 548 611 578 604 641 607 601 597 607 612 576 568 589 600 609 601 630 617 601 596 626 604 587 580 581 579 565 570 587 645 617 564 607 621 605 607 575 588 588 576 619 595 610 556 547 602 592 603 592 566 
 ACC-INT n=5 t=198049 st=5 bz=0 pin=1
 ACC-STAT s=0x40 pin=0 n=5 sk=0
@@ -94,6 +97,7 @@ FSM: Transitioned to STATE_MONITORING
 ACC-STAT read FAILED
 ACC-STAT s=0x3DE pin=0 n=6 sk=1
 ACC-STAT s=0x3EA pin=0 n=6 sk=1
+  Voltage value : 2512  (settling, ignored)
 ACC-STAT s=0x3EF pin=0 n=6 sk=1
 ACC-STAT s=0x3E1 pin=0 n=6 sk=1
 ACC-STAT s=0x3EF pin=0 n=6 sk=1
@@ -116,6 +120,7 @@ ARM q=214 a=1 v=1 g=1 ro=8
 FSM: Transitioned to STATE_DECELERATING 
 ACC-STAT s=0x40 pin=0 n=10 sk=0
 ACC-INT n=11 t=392429 st=5 bz=0 pin=1
+RAMP latched mean=602 dir=100
 ACC-STAT s=0x3D3 pin=0 n=11 sk=0
 BURST k=arr pre=20 n=80 signed_mmss=-37 -12 9 -6 9 45 87 75 39 21 -10 -18 -60 -158 -244 -281 -438 -485 -484 -515 -564 -581 -652 -594 -627 -545 -585 -527 -537 -559 -513 -631 -630 -582 -612 -579 -644 -595 -579 -571 -569 -571 -538 -534 -572 -631 -610 -630 -634 -597 -652 -612 -643 -606 -601 -604 -614 -610 -649 -610 -658 -612 -630 -628 -661 -663 -562 -573 -548 -659 -656 -611 -588 -570 -596 -659 -644 -605 -579 -573 
 ACC-INT n=12 t=395673 st=5 bz=0 pin=1
@@ -128,6 +133,7 @@ ACC-STAT s=0x3DB pin=0 n=12 sk=1
 ACC-STAT s=0x3E3 pin=0 n=12 sk=1
 ACC-STAT s=0x3EF pin=0 n=12 sk=1
 ACC-STAT s=0x3F4 pin=0 n=12 sk=1
+  Voltage value : 2509  (settling, ignored)
 ACC-STAT s=0x3D4 pin=0 n=12 sk=1
 ACC-STAT s=0x3EF pin=0 n=12 sk=1
 ACC-STAT s=0x3EC pin=0 n=12 sk=1
@@ -141,6 +147,7 @@ ACC-STAT s=0x3F2 pin=0 n=12 sk=1
 ACC-STAT s=0x3D0 pin=0 n=12 sk=1
 ACC-STAT s=0x3FA pin=0 n=12 sk=1
 ACC-STAT s=0x3E5 pin=0 n=12 sk=1
+  Voltage value : 2515  avg : 2515
 ACC-STAT s=0x3E7 pin=0 n=12 sk=1
 ACC-STAT s=0x3E5 pin=0 n=12 sk=1
 ACC-STAT read FAILED
@@ -165,6 +172,7 @@ ARM q=9 a=1 v=1 g=1 ro=16
 ACC-INT n=16 t=895188 st=5 bz=0 pin=1
 FSM: Transitioned to STATE_DECELERATING 
 ACC-STAT s=0x40 pin=0 n=16 sk=0
+RAMP latched mean=598 dir=100
 ACC-INT n=17 t=897400 st=5 bz=0 pin=1
 ACC-STAT s=0x437 pin=1 n=17 sk=0
 BURST k=arr pre=20 n=80 signed_mmss=-305 -270 -237 -220 -201 -182 -152 -93 -116 -109 -83 -8 16 60 526 522 555 547 548 538 582 623 634 601 594 608 574 578 590 585 607 561 597 626 589 590 624 587 587 619 627 572 606 587 581 631 609 556 567 579 509 470 461 377 347 347 307 259 237 173 147 114 91 79 56 27 2 -3 -8 9 12 -8 17 0 -32 38 0 0 -16 -18 

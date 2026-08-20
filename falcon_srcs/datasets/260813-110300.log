@@ -17,11 +17,13 @@ FSM: Arrival (polled), peak 0.561
 ARM q=177 a=1 v=1 g=1 ro=11
 FSM: Transitioned to STATE_DECELERATING 
 ACC-STAT s=0x40 pin=0 n=6 sk=0
+RAMP latched mean=597 dir=100
 BURST k=arr pre=20 n=80 signed_mmss=-9 -64 -22 25 0 -124 -73 -15 32 50 45 116 211 347 404 387 488 542 561 528 640 595 509 460 505 533 580 643 621 620 630 624 656 624 605 611 659 640 588 561 599 605 614 590 584 625 597 602 612 578 605 569 523 614 616 623 622 612 609 591 611 597 600 589 561 583 649 633 618 589 587 590 613 614 604 575 570 621 634 612 
 ACC-INT n=7 t=189579 st=5 bz=0 pin=1
 ACC-STAT s=0x40 pin=0 n=7 sk=0
 FSM: Transitioned to STATE_STOPPED 
 FSM: Transitioned to STATE_MONITORING 
+  Voltage value : 2487  (settling, ignored)
 ACC-INT n=8 t=279281 st=2 bz=0 pin=1
 FSM: Departure latched (any-motion) 
 FSM: Transitioned to STATE_MOVEMENT_DETECTED 
@@ -39,6 +41,7 @@ FSM: Arrival (polled), peak 0.463
 ARM q=210 a=1 v=1 g=1 ro=9
 FSM: Transitioned to STATE_DECELERATING 
 ACC-STAT s=0x40 pin=0 n=11 sk=0
+RAMP latched mean=608 dir=100
 BURST k=arr pre=20 n=80 signed_mmss=-28 54 -32 -25 -1 -51 7 -57 34 85 90 105 71 -297 -463 -507 -481 -505 -522 -613 -588 -622 -598 -569 -571 -539 -581 -547 -560 -567 -591 -597 -599 -618 -622 -636 -649 -600 -626 -628 -629 -609 -566 -606 -564 -562 -613 -586 -638 -600 -658 -628 -570 -630 -630 -636 -651 -606 -591 -627 -615 -622 -591 -573 -549 -543 -621 -668 -636 -634 -536 -617 -585 -640 -644 -612 -558 -596 -585 -616 
 ACC-INT n=12 t=298418 st=5 bz=0 pin=1
 ACC-STAT s=0x40 pin=0 n=12 sk=0
@@ -82,6 +85,7 @@ FSM: Transitioned to STATE_DECELERATING
 BURST k=arr pre=20 n=80 signed_mmss=-135 166 99 -184 -31 161 11 -143 28 143 -60 -78 91 5 -72 30 53 -42 21 54 2 -34 2 21 -7 -6 34 6 -10 -4 9 -16 -8 9 10 -19 14 8 -14 -8 13 -3 -5 -9 10 -20 -4 -12 1 2 -1 -2 -17 4 12 2 -11 8 -8 -12 0 4 -6 -22 12 0 8 -1 0 -2 -12 2 15 -6 -3 -6 0 -3 14 -15 
 FSM: Transitioned to STATE_STOPPED 
 FSM: Transitioned to STATE_MONITORING 
+  Voltage value : 2466  (settling, ignored)
 ACC-INT n=20 t=412647 st=2 bz=0 pin=1
 FSM: Departure latched (any-motion) 
 FSM: Transitioned to STATE_MOVEMENT_DETECTED 
@@ -157,6 +161,7 @@ FSM: Arrival (any-motion), edges 3 peak 0.501
 ARM q=9 a=1 v=1 g=1 ro=13
 FSM: Transitioned to STATE_DECELERATING 
 ACC-STAT s=0x40 pin=0 n=38 sk=0
+RAMP latched mean=601 dir=100
 ACC-INT n=39 t=489537 st=5 bz=0 pin=1
 ACC-STAT s=0x40 pin=0 n=39 sk=0
 BURST k=arr pre=20 n=80 signed_mmss=-515 -396 -380 -349 -322 -294 -240 -175 -215 -130 -176 -105 -115 331 405 429 442 500 496 587 572 608 595 612 600 611 614 674 620 656 606 600 585 602 541 595 543 606 563 610 607 578 610 599 574 629 624 611 609 589 606 572 571 554 543 583 505 472 470 433 364 348 321 282 256 205 176 162 108 88 76 5 37 3 1 0 1 9 1 11 
@@ -178,6 +183,7 @@ FSM: Arrival (any-motion), edges 2 peak 0.492
 ARM q=11 a=1 v=1 g=1 ro=15
 FSM: Transitioned to STATE_DECELERATING 
 ACC-STAT s=0x40 pin=0 n=42 sk=0
+RAMP latched mean=596 dir=100
 ACC-INT n=43 t=510541 st=5 bz=0 pin=1
 ACC-STAT s=0x40 pin=0 n=43 sk=0
 ACC-INT n=44 t=510885 st=5 bz=0 pin=1
@@ -185,6 +191,8 @@ BURST k=arr pre=20 n=80 signed_mmss=444 435 379 362 323 308 293 238 221 185 135 
 ACC-STAT s=0x40 pin=0 n=44 sk=0
 FSM: Transitioned to STATE_STOPPED 
 FSM: Transitioned to STATE_MONITORING 
+  Voltage value : 2478  avg : 2478
+  Voltage value : 2490  avg : 2479
 ACC-STAT s=0x3E8 pin=0 n=44 sk=1
 ACC-INT n=45 t=981090 st=2 bz=0 pin=1
 FSM: Departure latched (any-motion) 
@@ -201,6 +209,7 @@ FSM: Arrival (any-motion), edges 2 peak 0.467
 ARM q=10 a=1 v=1 g=1 ro=12
 FSM: Transitioned to STATE_DECELERATING 
 ACC-STAT s=0x40 pin=0 n=47 sk=0
+RAMP latched mean=605 dir=100
 ACC-INT n=48 t=986857 st=5 bz=0 pin=1
 ACC-STAT s=0x40 pin=0 n=48 sk=0
 BURST k=arr pre=20 n=80 signed_mmss=-387 -390 -394 -329 -325 -270 -240 -227 -160 -150 -99 -97 -111 -90 -77 -14 -11 57 469 514 517 624 603 622 592 666 599 666 575 619 598 595 558 603 581 607 573 626 621 557 641 615 588 630 569 624 624 598 572 605 581 569 511 612 546 459 479 455 355 395 340 292 238 216 192 147 135 117 45 44 48 14 5 49 -14 3 22 17 3 -1 
@@ -208,13 +217,18 @@ FSM: Transitioned to STATE_STOPPED
 FSM: Transitioned to STATE_MONITORING 
 ACC-STAT s=0x3CA pin=0 n=48 sk=1
 ACC-STAT s=0x3D6 pin=0 n=48 sk=1
+  Voltage value : 2490  avg : 2481
 ACC-STAT s=0x3D4 pin=0 n=48 sk=1
 ACC-STAT s=0x3DC pin=0 n=48 sk=1
 ACC-STAT s=0x3DB pin=0 n=48 sk=1
 ACC-STAT s=0x3EC pin=0 n=48 sk=1
+  Voltage value : 2496  avg : 2483
 ACC-STAT s=0x3F1 pin=0 n=48 sk=1
+Device Booted 
 Reset cause: 0x6
+Device Booted 
 Reset cause: 0x6
+Device Booted 
 Reset cause: 0x6
 ACC-INT n=1 t=5292 st=7 bz=0 pin=0
 FSM: Performing Self Calibration 
@@ -247,6 +261,7 @@ FSM: Arrival (polled), peak 0.511
 ARM q=2 a=1 v=2 g=1 ro=11
 FSM: Transitioned to STATE_DECELERATING 
 ACC-STAT s=0x40 pin=0 n=5 sk=0
+RAMP latched mean=588 dir=100
 ACC-INT n=6 t=103858 st=5 bz=0 pin=1
 ACC-STAT s=0x40 pin=0 n=6 sk=0
 BURST k=arr pre=20 n=80 signed_mmss=511 479 533 428 429 125 165 -246 -290 -316 -334 -380 -391 -467 -510 -484 -472 -540 -492 -528 -596 -538 -525 -572 -577 -565 -593 -611 -552 -569 -610 -616 -616 -571 -624 -589 -561 -616 -597 -565 -589 -586 -581 -557 -626 -602 -567 -583 -601 -605 -625 -601 -571 -606 -553 -607 -517 -549 -552 -435 -397 -441 -381 -349 -312 -244 -47 -40 1 -2 4 16 4 17 17 -13 -21 25 4 7 
@@ -277,6 +292,7 @@ FSM: Transitioned to STATE_DECELERATING
 ACC-STAT s=0x40 pin=1 n=13 sk=0
 ACC-INT n=13 t=180158 st=5 bz=0 pin=1
 ACC-STAT s=0x40 pin=0 n=13 sk=0
+RAMP latched mean=587 dir=100
 BURST k=arr pre=20 n=80 signed_mmss=-3 68 25 -20 -68 -119 -124 0 64 72 0 32 174 309 412 437 417 488 583 586 653 648 588 529 489 604 711 638 553 438 586 678 752 688 622 597 602 655 647 586 563 531 541 592 617 608 547 586 594 634 659 611 584 563 570 598 635 611 618 601 598 622 654 647 589 639 623 610 594 573 614 565 594 590 596 602 572 622 580 612 
 ACC-INT n=14 t=184057 st=5 bz=0 pin=1
 ACC-STAT s=0x40 pin=0 n=14 sk=0
@@ -294,6 +310,7 @@ BURST k=dep pre=20 n=80 signed_mmss=-48 -37 1 12 12 17 31 15 44 36 14 25 9 70 13
 JOGV pos=36862 neg=0 ratio=0 opk=48 verdict=RUN (armed)
 ACC-INT n=17 t=204619 st=4 bz=0 pin=1
 ACC-STAT s=0x40 pin=0 n=17 sk=0
+  Voltage value : 2327  (settling, ignored)
 ACC-STAT s=0x408 pin=0 n=17 sk=0
 ACC-STAT s=0x42C pin=0 n=17 sk=0
 ACC-INT n=18 t=213843 st=4 bz=0 pin=1
@@ -301,6 +318,7 @@ FSM: Arrival (polled), peak 0.508
 ARM q=182 a=1 v=1 g=1 ro=10
 FSM: Transitioned to STATE_DECELERATING 
 ACC-STAT s=0x40 pin=0 n=18 sk=0
+RAMP latched mean=584 dir=100
 BURST k=arr pre=20 n=80 signed_mmss=25 -51 4 64 77 105 143 51 -68 -81 -53 -157 -223 -284 -480 -507 -506 -497 -493 -567 -649 -669 -559 -587 -552 -592 -576 -655 -644 -637 -604 -634 -629 -654 -653 -614 -602 -620 -608 -580 -527 -499 -542 -583 -650 -640 -577 -586 -575 -614 -638 -681 -608 -613 -588 -609 -574 -544 -573 -589 -584 -625 -625 -623 -591 -628 -607 -602 -620 -655 -592 -591 -600 -628 -600 -647 -582 -584 -559 -641 
 ACC-INT n=19 t=218087 st=5 bz=0 pin=1
 ACC-STAT s=0x40 pin=0 n=19 sk=0

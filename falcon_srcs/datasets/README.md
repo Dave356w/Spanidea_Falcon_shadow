@@ -132,7 +132,21 @@ separation.
 cd falcon_srcs
 for f in logs/device-monitor-*.log; do
   b=$(basename "$f" .log)
-  grep -E '^(BURST|JOGV|ARM |FSM:|ACC-STAT|ACC-INT|XY:|XY-Still|Reset cause|VEL:)' \
+  grep -E '^(BURST|JOGV|ARM |RAMP |FSM:|ACC-STAT|ACC-INT|XY:|XY-Still|Reset cause|VEL:|HEALTH|Zero-Calib|Threshold-Value|Device Booted|  Voltage value)' \
     "$f" > "datasets/${b#device-monitor-}.log"
 done
 ```
+
+🔴 **`RAMP ` WAS MISSING FROM THIS PATTERN UNTIL 2026-08-20, and every capture in
+this directory was distilled without it.** `RAMP latched mean= dir=` does not
+start with `FSM:`, so **not one ramp verdict was in the versioned corpus** --
+while the notes carried claims like "17/17 on automatic stops" and "~28 lifetime
+firings" that could not be checked against it. Repaired from the raw logs on the
+bench machine: **87 ramp verdicts recovered** across five captures. Captures
+still showing zero genuinely had none -- 2026-08-18 is inspection and bench
+work, where the detector correctly declines.
+
+⚠️ The same omission dropped `Voltage value`, `Device Booted` and the
+calibration value lines. Those are restored too. **If a line type matters,
+check that it survives this grep — the pattern is the corpus's real schema and
+nothing validates it.**

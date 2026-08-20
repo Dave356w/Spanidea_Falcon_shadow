@@ -1,7 +1,7 @@
 # Automatic operation at contract speed, 2026-08-20 — session C's table, and the peak collector arming by one sample
 
 **In-car, automatic, 300 fpm, 4-floor building, Dave dispatching.** Build
-`build-2026-08-20`. Capture `falcon_srcs/datasets/260820-140000.log`.
+`build-2026-08-20`. Capture `falcon_srcs/datasets/260820-150000.log`.
 **Eleven runs**, full-travel and single-floor, both directions.
 
 The first automatic operation since the primary build landed, and the first

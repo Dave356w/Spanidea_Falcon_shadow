@@ -1,0 +1,328 @@
+BURST k=dep pre=20 n=80 signed_mmss=-22 -14 -71 3 9 55 -61 -72 -8 74 71 67 99 110 144 122 188 222 274 314 368 377 434 446 501 482 458 482 473 538 495 477 482 505 526 488 538 465 429 468 442 474 431 496 548 526 491 513 495 543 471 515 449 378 528 329 506 446 540 619 518 512 457 531 392 570 373 535 676 441 440 555 338 385 500 459 338 519 513 538 
+JOGV pos=29760 neg=0 ratio=0 opk=72 verdict=RUN (armed)
+ACC-INT n=110 t=1720090 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=111 sk=0
+ACC-INT n=111 t=1720303 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=111 sk=0
+FSM: Arrival (polled), peak 0.618
+ARM q=10 a=1 v=1 g=1 ro=18
+ACC-INT n=112 t=1730641 st=5 bz=0 pin=1
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=112 sk=0
+ACC-INT n=113 t=1730756 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=113 sk=0
+RAMP latched mean=503 dir=100
+BURST k=arr pre=20 n=80 signed_mmss=-14 -166 0 -66 19 -45 -37 115 104 6 -96 -226 79 -148 -236 -442 -617 -589 -560 -578 -433 -445 -431 -313 -334 -604 -586 -618 -645 -662 -605 -653 -589 -514 -499 -542 -556 -447 -604 -532 -504 -438 -496 -626 -562 -514 -374 -348 -481 -562 -522 -492 -569 -491 -524 -522 -527 -488 -525 -458 -463 -585 -496 -532 -401 -522 -544 -523 -570 -525 -427 -503 -580 -466 -424 -414 -250 -251 -315 -509 
+ACC-INT n=114 t=1733623 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=114 sk=0
+ACC-INT n=115 t=1734164 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=115 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+FSM: re-arm blank cleared early, settled at 2507 ms
+  Voltage value : 2306  avg : 2297  pack_mv : 4594
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: Departure latched (polled) ml=8307 q=0 dq=0 td=-1
+ACC-INT n=116 t=1748844 st=3 bz=0 pin=1
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=116 sk=0
+ACC-INT n=117 t=1752465 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=117 sk=0
+ACC-STAT s=0x379 pin=0 n=117 sk=0
+ACC-INT n=118 t=1762934 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=118 sk=0
+FSM: Arrival (polled), peak 0.593
+ARM q=6 a=1 v=1 g=0 ro=8
+FSM: Transitioned to STATE_DECELERATING 
+RAMP latched mean=444 dir=100
+ACC-INT n=119 t=1765834 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=119 sk=0
+ACC-INT n=120 t=1766260 st=5 bz=0 pin=1
+BURST k=arr pre=20 n=80 signed_mmss=240 100 26 173 -1 50 -209 -182 -75 -133 -120 16 30 298 83 234 438 537 592 536 524 437 482 376 387 415 468 648 555 529 442 597 343 520 488 658 560 555 348 519 485 409 425 468 555 468 549 558 517 528 318 533 372 451 380 350 607 352 484 491 464 485 507 581 480 419 454 572 472 451 492 523 590 573 623 623 314 296 385 321 
+ACC-STAT s=0x40 pin=0 n=120 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+  Voltage value : 2306  avg : 2297  pack_mv : 4594
+FSM: re-arm blank cleared early, settled at 2523 ms
+ACC-STAT s=0x300 pin=0 n=120 sk=0
+ACC-STAT read FAILED
+ACC-INT n=122 t=1780776 st=2 bz=0 pin=1
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: Departure latched (polled) ml=8372 q=0 dq=0 td=-1
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=122 sk=0
+BURST k=dep pre=20 n=80 signed_mmss=-6 13 -68 -49 -39 47 53 72 85 110 116 109 178 194 256 369 422 440 475 458 467 478 467 467 465 461 520 489 528 484 506 525 494 496 487 519 479 443 495 465 470 471 440 473 438 535 486 485 531 357 474 539 384 485 437 585 418 525 713 529 592 477 461 521 335 535 456 427 487 603 444 529 647 543 459 310 355 435 325 388 
+JOGV pos=31631 neg=0 ratio=0 opk=68 verdict=RUN (armed)
+ACC-INT n=123 t=1784397 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=123 sk=0
+ACC-INT n=124 t=1794899 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=124 sk=0
+FSM: Arrival (polled), peak 0.484
+ARM q=6 a=1 v=1 g=1 ro=17
+FSM: Transitioned to STATE_DECELERATING 
+RAMP latched mean=513 dir=100
+BURST k=arr pre=20 n=80 signed_mmss=37 -46 144 59 130 27 -107 33 -75 210 -302 -342 -257 -300 -410 -404 -484 -559 -689 -608 -681 -553 -507 -481 -519 -487 -395 -326 -407 -614 -512 -633 -447 -571 -517 -560 -525 -589 -357 -454 -453 -628 -587 -510 -562 -565 -525 -496 -482 -493 -408 -559 -468 -422 -516 -641 -494 -477 -344 -519 -566 -577 -517 -477 -639 -538 -535 -431 -383 -443 -404 -566 -339 -438 -336 -316 -375 -320 -481 -450 
+ACC-INT n=125 t=1798471 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=125 sk=0
+ACC-INT n=126 t=1798520 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=126 sk=0
+  Voltage value : 2293  avg : 2295  pack_mv : 4590
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-STAT s=0x338 pin=0 n=126 sk=0
+FSM: re-arm blank cleared early, settled at 2523 ms
+ACC-STAT s=0x30E pin=0 n=126 sk=0
+ACC-INT n=127 t=1811857 st=2 bz=0 pin=1
+ACC-STAT s=0x40 pin=1 n=128 sk=1
+ACC-INT n=128 t=1811890 st=3 bz=0 pin=1
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: Departure latched (polled) ml=7078 q=0 dq=0 td=-1
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=128 sk=0
+BURST k=dep pre=20 n=80 signed_mmss=15 1 -50 -8 0 16 -4 -34 -29 -53 -55 -104 -123 -145 -154 -184 -265 -303 -316 -357 -433 -460 -499 -486 -529 -513 -511 -464 -475 -585 -511 -499 -572 -539 -492 -520 -468 -486 -457 -513 -511 -486 -487 -492 -547 -538 -530 -392 -362 -459 -509 -466 -506 -464 -550 -517 -552 -519 -513 -502 -494 -389 -498 -564 -472 -534 -528 -559 -523 -322 -658 -508 -686 -506 -525 -457 -461 -593 -525 -567 
+JOGV pos=0 neg=31862 ratio=0 opk=16 verdict=RUN (armed)
+ACC-INT n=129 t=1815527 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=129 sk=0
+ACC-INT n=130 t=1826045 st=4 bz=0 pin=1
+FSM: Arrival (polled), peak 0.501
+ARM q=5 a=1 v=1 g=1 ro=16
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=130 sk=0
+RAMP latched mean=478 dir=100
+ACC-INT n=131 t=1828880 st=5 bz=0 pin=1
+BURST k=arr pre=20 n=80 signed_mmss=130 -57 -185 -110 -200 -268 -152 -17 -47 83 -13 191 219 277 176 376 333 500 480 562 497 509 452 513 452 412 429 397 695 513 813 534 594 563 473 502 327 380 426 475 408 477 587 558 415 437 546 489 515 464 483 532 572 535 366 388 362 546 537 513 461 533 526 424 440 558 483 462 473 525 649 534 609 638 546 594 540 530 444 395 
+ACC-STAT s=0x40 pin=0 n=131 sk=0
+ACC-INT n=132 t=1829748 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=132 sk=0
+  Voltage value : 2290  avg : 2300  pack_mv : 4600
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+FSM: re-arm blank cleared early, settled at 2573 ms
+ACC-INT n=133 t=1842741 st=2 bz=0 pin=1
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: Departure latched (any-motion) ml=7013 q=1 dq=0 td=-1
+ACC-STAT s=0x40 pin=0 n=133 sk=0
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+BURST k=dep pre=20 n=80 signed_mmss=-3 -68 10 10 -23 -71 -98 0 53 50 73 74 109 118 140 164 191 268 299 327 381 410 455 472 458 464 459 474 496 478 498 512 478 485 448 456 495 461 491 465 501 479 441 497 441 504 461 413 461 494 525 526 422 560 470 472 451 567 377 476 373 447 357 514 427 488 610 475 546 528 482 531 449 438 421 519 527 655 504 381 
+JOGV pos=29795 neg=0 ratio=0 opk=98 verdict=RUN (armed)
+ACC-INT n=134 t=1846509 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=134 sk=0
+FSM: Arrival (polled), peak 0.453
+ARM q=6 a=1 v=1 g=0 ro=10
+FSM: Transitioned to STATE_DECELERATING 
+ACC-INT n=135 t=1856946 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=135 sk=0
+RAMP latched mean=506 dir=100
+BURST k=arr pre=20 n=80 signed_mmss=-23 -59 -152 80 34 -61 -157 -7 13 -95 109 199 98 51 -174 -308 -320 -453 -610 -515 -520 -398 -617 -420 -438 -454 -426 -297 -444 -796 -516 -310 -562 -519 -502 -505 -528 -656 -491 -560 -559 -562 -452 -513 -531 -516 -554 -465 -402 -602 -571 -614 -513 -545 -513 -406 -526 -533 -468 -506 -524 -516 -460 -572 -478 -432 -488 -463 -442 -503 -471 -567 -487 -580 -544 -390 -421 -390 -475 -442 
+ACC-INT n=136 t=1860616 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=136 sk=0
+  Voltage value : 2245  avg : 2292  pack_mv : 4584
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+FSM: re-arm blank cleared early, settled at 2507 ms
+ACC-STAT read FAILED
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: Departure latched (polled) ml=7586 q=0 dq=0 td=-1
+ACC-INT n=137 t=1874542 st=3 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=138 sk=0
+ACC-INT n=138 t=1874575 st=3 bz=0 pin=1
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=138 sk=0
+ACC-INT n=139 t=1878065 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=139 sk=0
+ACC-INT n=140 t=1883783 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=140 sk=0
+ACC-INT n=141 t=1888731 st=4 bz=0 pin=1
+FSM: Arrival (polled), peak 0.483
+ARM q=9 a=1 v=1 g=0 ro=10
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=141 sk=0
+RAMP latched mean=483 dir=100
+ACC-INT n=142 t=1891598 st=5 bz=0 pin=1
+BURST k=arr pre=20 n=80 signed_mmss=-3 -4 21 -71 -101 -44 -8 71 -10 84 195 155 177 82 162 142 290 438 483 379 362 603 503 536 509 428 586 553 610 484 574 467 544 356 457 385 407 446 531 552 533 441 447 394 476 447 457 409 453 620 615 472 467 343 651 425 425 455 465 523 450 473 489 401 496 513 462 446 498 512 605 498 584 594 623 674 631 347 308 295 
+ACC-STAT s=0x339 pin=1 n=143 sk=0
+ACC-INT n=143 t=1892548 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=143 sk=0
+  Voltage value : 2284  avg : 2296  pack_mv : 4592
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+ACC-INT n=144 t=1904525 st=2 bz=0 pin=1
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: Departure latched (polled) ml=6389 q=2 dq=0 td=-1
+ACC-STAT s=0x40 pin=0 n=144 sk=0
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-INT n=145 t=1905328 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=145 sk=0
+BURST k=dep pre=20 n=80 signed_mmss=9 31 59 34 -5 -47 -53 -13 40 18 36 58 109 136 164 199 250 278 325 352 405 431 456 461 464 452 456 464 495 498 479 488 534 516 495 494 472 498 469 491 482 497 467 433 446 462 473 540 461 559 450 490 538 384 488 413 567 466 465 677 588 526 610 591 534 422 552 438 355 537 470 485 562 510 526 397 483 509 446 365 
+JOGV pos=30750 neg=0 ratio=0 opk=53 verdict=RUN (armed)
+ACC-INT n=146 t=1907949 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=146 sk=0
+ACC-INT n=147 t=1908097 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=147 sk=0
+ACC-INT n=148 t=1918697 st=4 bz=0 pin=1
+FSM: Arrival (polled), peak 0.474
+ARM q=20 a=1 v=1 g=0 ro=12
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=148 sk=0
+RAMP latched mean=513 dir=100
+ACC-STAT s=0x2E9 pin=0 n=148 sk=0
+ACC-INT n=149 t=1921794 st=5 bz=0 pin=1
+BURST k=arr pre=20 n=80 signed_mmss=35 94 -49 47 106 9 -60 -164 -79 -88 -188 -16 -381 -211 -254 -278 -348 -474 -463 -539 -696 -525 -446 -578 -468 -486 -311 -356 -590 -561 -452 -652 -582 -684 -520 -639 -481 -517 -511 -466 -591 -471 -407 -612 -620 -493 -542 -573 -617 -416 -522 -492 -432 -454 -476 -523 -488 -457 -595 -555 -432 -513 -452 -471 -482 -497 -575 -610 -630 -447 -381 -423 -444 -395 -367 -305 -315 -400 -481 -565 
+ACC-STAT s=0x40 pin=0 n=149 sk=0
+ACC-INT n=150 t=1923547 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=150 sk=0
+  Voltage value : 2287  avg : 2291  pack_mv : 4582
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+FSM: re-arm blank cleared early, settled at 2523 ms
+ACC-STAT s=0x342 pin=0 n=150 sk=1
+ACC-INT n=151 t=1935622 st=2 bz=0 pin=1
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: Departure latched (any-motion) ml=7029 q=0 dq=0 td=-1
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=151 sk=0
+BURST k=dep pre=20 n=80 signed_mmss=32 -5 -2 -46 -26 12 -49 1 17 19 -11 -84 -14 -81 -81 -105 -136 -134 -177 -186 -260 -290 -351 -393 -416 -501 -486 -508 -529 -423 -439 -450 -584 -546 -500 -529 -516 -520 -544 -539 -577 -489 -493 -538 -545 -483 -513 -468 -481 -521 -559 -555 -523 -522 -497 -584 -505 -528 -433 -515 -578 -499 -458 -484 -522 -507 -544 -524 -611 -526 -363 -586 -433 -543 -466 -363 -540 -387 -791 -383 
+JOGV pos=0 neg=30124 ratio=0 opk=32 verdict=RUN (armed)
+ACC-INT n=152 t=1939259 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=152 sk=0
+ACC-INT n=153 t=1949859 st=4 bz=0 pin=1
+FSM: Arrival (polled), peak 0.467
+ARM q=13 a=1 v=1 g=0 ro=8
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=153 sk=0
+RAMP latched mean=450 dir=100
+ACC-INT n=154 t=1952694 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=154 sk=0
+ACC-INT n=155 t=1953136 st=5 bz=1 pin=1
+BURST k=arr pre=20 n=80 signed_mmss=49 9 125 -88 64 100 -24 -69 -229 -49 74 105 276 341 467 471 464 383 421 652 467 468 435 438 529 332 453 412 487 360 486 425 485 412 517 576 599 567 565 489 457 382 549 427 459 558 571 615 453 459 461 381 433 416 485 400 422 519 514 462 495 520 543 488 488 548 468 504 565 559 588 575 635 638 592 594 509 482 236 238 
+ACC-STAT s=0x40 pin=0 n=155 sk=0
+  Voltage value : 2290  avg : 2287  pack_mv : 4574
+ACC-INT n=156 t=1954430 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=156 sk=0
+ACC-INT n=157 t=1955119 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=157 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+FSM: re-arm blank cleared early, settled at 2556 ms
+ACC-INT n=158 t=1967423 st=2 bz=0 pin=1
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: Departure latched (polled) ml=8028 q=1 dq=0 td=-1
+ACC-STAT s=0x40 pin=0 n=158 sk=0
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+BURST k=dep pre=20 n=80 signed_mmss=0 14 29 13 -41 -79 -88 -18 27 59 40 59 77 113 147 187 235 287 312 384 393 436 446 462 461 461 472 488 504 489 488 492 476 475 479 471 470 483 512 434 510 483 527 519 504 518 497 502 518 433 543 432 522 441 356 531 461 502 428 564 495 473 325 510 323 597 360 529 764 549 480 529 412 377 512 464 334 451 498 528 
+JOGV pos=30098 neg=0 ratio=0 opk=88 verdict=RUN (armed)
+ACC-INT n=159 t=1970962 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=159 sk=0
+ACC-INT n=160 t=1981546 st=4 bz=0 pin=1
+FSM: Arrival (polled), peak 0.600
+ARM q=7 a=1 v=1 g=0 ro=13
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=160 sk=0
+RAMP latched mean=469 dir=100
+  Voltage value : 2278  avg : 2284  pack_mv : 4568
+BURST k=arr pre=20 n=80 signed_mmss=-28 -172 -59 -117 27 125 -77 107 38 9 56 -20 -281 -125 -372 -486 -527 -599 -596 -487 -420 -344 -311 -442 -589 -593 -548 -639 -587 -600 -583 -722 -553 -390 -338 -359 -454 -511 -526 -494 -483 -324 -620 -632 -565 -468 -405 -417 -496 -389 -404 -484 -530 -432 -547 -570 -486 -528 -393 -432 -441 -547 -568 -492 -431 -541 -539 -523 -528 -550 -572 -561 -497 -396 -410 -481 -280 -295 -341 -447 
+ACC-INT n=161 t=1985183 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=161 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+FSM: polled ignored, re-arm blanking t=5882 d=0.0471
+FSM: any-motion ignored, re-arm blanking t=5882 q=0
+ACC-INT n=162 t=1997357 st=2 bz=0 pin=1
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: Departure latched (polled) ml=6111 q=0 dq=2 td=229
+ACC-STAT s=0x40 pin=0 n=162 sk=0
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-INT n=163 t=2001010 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=163 sk=0
+ACC-INT n=164 t=2007597 st=4 bz=0 pin=1
+FSM: Arrival (polled), peak 0.532
+ARM q=8 a=1 v=1 g=0 ro=11
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=164 sk=0
+RAMP latched mean=460 dir=100
+BURST k=arr pre=20 n=80 signed_mmss=-227 -256 -268 -263 -136 -114 -38 199 139 176 51 20 19 148 154 230 342 532 492 567 498 591 439 425 274 321 455 489 346 425 359 485 443 553 395 580 435 524 471 483 371 451 387 427 517 435 500 501 370 398 450 452 429 491 489 535 478 495 455 495 464 515 512 488 539 440 501 485 503 443 523 526 418 540 535 416 440 589 471 365 
+ACC-INT n=165 t=2011217 st=5 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=165 sk=0
+  Voltage value : 2287  avg : 2281  pack_mv : 4562
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+FSM: re-arm blank cleared early, settled at 2524 ms
+ACC-STAT s=0x346 pin=0 n=165 sk=1
+ACC-STAT s=0x37B pin=0 n=165 sk=1
+ACC-STAT s=0x358 pin=0 n=165 sk=1
+  Voltage value : 2321  avg : 2285  pack_mv : 4570
+ACC-STAT s=0x362 pin=0 n=165 sk=1
+ACC-STAT s=0x377 pin=0 n=165 sk=1
+  Voltage value : 2330  avg : 2290  pack_mv : 4580
+ACC-STAT s=0x365 pin=0 n=165 sk=1
+  Voltage value : 2339  avg : 2302  pack_mv : 4604
+  Voltage value : 2345  avg : 2309  pack_mv : 4618
+ACC-STAT s=0x374 pin=0 n=165 sk=1
+ACC-INT n=166 t=2148122 st=2 bz=0 pin=1
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: Departure latched (any-motion) ml=130876 q=0 dq=0 td=-1
+ACC-STAT s=0x40 pin=0 n=166 sk=0
+ACC-INT n=167 t=2148368 st=3 bz=0 pin=1
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=167 sk=0
+BURST k=dep pre=20 n=80 signed_mmss=12 -36 64 39 -53 -51 -3 49 21 -47 12 -10 119 0 -110 -161 -180 -181 45 268 149 -44 -193 -264 -253 -264 -309 -308 -389 -463 -486 -529 -586 -611 -610 -587 -556 -529 -533 -529 -421 -422 -500 -439 -436 -366 -532 -447 -542 -545 -523 -565 -462 -572 -488 -503 -518 -462 -510 -466 -504 -419 -517 -439 -583 -518 -533 -564 -471 -514 -439 -550 -395 -556 -493 -443 -448 -587 -542 -272 
+JOGV pos=268 neg=28027 ratio=0 opk=268 verdict=RUN (armed)
+ACC-INT n=168 t=2151809 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=168 sk=0
+FSM: Arrival (polled), peak 0.513
+ARM q=7 a=1 v=1 g=0 ro=8
+FSM: Transitioned to STATE_DECELERATING 
+RAMP latched mean=503 dir=100
+ACC-INT n=169 t=2155364 st=5 bz=0 pin=1
+BURST k=arr pre=20 n=80 signed_mmss=-232 -146 4 7 -119 -19 -31 -141 -196 -143 53 127 188 161 227 387 513 592 509 481 538 514 468 418 467 601 380 598 429 431 370 466 475 432 476 497 486 558 611 513 497 483 565 441 381 524 553 522 528 478 452 383 601 632 370 511 538 509 565 479 499 573 419 511 452 493 529 490 594 654 621 670 650 594 550 482 478 406 272 285 
+ACC-STAT s=0x40 pin=0 n=169 sk=0
+ACC-INT n=170 t=2156265 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=170 sk=0
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+  Voltage value : 2339  avg : 2316  pack_mv : 4632
+FSM: re-arm blank cleared early, settled at 2637 ms
+ACC-STAT s=0x361 pin=0 n=170 sk=1
+  Voltage value : 2345  avg : 2323  pack_mv : 4646
+  Voltage value : 2348  avg : 2331  pack_mv : 4662
+ACC-STAT s=0x354 pin=0 n=170 sk=1
+  Voltage value : 2351  avg : 2339  pack_mv : 4678
+  Voltage value : 2366  avg : 2345  pack_mv : 4690
+ACC-STAT s=0x358 pin=0 n=170 sk=1
+ACC-INT n=171 t=2295775 st=2 bz=0 pin=1
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: Departure latched (any-motion) ml=133447 q=0 dq=0 td=-1
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+ACC-STAT s=0x40 pin=0 n=171 sk=0
+ACC-INT n=172 t=2296201 st=4 bz=1 pin=1
+ACC-STAT s=0x40 pin=0 n=172 sk=0
+BURST k=dep pre=20 n=80 signed_mmss=8 7 -12 30 30 19 -23 -14 -38 -56 -35 24 67 53 64 110 137 165 186 224 285 316 358 377 415 449 450 497 513 480 513 501 494 506 492 523 491 518 515 497 531 457 481 458 502 453 429 466 494 485 516 463 535 521 482 547 348 538 483 592 343 440 448 546 427 738 604 629 561 450 615 410 393 516 461 485 494 389 482 580 
+JOGV pos=29557 neg=0 ratio=0 opk=56 verdict=RUN (armed)
+ACC-INT n=173 t=2299363 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=173 sk=0
+ACC-INT n=174 t=2299854 st=4 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=174 sk=0
+FSM: Arrival (polled), peak 0.513
+ARM q=6 a=1 v=1 g=0 ro=9
+ACC-INT n=175 t=2310045 st=5 bz=0 pin=1
+FSM: Transitioned to STATE_DECELERATING 
+ACC-STAT s=0x40 pin=0 n=175 sk=0
+RAMP latched mean=512 dir=100
+BURST k=arr pre=20 n=80 signed_mmss=52 97 40 68 49 -101 13 -177 124 -143 -69 -150 -205 -113 -229 -148 -513 -479 -241 -350 -292 -430 -565 -463 -559 -576 -568 -401 -562 -429 -222 -465 -434 -553 -389 -492 -766 -642 -732 -530 -549 -550 -550 -463 -455 -499 -414 -502 -408 -592 -529 -585 -567 -581 -514 -444 -552 -507 -363 -520 -537 -535 -501 -565 -488 -422 -447 -515 -504 -436 -340 -429 -543 -629 -541 -430 -507 -439 -420 -318 
+ACC-INT n=176 t=2313633 st=5 bz=0 pin=1
+ACC-STAT s=0x40 pin=0 n=176 sk=0
+  Voltage value : 2321  avg : 2344  pack_mv : 4688
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+FSM: re-arm blank cleared early, settled at 2506 ms
