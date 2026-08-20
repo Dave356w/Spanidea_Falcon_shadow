@@ -1,5 +1,11 @@
 # State of the project — 2026-08-18
 
+> ⛔ **READ `falcon_START_HERE_2026-08-20.md` FIRST.** On 2026-08-20 the beacon
+> was measured **releasing on a moving car** at contract speed — §14.4's only
+> catastrophic failure, observed directly for the first time. That document is
+> the handover; this one is still the build definition and architecture
+> reference, amended in place.
+
 Supersedes `falcon_state_of_project_2026-08-14.md`. This document defines the
 current build, the detection logic as implemented, the evidence supporting each
 armed path, and the open items. It is written to be built from without
