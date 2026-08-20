@@ -27,6 +27,47 @@ real arrivals are rejected, each then holding the beacon over a stopped car to
 the 600 s failsafe. This retires "retune `ARRIVAL_PEAK_VALUE`" the way 08-18
 retired "retune `ANYMOTION_THRESHOLD`".
 
+## 0a. ⚖️ WHAT IS ESTABLISHED vs WHAT IS NOT — read before acting on §0
+
+Nine notes were written on 2026-08-20 by two parallel sessions, and the language
+in them is alarming in places. This is the proportionate version.
+
+**Established, and not negotiable:**
+
+- **One release on a moving car, confirmed.** Dave called it from inside the
+  car; lateral read 0.2–0.884 for eleven continuous seconds against a rest level
+  of 0.005–0.05; the device then re-latched, which it only does on a fresh
+  departure. An independent instrument scores its lateral verdict at 0.311
+  against 0.018–0.095 for every other release on file. **This is the single
+  best-evidenced event of the day. It is not a ghost.**
+- **The arrival gate cannot separate the two populations on that machine** —
+  real arrivals 0.450–0.511 (one exactly on the gate), false release 0.472,
+  inside the population.
+- **Every candidate fix is refuted**: retuning the gate, reversal-only arming
+  (misses 51.5%), ramp-priority (changes nothing), ramp-veto (blocks 100% of
+  inspection stops).
+
+**NOT established — do not act as though it were:**
+
+- **The rate.** One confirmed event, and **35 runs since with none flagged**.
+  On the evidence this is roughly 1 in 44 on one machine, and a single event
+  cannot support a rate at all. It is not "every trip" and nothing here says it
+  is getting worse.
+- **A second event.** `142248:696` is flagged MOVING but reads only **1.01×**
+  the rest threshold — the tool itself calls it UNRESOLVED. Treat it as
+  unresolved, not as a second data point.
+- **That the problem generalises.** All contract-speed automatic data comes from
+  **one building on one afternoon**. The 350 and 500 fpm machines have never
+  been run against this build.
+- **That anything got worse today.** Nothing regressed. The firmware behaved the
+  same before and after every change; what changed is that the instruments can
+  now see what it was already doing.
+
+⚠️ **The catastrophic-failure framing is about CONSEQUENCE, not frequency.**
+Silence while moving is the one failure the product exists to prevent, so one
+instance is worth this much writing. That is not the same as saying the device
+fails often, and the notes should not be read that way.
+
 ## 1. Build on the device and in the repo
 
 | | |
@@ -148,6 +189,22 @@ The background capture ran on after the write-up and holds **33 departures, not
 6. **Quiescent current has never been measured.** `idle_current` now builds.
 7. **Battery divider** — `pack_mv` reads ×2, `VBATT_CONST` is 4.4, `Release.txt`
    says 3.2 V. Three answers, no meter.
+
+## 5a. Every note from 2026-08-20
+
+Two sessions wrote in parallel; this is all of it, in reading order.
+
+| note | what it holds |
+|---|---|
+| **this file** | handover, and §0a's proportionate framing |
+| `falcon_false_release_2026-08-20.md` | the release on a moving car — the one that matters |
+| `falcon_ramp_priority_2026-08-20.md` | ramp-priority refuted, ramp-veto costed (parallel session) |
+| `falcon_automatic_2026-08-20.md` | 33 contract-speed runs, session C's table, the `v=2` firing |
+| `falcon_session_a_2026-08-20.md` | flash headroom, `FALCON_LOG`, and the A/B method error |
+| `falcon_b1_2026-08-20.md` | latch attribution, the bench cascade, the polled re-arm gate |
+| `falcon_cartop_2026-08-20.md` | inspection runs and jogs; the jog floor at 937 |
+| `falcon_corpus_labelling_2026-08-20.md` | the session G procedure (written before the run) |
+| `falcon_corpus_labelled_2026-08-20.md` | the session G result — 98 labelled records |
 
 ## 6. Data
 

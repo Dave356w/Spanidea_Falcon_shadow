@@ -120,6 +120,28 @@ that direction is the catastrophic one.**
   ear gets no warning. `main.cpp` §14.4 calls it the only catastrophic failure
   and it is now measured, not hypothesised.
 
+## 5a. ⚖️ Rate — added after 35 further runs
+
+**35 runs after this event, none flagged by the lateral instrument.** Pooling
+the day's contract-speed work: **1 confirmed release on a moving car in 44
+runs.**
+
+That is the honest denominator, and it cuts both ways:
+
+- It is **not** "every trip", and nothing measured says the device is degrading.
+- 1 in 44 on a car that runs hundreds of times a day is **several times a day**
+  in service, each one a window with no warning to someone ranging by ear.
+
+⚠️ **Both numbers are soft.** One event cannot support a rate, and the
+instrument that scores the other 43 has a stated blind spot: it detects only a
+release early enough that the car is still moving 5–11 s later. A release 1–2 s
+early is invisible to it. **Every "clean" count is a lower bound.**
+
+⬜ A second release, `142248:696`, is flagged MOVING but reads only **1.01×**
+the rest threshold and the tool calls it UNRESOLVED. It came *before* this one
+and was not noticed in the car. Do not count it as a second instance; do not
+dismiss it either.
+
 ## 6. What must happen before this car is trusted again
 
 1. ⛔ **No further reliance on the beacon on this installation.**
