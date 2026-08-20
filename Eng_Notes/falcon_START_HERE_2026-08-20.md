@@ -105,8 +105,15 @@ So: **give the ramp verdict priority where one is available, keep the peak for
 brake sets.** Unlike a gate swap this does not trade one failure direction for
 the other.
 
-⬜ **Next step is desk work, not a car:** extend `arming_replay.py` to ask what
-each arrival would have done under ramp-priority. All the data is committed.
+⛔ **RETRACTED THE SAME DAY — see `falcon_ramp_priority_2026-08-20.md`.** The
+replay is done. Priority with a peak fallback (`ramp_pri`) releases the false
+release anyway, 2 s later, still mid-travel: its ramp landed 9798 ms after the
+peak, so no usable hold reaches it. Only a *veto* — refusing to release without
+ramp confirmation — prevents it, and that costs a NO RELEASE on **100% of
+inspection stops**, which carry 0 ramp verdicts in 79 runs. It does trade one
+failure direction for the other. The open question is now whether the firmware
+can tell automatic operation from inspection at runtime; `g=` is not that
+discriminator.
 
 ## 4a. 🟢 One piece of good news, found after the session was written up
 
