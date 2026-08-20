@@ -14,7 +14,8 @@ describes this build unless a line says otherwise.
 
 | | |
 |---|---|
-| Commit | `6483f9d` on `Falcon_Rel_EFT`, tagged `build-2026-08-20` |
+| Tag | **`build-2026-08-20`** on `Falcon_Rel_EFT` — the authoritative reference for this build |
+| Commit | `d596310`. The firmware last changed at `6483f9d`; `d596310` is documentation plus `platformio.ini` flags for `bench_battery` and `idle_current`, so the `ATmega328PB` binary is byte-identical across the two |
 | Environment | `[env:ATmega328PB]`, `pio run -e ATmega328PB` |
 | Build flags | `-DTWI_FREQ=25000L -Wl,--relax` (`FALCON_LOG` defaults to 2) |
 | Flash | **32176 / 32256 bytes — 80 bytes free** |
