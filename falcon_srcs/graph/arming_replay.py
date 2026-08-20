@@ -345,11 +345,18 @@ def main():
     print("=" * 78)
     print(f"   paired arrival bursts only (n={len(arrs_paired)}); see the")
     print("   header for why this is PARTIAL evidence, not a service claim.\n")
+    print("   NO RELEASE is the decision-relevant column: nothing fired at")
+    print("   all, either because the rule never armed OR because it armed and")
+    print("   neither detector triggered. 'neither' alone HIDES every arrival")
+    print("   the rule never armed on, which is most of them for 'rev'.")
+    print("   A NO RELEASE is the beacon held over a stopped car to the")
+    print("   600 s failsafe -- a position lie, not silence while moving.")
+    print("")
     print(f"   {'rule':<10} {'armed':>12} {'ramp':>11} {'peak':>11} "
-          f"{'neither':>9}")
-    print("   " + "-" * 56)
+          f"{'neither':>9} {'NO RELEASE':>13}")
+    print("   " + "-" * 72)
     for rule in ('quiet', 'rev', 'union'):
-        armed = ramp = peak = neither = 0
+        armed = ramp = peak = neither = norel = 0
         for b in arrs_paired:
             r = evaluate(b, rule, signs[id(b)])
             armed += r['armed']
@@ -357,9 +364,12 @@ def main():
             peak += r['peak']
             if r['armed'] and not r['ramp'] and not r['peak']:
                 neither += 1
+            if not (r['armed'] and (r['ramp'] or r['peak'])):
+                norel += 1
         n = len(arrs_paired)
         print(f"   {rule:<10} {armed:>5}/{n:<6} {ramp:>5}/{n:<5} "
-              f"{peak:>5}/{n:<5} {neither:>8}")
+              f"{peak:>5}/{n:<5} {neither:>8} {norel:>8}/{n:<4}"
+              f"  {100.0*norel/n:5.1f}%")
 
     # ── Experiment 4: sweep ARM_REV_SAMPLES ─────────────────────────────────
     if args.sweep:
