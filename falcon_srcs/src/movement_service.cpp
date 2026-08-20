@@ -131,7 +131,7 @@ extern bool     ramp_hit();
 extern uint16_t ramp_mean_get();
 extern uint8_t  ramp_dir_get();
 
-MovementService::MovementService(RollingAvg<float> *acc_avg)
+MovementService::MovementService(RollingAvg<float, 32> *acc_avg)
 {
     acceleration_avg_ref = acc_avg;
     reset_counter = 100;

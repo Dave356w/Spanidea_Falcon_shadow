@@ -592,13 +592,13 @@ class MovementService {
   public:
     MotionStates state;
     MotionStates last_state;
-    RollingAvg<float> *acceleration_avg_ref;
+    RollingAvg<float, 32> *acceleration_avg_ref;
     float zero_calib_value;
     float threshold_value;       /* learned polled departure gate       */
     float z_cal_min;             /* z average min across calibration    */
     float z_cal_max;             /* z average max across calibration    */
 
-    MovementService(RollingAvg<float> *acc_avg);
+    MovementService(RollingAvg<float, 32> *acc_avg);
 
     void fsm_run(void);
     int  get_state();

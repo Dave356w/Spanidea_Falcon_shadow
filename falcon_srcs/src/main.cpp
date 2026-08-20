@@ -84,8 +84,8 @@ static boolean in_isr = false;
  * arrival measured 0.058 against a parked noise floor of 0.103, and a 2.8x
  * quieter floor is what would make it visible.
  */
-RollingAvg<float> acceleration_avg_g(32);
-RollingAvg<uint16_t> battery_avg(8);
+RollingAvg<float, 32> acceleration_avg_g;
+RollingAvg<uint16_t, 8> battery_avg;
 float x = 0, y = 0, z = 0;
 float g_value, accel_value;
 
