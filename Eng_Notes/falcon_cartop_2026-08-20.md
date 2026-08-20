@@ -36,10 +36,30 @@ and would have been dropped from any run count taken from `Departure latched`.
 The 08-19 session hit exactly that: 4 real runs, 3 latch lines, and the silent
 one recovered only by cross-checking raw state transitions by hand.
 
-It also says something about detection: **any-motion missed run 4 and the
-backstop covered it, at 19 fpm** — the speed where any-motion is weakest. The
-layered design working, visible for the first time because the instrument now
-exists.
+☠️ **RETRACTED, same day.** I wrote here that "any-motion missed run 4 and the
+backstop covered it, at 19 fpm — the layered design working." **That is wrong.**
+
+Run 4 carries a **departure burst**, and `burst_trigger(BURST_POST_DEP, 0)` sits
+inside the `if (any_motion_pending)` branch. Any-motion *did* fire on run 4.
+Checked against all eleven records in this capture and all four in the
+contract-speed capture: **every polled-latched departure also carries a burst.**
+
+⚠️ **`latch_path` reports EVALUATION ORDER, NOT DETECTION ORDER.** The polled
+test is checked first in `fsm_run()` and `latch_path` is first-setter-wins, so
+when both paths trip in the same loop pass the line says `(polled)`. It does not
+mean any-motion missed anything, and nothing in this session demonstrates the
+backstop covering a miss.
+
+**What the line does still establish, unchanged:** the polled path used to enter
+`STATE_MOVEMENT_DETECTED` printing nothing at all, so a departure it latched
+first was invisible and dropped out of any `Departure latched` count. That gap
+is closed.
+
+⬜ **Instrument fix worth making:** report every path that fired, not the first —
+`p=po+am` — so "the backstop caught one" becomes a claim the log can actually
+support. Until then, read `(polled)` as "polled won the race in that pass" and
+use the presence or absence of a departure burst to tell whether any-motion
+fired at all.
 
 `dq=0` on all five, so no motion evidence was discarded on any run and the
 missed-departure signature did not appear. **Five for five departures caught;
