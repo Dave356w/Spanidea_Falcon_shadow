@@ -288,7 +288,12 @@ What works is the **impulse pair**: a jog is a hand-jerk one way and a
 brake-jerk the other, net velocity ≈ 0, inside ~1 s; a real departure has no
 compensating partner. Classified from the departure burst 3.2 s after the
 latch. **`opk` (opposite-side peak) carries the verdict; the ratio is only an
-AND guard.** Live and armed — **25/25 lifetime**.
+AND guard.** Live and armed — **25/25 lifetime** ⚠️ *(that tally is off by
+one: `260811-152209.log` carries a fourth `JOGV` line the 08-11 note never
+tabulated — an uncounted RUN verdict. And "lifetime" counts verdicts the
+firmware issued, not correctness: scored against labels 2026-08-20 the verdict
+runs **1 false JOG in 63 real departures and 1 miss in 17 jogs** —
+`falcon_corpus_labelled_2026-08-20.md` §4.1.)*
 
 ---
 
@@ -593,7 +598,7 @@ changing one.
 | `JOG_VERDICT_ARMED` | **1** | releases the latch on a JOG verdict |
 | `JOG_DEADBAND_MMSS` | 150 | samples below this feed neither impulse |
 | `JOG_OPP_RATIO_PCT` | 33 | opposite/primary ratio — the AND guard |
-| `JOG_OPP_PEAK_MMSS` | **900** | opposite-side peak — **carries the verdict.** Real departures ≤440, jogs ≥1366 |
+| `JOG_OPP_PEAK_MMSS` | **900** | opposite-side peak — **carries the verdict.** ⚠️ corrected 2026-08-20 against the labelled corpus: real departures **11–562 plus one at 972**, jogs **381–4154** — the populations OVERLAP and the old "≤440 vs ≥1366" gap does not exist |
 
 ### Timing and release
 

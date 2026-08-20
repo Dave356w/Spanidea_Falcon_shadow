@@ -25,10 +25,18 @@ population better than opk does.
 WHAT THIS CAN AND CANNOT ESTABLISH -- read before trusting any number
 ════════════════════════════════════════════════════════════════════════════════
 
-  ❌ THERE ARE NO GROUND-TRUTH LABELS IN THE LOGS. Nothing records "this burst
-     was a jog" versus "this burst was a real run". So this tool CANNOT report
-     an accuracy, a false-JOG rate, or a miss rate. Any such number would be
-     invented.
+  ⚠️ THERE ARE NO GROUND-TRUTH LABELS IN THE LOGS THEMSELVES. Nothing in a
+     capture records "this burst was a jog" versus "this burst was a real run",
+     so this tool CANNOT report an accuracy, a false-JOG rate or a miss rate.
+
+     PARTLY LIFTED 2026-08-20: labels now exist for a SUBSET, recovered from the
+     dated session notes and held in datasets/session_g_labels.csv -- 87 of 273
+     departures, with a named basis per record. This tool does not read them; it
+     remains a separation report over every burst. To score a rule against
+     labels, join on (log, run) the way falcon_corpus_labelled_2026-08-20.md §4
+     does. Note the labelled jog population is small (17) and NOT random -- jogs
+     were written into notes because they were verdict tests -- so a miss rate
+     computed from it is still not a miss rate.
 
   ✅ WHAT IT CAN DO: measure SEPARATION. It computes both statistics on every
      departure burst and reports whether the proposed statistic splits the
@@ -111,6 +119,13 @@ def windowed_verdict(samples, floor, dir_pct=RAMP_DIR_PCT):
 
 
 def main():
+    # Non-ASCII in the report aborts on a cp1252 Windows console. Force UTF-8.
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding='utf-8')
+        except (AttributeError, ValueError):
+            pass
+
     ap = argparse.ArgumentParser()
     ap.add_argument('--logs', default=os.path.join(
         os.path.dirname(os.path.abspath(__file__)), '..', 'logs'))
@@ -180,9 +195,11 @@ def main():
     if not n_dis:
         print("  none")
 
-    print("\n⚠️  NO GROUND-TRUTH LABELS EXIST IN THESE LOGS. The above is a")
-    print("   SEPARATION and DISAGREEMENT report, not an accuracy report.")
-    print("   Every disagreement needs a human to say which rule was right.")
+    print("\n⚠️  THIS IS A SEPARATION AND DISAGREEMENT REPORT, not an")
+    print("   accuracy report. Every disagreement needs a human to say which")
+    print("   rule was right. Labels exist for 87 of 273 departures since")
+    print("   2026-08-20 (datasets/session_g_labels.csv); this tool does not")
+    print("   read them -- join on (log, run) to score a rule against them.")
     return 0
 
 

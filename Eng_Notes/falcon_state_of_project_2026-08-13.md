@@ -97,7 +97,10 @@ legends, thresholds and logic.
 - **Departure detection.** Caught at 17, 18, 20, 25, 27 fpm and every speed up
   to 500. It has never been missed in a hoistway on current firmware. This is the
   catastrophic direction and it is the best-evidenced part of the device.
-- **The jog verdict.** 29/29 lifetime. Real departures measure opk ≤ 440 against
+- **The jog verdict.** 29/29 lifetime *(⚠️ off by one — see the 08-11 note §1;
+  and corrected 2026-08-20: real departures reach **562**, one reached 972, and
+  the populations overlap. `falcon_corpus_labelled_2026-08-20.md`)*. Real
+  departures measure opk ≤ 440 against
   jogs ≥ 1366, with a gate at 900 — no overlap on the axis that carries the
   verdict.
 - **The ramp discriminator.** 28+ automatic stops, block means **470–653**,

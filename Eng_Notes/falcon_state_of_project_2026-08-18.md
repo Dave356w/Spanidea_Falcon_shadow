@@ -457,7 +457,7 @@ Values that carry safety consequence, with derivation and evidence status.
 | `ARRIVAL_PEAK_VALUE` | 0.45 | geometric middle of cruise 0.28 / arrival 0.713 | derivation stale; weakest arrival now 0.460 |
 | `ARRIVAL_QUIET_MSS` | 0.15 | stated as above cruise max 0.0875 | conflicts with later cruise of 0.23–0.28 |
 | `ARRIVAL_ARM_SAMPLES` | 5 | 200 ms at 25 Hz | — |
-| `JOG_OPP_RATIO_PCT` | 33 | geometric mean of measured populations | populations now known to overlap |
+| `JOG_OPP_RATIO_PCT` | 33 | geometric mean of measured populations | populations now known to overlap — measured 2026-08-20 at runs 0–58 vs jogs 44–99 |
 | `JOG_OPP_PEAK_MMSS` | 900 | as above | ⚠️ corrected 2026-08-20: real runs observed at 11–972, **2974 is a jog** (08-18 §3.4 jog-clear range). Scored 1 false JOG / 63 labelled runs |
 | `RAMP_FLOOR_MMSS` | 300 | arrival decelerations | rejects slow departures; correct for its own use |
 | `LATCH_FAILSAFE_MS` | 600000 | deliberate, 240 s constraint void | ten-minute false alarms |
@@ -556,7 +556,7 @@ Recorded so they are not re-derived. Detail in
 | Approach | Result |
 |---|---|
 | Retune `ANYMOTION_THRESHOLD` | A hand bump (0.136 m/s²) exceeds a real 18 fpm departure (0.116). No value satisfies both directions. |
-| Replace `opk` with windowed waveform shape | Complete overlap across 177 bursts. A jog's departure is a real departure; only the reversal differs, which `opk` already measures. |
+| Replace `opk` with windowed waveform shape | Complete overlap across 177 bursts. A jog's departure is a real departure; only the reversal differs, which `opk` already measures. **Re-tested 2026-08-20 against labels, not just bursts: 14 of 17 labelled jogs fall inside the labelled run range. Refuted on labels as well as on structure.** |
 | Windowed shape as a knock pre-filter | A confirmed 20 fpm departure scored inside the knock band. Any floor rejecting knocks also rejects it. |
 | Raise `JOG_OPP_PEAK_MMSS` | A real run was silenced at 972 against a 900 gate; real departures throw jolts of arbitrary size. **Quantified 2026-08-20 on labelled data** (`falcon_corpus_labelled_2026-08-20.md` §4.3): a gate of 973 scores strictly better on the corpus as it stands — but the labelled run ceiling moved 440 → 562 → 972 across three additions of data, so fitting the gate to a sample maximum is what the refutation is about. Still refuted. |
 | Fixed polled departure threshold | Mounting-dependent by 2–3x; wrong in every mounting but the one measured. |
@@ -633,7 +633,17 @@ it is a small credit against item 1.
 
 `falcon_srcs/logs/` is gitignored. The distilled event corpus is versioned at
 `falcon_srcs/datasets/` — one file per capture, event lines only, verified to
-reproduce replay results identically to the raw logs. 387 burst records.
+reproduce replay results identically to the raw logs. ⚠️ **The "387 burst
+records" written here is not reproducible.** Measured 2026-08-20 by
+`graph/session_g.py`: **56 captures, 273 departures, 416 BURST lines** — 204
+`k=dep`, 203 `k=arr`, 9 in the pre-`k=` format. Departure bursts replayable by
+`arming_replay.load_bursts` number **204**.
+
+**Labels:** `falcon_srcs/datasets/session_g_labels.csv` — 87 of the 273
+departures labelled `run`/`jog`/`disturbance` with a named per-record basis,
+plus 19 explicit `unknown`. Merge into a worksheet with
+`session_g.py --labels`. Method and limits in
+`falcon_corpus_labelled_2026-08-20.md`.
 
 Session reports: `falcon_departure_detection_2026-08-18.md` (departure
 detection), `falcon_arrival_gate_2026-08-19.md` (arrival gate, contract speed vs inspection).

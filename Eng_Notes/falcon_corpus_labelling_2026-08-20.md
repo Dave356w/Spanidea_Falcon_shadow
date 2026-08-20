@@ -1,5 +1,19 @@
 # Session G — corpus labelling procedure
 
+> **✅ RUN 2026-08-20 — results in `falcon_corpus_labelled_2026-08-20.md`.**
+> Two things in this procedure were wrong and are worth reading before reusing
+> it:
+> - **§4's working order.** It prioritises the three captures holding 62% of
+>   the bursts. Burst count does not predict labellability — the largest of
+>   those three yielded 10 labels and the small 08-11/08-12 logs yielded 90–100%
+>   of theirs. §1 of this note already says why; §4 does not follow it.
+> - **§5's expectation.** It predicts the second branch ("labelling is capped,
+>   collect at the car"). The cap is real, but the set *was* scoreable: 63
+>   labelled runs against 17 labelled jogs, enough to score the shipping gate
+>   against labels that do not come from the gate. Both conclusions hold at
+>   once — §6's collection pivot still stands, because the gentle-jog end of the
+>   population has exactly one member.
+
 **Desk. No hardware, no car, no firmware.** Written 2026-08-20 to be run as
 written. Supersedes the method paragraph in
 `falcon_test_plan_2026-08-18.md` §8; the plan's *why* and *caution* still stand.

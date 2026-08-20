@@ -271,6 +271,12 @@ Limits:
 2. Establish whether the re-arm correction has re-opened the 2026-08-07
    stationary-car alarm. Requires terminal-floor stops with the logger running.
 3. Investigate `ARRIVAL_QUIET_MSS` against measured cruise (4.3).
-4. Label the burst corpus. None of the four candidate rules in §3 could be
-   scored against 177 unlabelled bursts; the six labelled events that exist were
-   produced deliberately, and were what refuted the strongest candidate.
+4. ~~Label the burst corpus.~~ **DONE 2026-08-20 —
+   `falcon_corpus_labelled_2026-08-20.md`.** The six labelled events became 87
+   (66 run / 17 jog / 4 disturbance, named basis per record). §3.2's shape
+   refutation now holds against labels as well as structure, and the shipping
+   gate scores **1 false JOG in 63 labelled runs, 1 miss in 17 labelled jogs** —
+   both errors being events from *this* capture (§3.4's 381 jog, and the 972 run
+   this note's session silenced). ⚠️ **This capture is 30% of the corpus by
+   departures and yielded only 10 labels**, because §2.4 reports its runs as
+   counts rather than as records — see that note's §2.

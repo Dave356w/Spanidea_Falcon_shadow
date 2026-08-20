@@ -31,7 +31,15 @@ peaks 2.575, 2.182, 1.012 — brake-set stops, the case that works).
 | jogs, n=4 (blip to ~1 s, both directions) | **46–95** | **1914–3194** |
 
 **No overlap on either axis.** Ratio gap 2.3× (20 vs 46); opk gap **4.8×**
-(396 vs 1914). And the shortest blip — the direction a miss was expected
+(396 vs 1914).
+
+> ⚠️ **SUPERSEDED 2026-08-20 — the no-overlap finding was true of one evening
+> and does not survive the labelled corpus.** Across 63 labelled real
+> departures and 17 labelled jogs: real **11–562 plus one at 972**, jogs
+> **381–4154**; the populations overlap on **381–972**, and ratio overlaps on
+> **44–58**. Everything below about *mechanism* stands — opk is still the
+> primary axis and the brake-set jolt is still what it measures. What does not
+> stand is the gap. `falcon_corpus_labelled_2026-08-20.md` §4.2. And the shortest blip — the direction a miss was expected
 from — was the *most* jog-like event of the day (ratio 95: near-perfect
 impulse cancellation, because there is no cruise segment to skew it).
 
@@ -109,7 +117,11 @@ spans two boots, split on `Device Booted` before analysing — and
 | 14 | hard-stop run departure, down | 15 | 260 | RUN | ✔ |
 | 15 | 125 fpm departure, down | 1 | 214 | RUN | ✔ |
 
-15/15 lifetime. Two findings of consequence:
+15/15 lifetime. ⚠️ *(Off by one: `260811-152209.log` carries a **fourth**
+`JOGV` line — `pos=11815 neg=0 ratio=0 opk=99`, log line 97 — that this table
+never picked up. An uncounted RUN verdict, so the tally errs harmlessly; every
+lifetime figure downstream of it inherits the same off-by-one. Found
+2026-08-20.)* Two findings of consequence:
 
 - **The 2 s jog closed the boundary question**: 98% cancellation, hardest
   brake shock recorded (±4.2 ringing). The jog band blip→2 s all reads JOG;
@@ -170,7 +182,9 @@ Lifetime: **20/20 verdicts, 5/5 armed releases.** Updated populations
 (jogs n=10, real departures n=9):
 
 - **Jog opk floor moved on the first armed test: 1914 → 1366** (1.52× over
-  the 900 gate). Real ceiling 440 (2.05× under). The gate still splits the
+  the 900 gate). Real ceiling 440 (2.05× under) — ⚠️ **the real ceiling is
+  562 on labelled data, and one run reached 972; see the box in §2.** The gate
+  still splits the
   gap, but the floor drifted on day one — exactly what the passive-session
   recommendation existed to watch for. A jog under 900 fails SAFE (RUN →
   failsafe runoff, the old behaviour), so the cost of drift is a missed

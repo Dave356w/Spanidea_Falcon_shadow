@@ -553,10 +553,13 @@ succeeded. The failures live at inspection speed.
 **Open items:** enables 4; prerequisite for any future discrimination work.
 
 **Why.** Four candidate discrimination rules were tested and none could be
-scored against the 387-record corpus, because nothing in it records whether a
+scored against the corpus, because nothing in it records whether a
 burst was a real run, a jog, or a disturbance. Each rule was assessed against
 the six events an operator happened to label aloud, and the strongest candidate
-survived three of those and was refuted by the fourth.
+survived three of those and was refuted by the fourth. *(The "387-record" figure
+written here is not reproducible; the measured corpus is 273 departures and 204
+replayable departure bursts. The six labelled events grew to 87 on 2026-08-20 —
+see the result block below.)*
 
 Any future rule faces the same problem. Labelling is the highest-value work in
 this plan that needs no elevator and no firmware.
@@ -720,7 +723,7 @@ items 5 and 12 behind session A. Section 3.
 | Not scheduled | Reason |
 |---|---|
 | Retuning `ANYMOTION_THRESHOLD` | Refuted. A hand bump exceeds a real 18 fpm departure; no value satisfies both directions. |
-| Waveform-shape replacement for `opk` | Refuted across 177 bursts. A jog's departure is a real departure. |
+| Waveform-shape replacement for `opk` | Refuted across 177 bursts. A jog's departure is a real departure. **Re-tested 2026-08-20 against 84 labelled records: 14 of 17 labelled jogs sit inside the labelled run range. Refuted on labels too.** |
 | Waveform shape as a knock pre-filter | Refuted. A confirmed 20 fpm departure scored inside the knock band. |
 | Raising `JOG_OPP_PEAK_MMSS` | Refuted. A real run was silenced at 972 against a 900 gate. |
 | Further 150 fpm runs **for departure characterisation** | Confirms nothing. All transients are far above threshold at that speed. ⚠️ Narrowed 2026-08-19: this holds for DEPARTURES only. It was being applied as a blanket rule and was keeping the project out of the only regime where the arrival gate's weak tail exists — soft stops need automatic operation at contract speed. State doc §2.5a. |
@@ -738,5 +741,8 @@ If only one bench session and one car session are available:
   have introduced, it needs no instrumentation, and ten terminal stops is under
   an hour.
 
-If only a desk hour is available, **session G** needs no hardware and unblocks
-the largest body of stalled analysis.
+~~If only a desk hour is available, **session G** needs no hardware and unblocks
+the largest body of stalled analysis.~~ **Session G was run 2026-08-20 — §8.**
+The desk work it unblocked is done; what remains needing no elevator is nothing
+in this plan. **The next desk hour is better spent on session A** (flash
+headroom), which every other firmware change is behind.

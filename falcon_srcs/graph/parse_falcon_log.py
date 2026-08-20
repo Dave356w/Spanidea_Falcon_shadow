@@ -850,6 +850,13 @@ def plot(cap):
 
 
 def main():
+    # Non-ASCII in the report aborts on a cp1252 Windows console. Force UTF-8.
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding='utf-8')
+        except (AttributeError, ValueError):
+            pass
+
     args = [a for a in sys.argv[1:] if a != "--plot"]
     want_plot = "--plot" in sys.argv
     if not args:

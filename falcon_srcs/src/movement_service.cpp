@@ -53,7 +53,9 @@
  *
  * 🔴 FAILURE DIRECTION IF THIS IS WRONG: too low means a FALSE departure --
  * beacon on a stationary car, which at LATCH_FAILSAFE_MS 600 s is a ten-minute
- * alarm (see falcon_jog_ringing_2026-08-18.md §0.0d). Watch for a latch with no
+ * alarm (see falcon_state_of_project_2026-08-18.md §4.2, LATCH_FAILSAFE_MS --
+ * the note this line used to cite as falcon_jog_ringing_2026-08-18.md does not
+ * exist under that name). Watch for a latch with no
  * car movement; revert to 0.40 if it appears.
  */
 #define DEFAULT_THRESHOLD_VALUE 0.10
@@ -787,6 +789,13 @@ void MovementService::fsm_run()
          * (jog), falcon_jog_verdict_2026-08-11.md. Armed on Dave's decision
          * 2026-08-11 with n=4 jogs from one car and one day -- if a false
          * JOG ever silences a moving car, disarm first, diagnose second.
+         *
+         * SUPERSEDED 2026-08-20 (falcon_corpus_labelled_2026-08-20.md): on
+         * 63 labelled real departures and 17 labelled jogs the populations
+         * OVERLAP -- real 11-562 plus one at 972, jogs 381-4154 -- and the
+         * measured rate is 1 false JOG in 63 runs, 1 miss in 17 jogs. The
+         * false JOG the comment above hopes never happens is on file, at
+         * opk 972 (260818-105317.log r44). See main.cpp at the gate.
          */
         if (jog_release_pending) {
             jog_release_pending = false;

@@ -481,7 +481,9 @@ static_assert(XY_CALIB_MIN_BUCKETS <= XY_CALIB_BUCKETS,
  * Measured on the cartop 2026-08-18 (inverted mount, slow up runs from the
  * lower landing): 6 of 12 runs missed, and 4 of those 6 carry explicit
  * "any-motion ignored, re-arm blanking" lines for the departure edge. 32 such
- * discards across the session. See falcon_jog_ringing_2026-08-18.md §0.0c.
+ * discards across the session. See falcon_departure_detection_2026-08-18.md
+ * §2.2 and §2.4 (this line used to cite falcon_jog_ringing_2026-08-18.md,
+ * which does not exist under that name).
  *
  * THE FIX. End the blank as soon as the mechanical disturbance from the
  * previous stop has actually subsided, instead of after a fixed 6 s.

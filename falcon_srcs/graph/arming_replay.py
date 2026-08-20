@@ -260,6 +260,13 @@ def pair_dep_signs(bursts):
 
 
 def main():
+    # Non-ASCII in the report aborts on a cp1252 Windows console. Force UTF-8.
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding='utf-8')
+        except (AttributeError, ValueError):
+            pass
+
     ap = argparse.ArgumentParser()
     ap.add_argument('--logs', default=os.path.join(
         os.path.dirname(os.path.abspath(__file__)), '..', 'logs'))

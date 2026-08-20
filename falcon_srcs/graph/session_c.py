@@ -80,6 +80,13 @@ def parse(path):
 
 
 def main():
+    # Non-ASCII in the report aborts on a cp1252 Windows console. Force UTF-8.
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding='utf-8')
+        except (AttributeError, ValueError):
+            pass
+
     path = sys.argv[1]
     samples, events = parse(path)
     if not samples:

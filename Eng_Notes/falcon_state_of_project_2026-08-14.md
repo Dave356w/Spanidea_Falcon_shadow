@@ -117,7 +117,11 @@ MCP3208 while the real path used the internal ADC.
 - **Departure detection.** Caught at 17, 18, 20, 25, 27 fpm and every speed to
   500. Never missed in a hoistway on current firmware. This is the catastrophic
   direction and it remains the best-evidenced part of the device.
-- **The jog verdict.** **30/30 lifetime**, opk ≤ 440 for real departures against
+- **The jog verdict.** **30/30 lifetime** *(⚠️ off by one — see the 08-11 note
+  §1; and corrected 2026-08-20: the real-departure ceiling is **562** with one
+  at 972, the populations overlap, and the measured error rate is 1 false JOG
+  in 63 labelled runs. `falcon_corpus_labelled_2026-08-20.md`)*, opk ≤ 440 for
+  real departures against
   jogs ≥ 1366, gate at 900 — no overlap.
 - **The ramp discriminator.** 28+ automatic stops, block means 470–653,
   directionality 100% on every one, zero false latches across 89 replayed
