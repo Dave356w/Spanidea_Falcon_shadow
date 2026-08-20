@@ -52,8 +52,9 @@ signature read; the programmer re-enumerates constantly.
   Two bench taps produced nine alarm cycles in 90 s; fixed and verified.
 - **Session C's table** — 11 automatic stops; the rest gate is **not** inert, it
   was inert only on the inspection population it had been measured against.
-- **First automatic operation at contract speed** — 11 runs
-  (`falcon_automatic_2026-08-20.md`).
+- **First automatic operation at contract speed** — **33 runs**
+  (`falcon_automatic_2026-08-20.md`). The first 11 were analysed live; the
+  remaining 18 arrived when the background capture completed, §4a.
 
 ## 3. ⚠️ Things I got WRONG today and retracted — do not re-derive the wrong version
 
@@ -94,7 +95,7 @@ Safe and useless: it misses more than half of all arrivals.
 
 **⭐ The candidate worth building next: RELEASE PRIORITY, not a threshold.**
 
-The ramp detector fired **11/11 at contract speed** today, `dir=100` every time,
+The ramp detector fired on every contract-speed stop analysed, `dir=100` every time,
 means 471–511 — and was **never once the releasing path**, because the polled
 peak always wins the race. Its discriminator is sustained one-signed
 deceleration, which a cruise transient cannot fake. It correctly declines
@@ -127,8 +128,10 @@ The background capture ran on after the write-up and holds **33 departures, not
 
 1. **`ARRIVAL_QUIET_MSS` 0.15 vs measured cruise 0.27–0.29** — the arming gate
    is starved on its own channel.
-2. **The peak collector armed at exactly its minimum (`q=5`) on 3 of 11**
-   contract-speed runs.
+2. **The peak collector armed at exactly its minimum (`q=5`) on 8 of 32**
+   contract-speed runs, and **8 of 32 arrivals land within 5% of the gate**
+   (one exactly on it). Partly mitigated: when quiet fails outright the
+   reversal path arms instead — §4a.
 3. **Session C proper** — no re-latch in 11 stops is a null result, not a clean
    bill. Item 9 open.
 4. **B3** — burst on the polled departure path. Needs room; 80 bytes free, so it
@@ -142,8 +145,9 @@ The background capture ran on after the write-up and holds **33 departures, not
 ## 6. Data
 
 `datasets/260820-*.log` — six captures from today: bench cascade, cartop
-inspection (5 runs + 5 jogs), the long 18 fpm run, contract-speed automatic
-(11 runs), and **`260820-150000.log`, which contains the false release**.
+inspection (5 runs + 5 jogs), the long 18 fpm run, contract-speed automatic,
+and **`260820-150000.log` — 33 departures, containing both the false release
+and all three `v=2` arms**.
 
 ⚠️ **`falcon_srcs/logs/` is gitignored** — the raw captures exist only on the
 bench machine. The distilled event corpus in `datasets/` is what is versioned.
