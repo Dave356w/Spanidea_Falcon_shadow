@@ -162,6 +162,41 @@ sessions) and a production variant (logging off) from the same source.
 plus session B's instrumentation — or a recorded decision to defer, naming what
 is being given up.
 
+**✅ RUN 2026-08-20, bench, device on COM5/COM7 —
+`Eng_Notes/falcon_session_a_2026-08-20.md`.** Two of the four options taken, in
+the order this section recommends. Flash free went **62 → 706** on the test
+build, with a production build at **1134** and a silent one at **6902**:
+
+| build | flash | free | RAM | env |
+|---|---|---|---|---|
+| test (`FALCON_LOG` 2) | 31550 | 706 | 1492 | `ATmega328PB` |
+| production (events + `HEALTH`) | 31122 | 1134 | 1497 | `production` |
+| silent | 25354 | 6902 | 1149 | `production_silent` |
+
+- **`RollingAvg` to a fixed member array: 644 bytes**, and `malloc`/`free`/
+  `realloc` are gone from the image. Also `rd=` 11464 → 10362 µs, because
+  `calc_avg()` sums 32 floats per sample and a fixed global is addressed
+  directly. Costed at 586 bytes here; the measured figure is higher.
+- **Logging behind `FALCON_LOG`: a further 428 bytes at level 1, 6196 at
+  level 0.**
+
+⚠️ **The 1.5 KB target is partly obsolete as written.** It is justified above as
+"`-DWIRE_TIMEOUT` (1198 bytes) plus session B's instrumentation", but
+`-DWIRE_TIMEOUT` was **superseded on 2026-08-12** by the vendored `lib/Wire1`
+spin guard, which bounds all seven TWI wait sites for **124 bytes** — see
+`falcon_ramp_armed_2026-08-12.md` §8. Half the requirement no longer exists.
+What remains is session B's instrumentation, and B2/B4 already fit inside the
+old 68 bytes. **Session B is unblocked on the test build at 706 bytes free**,
+and the bma4 driver swap is not needed for headroom.
+
+**Verification clause: answered, in the negative.** The concern was that
+removing the blocking print lets the detectors see more samples than the
+population every threshold was measured on. Measured on one rig, one mounting:
+**25.00 Hz (level 2), 25.00 Hz (reference), 25.01 Hz (level 1)**, `ov` flat in
+all three. At `LOG_DECIMATE_N` 8 the logging build is not throttling the
+consumer measurably. ⚠️ This is not a licence to lower `LOG_DECIMATE_N`, which
+was refuted separately on 2026-08-19 (§1.2).
+
 **Verification.** The logging-off variant is not a print-only change. Removing
 the prints removes the blocking `Serial.print` that is the sole cause of ring
 overrun, so the production build's detectors see a sample population that no
@@ -697,13 +732,13 @@ population.
 
 | Open item | Session | Blocked by |
 |---|---|---|
-| 1 flash headroom | A | — |
+| 1 flash headroom | A | ✅ A run 2026-08-20; 62 → 706 free, §2 |
 | 2 arrival gate margin | D | — (was A, B; cleared by B4) |
 | 3 knock/departure separability | I | — |
 | 4 jog verdict | J | ✅ G run 2026-08-20; scored, not retuned — see §8 |
 | 5 velocity path disabled | H | B1/B3, and so A |
 | 6 ramp detector unevidenced | E | — |
-| 7 logging in shipping build | A | — |
+| 7 logging in shipping build | A | ✅ A run 2026-08-20; `FALCON_LOG` + two production envs, §2 |
 | 8 quiet gate vs cruise | D | — (was A, B; cleared by B4) |
 | 9 re-arm regression | C | — |
 | 10 z threshold unproven | F | — |
