@@ -216,6 +216,57 @@ contain.
 deceleration rather than 44. A very short deceleration could fall inside it.
 Revert is this constant alone.
 
+## 5b. 🟢 `v=2` FIRED — the reversal arming path has live evidence, and had since 08-13
+
+The capture kept running after the session was written up. **It holds 33
+departures, not 11** — Dave continued driving and the last 18 runs were only
+distilled when the background capture completed.
+
+**`arm_via = 2` appears three times in the whole corpus, and all three are clean
+releases:**
+
+| capture | ARM line | released on | outcome |
+|---|---|---|---|
+| `260813-110300.log` | `q=2 a=1 v=2 g=1 ro=11` | `Arrival (polled), peak 0.511` | DECELERATING → STOPPED |
+| `260820-150000.log` | `q=4 a=1 v=2 g=1 ro=15` | `Arrival (polled), peak 0.787` | DECELERATING → STOPPED |
+| `260820-150000.log` | `q=4 a=1 v=2 g=1 ro=17` | `Arrival (any-motion), edges 2 peak 0.512` | DECELERATING → STOPPED |
+
+The 2026-08-12 note left a standing instruction: *"`v=2` on a short run with a
+clean release is the path working. `v=2` during a departure is the failure the
+replay says cannot happen — disarm on sight."* **All three are the path
+working.** Nothing to disarm.
+
+☠️ **"`v=2` has never fired in ~32 runs" was already stale when it was written.**
+It fired on **2026-08-13** and the evidence has been sitting in the committed
+corpus ever since. Readiness item 4 — "three release paths armed, two with ZERO
+live evidence" — is half wrong: the reversal arming path has live evidence, and
+has had for a week. Nobody grepped for it.
+
+⭐ **And it fires in exactly the condition this session identified as the
+problem.** All three have `q` of 2 or 4 — *below* `ARRIVAL_ARM_SAMPLES` 5, so
+quiet had not armed and could not have. **When the starved quiet counter fails
+outright, reversal picks it up.** That is a real mitigation of §2's concern,
+observed rather than argued.
+
+## 5c. The full 33-run picture
+
+| | |
+|---|---|
+| arrivals | n=32, **0.450 – 0.787**, worst margin **1.000×** |
+| within 1.05× of the gate | **8 of 32** — 0.450 0.455 0.455 0.458 0.459 0.468 0.471 0.472 |
+| arm_via | quiet 30, **reversal 2** |
+| `q` at the floor (=5) | **8 of 32** |
+| `ro` | 4 – 17 |
+| re-arm discards on real runs | `dq` > 0 on **3 of 33** — values 3, 2, 4 |
+
+**A quarter of all arrivals land within 5% of the gate**, and one is exactly on
+it. That is the distribution the false release came out of.
+
+**`dq` > 0 on three real runs** is the first time the re-arm gate has been seen
+discarding motion evidence in service. Each of those departures latched *later*
+than the discarded edge — the B1 signature doing its job, and worth checking
+against the beacon start time on the next slow-run session.
+
 ## 6. What this session did not settle
 
 - **No re-latch, no missed departure, no suppression.** `dq=0` on all eleven.

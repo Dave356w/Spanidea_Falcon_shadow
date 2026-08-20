@@ -107,6 +107,22 @@ the other.
 ⬜ **Next step is desk work, not a car:** extend `arming_replay.py` to ask what
 each arrival would have done under ramp-priority. All the data is committed.
 
+## 4a. 🟢 One piece of good news, found after the session was written up
+
+**`arm_via = 2` has fired — the reversal arming path works.** Three times in the
+corpus, all clean releases at a real arrival: once on **2026-08-13** (which
+means "`v=2` has never fired in ~32 runs" was already stale when written, and
+the evidence was sitting in the committed corpus) and twice on 08-20.
+
+All three armed with `q` of 2 or 4 — **below** `ARRIVAL_ARM_SAMPLES` 5, so quiet
+had not armed and could not have. **The insurance path fires in exactly the
+condition §0 identifies as the problem.** Readiness item 4 ("two release paths
+with ZERO live evidence") is half wrong.
+
+The background capture ran on after the write-up and holds **33 departures, not
+11**. Full stats in `falcon_automatic_2026-08-20.md` §5b–5c. The headline:
+**8 of 32 arrivals land within 5% of the gate, one exactly on it.**
+
 ## 5. Other open items in priority order
 
 1. **`ARRIVAL_QUIET_MSS` 0.15 vs measured cruise 0.27–0.29** — the arming gate
