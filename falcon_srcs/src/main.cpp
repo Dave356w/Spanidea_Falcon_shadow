@@ -6,6 +6,7 @@
  */
 
 #include "main.h"
+#include "falcon_log.h"
 #include "arduino_bma456.h"
 #include "common.h"
 #include "velocity.h"
@@ -84,6 +85,10 @@ static boolean in_isr = false;
  * arrival measured 0.058 against a parked noise floor of 0.103, and a 2.8x
  * quieter floor is what would make it visible.
  */
+#if FALCON_LOG == 0
+FalconNullLog falcon_null_log;
+#endif
+
 RollingAvg<float, 32> acceleration_avg_g;
 RollingAvg<uint16_t, 8> battery_avg;
 float x = 0, y = 0, z = 0;
@@ -97,7 +102,7 @@ MovementService ms(&acceleration_avg_g);
 /*
  * Sample telemetry.
  *
- * Serial.print() must never be called from inside the timer ISR. HardwareSerial
+ * FLOG.print() must never be called from inside the timer ISR. HardwareSerial
  * drains its TX ring buffer from the UART interrupt, so printing from another
  * ISR (which re-enables interrupts) races the drain and drops characters. The
  * 2026-07-15 EFT captures show 14 corrupted lines across 8 runs, every one of
@@ -142,7 +147,7 @@ typedef struct {
  *
  * The single slot lost ~20% of samples at 25 Hz, and every threshold measured
  * on 2026-08-10/11 therefore rests on 80% of the data. The cause is not the
- * ISR: Serial.print() BLOCKS once the 64-byte TX buffer fills, for roughly
+ * ISR: FLOG.print() BLOCKS once the 64-byte TX buffer fills, for roughly
  * 85 ms of a 145-character line, and the ISR keeps publishing into the one
  * slot throughout. At 3.13 Hz a 151 ms line fitted inside a 320 ms period; at
  * 25 Hz it spans two periods and the loser is always the sample.
@@ -1210,7 +1215,7 @@ extern bool get_buzzer_status();
 /*
  * ─── SERIAL BAUD: 9600 -> 62500, 2026-08-13 ──────────────────────────────────
  *
- * THIS IS A DETECTION FIX, NOT A CONVENIENCE. Serial.print blocks loop() once
+ * THIS IS A DETECTION FIX, NOT A CONVENIENCE. FLOG.print blocks loop() once
  * the 64-byte TX buffer fills, and loop() is what drains the sample ring and
  * steps the alarm. At alert onset the firmware emits 732 characters -- four FSM
  * transition lines, a 347-character departure burst dump, and the jog verdict.
@@ -1247,24 +1252,24 @@ void setup() {
     /*
      * Configure the debug serial port here
     */
-    Serial.begin(SERIAL_BAUD_RATE);
+    FLOG_BEGIN(SERIAL_BAUD_RATE);
 
-    Serial.print(F("\r\n\nDevice Booted \r\n"));
+    FLOG.print(F("\r\n\nDevice Booted \r\n"));
 
     /*
      * Reset cause, captured by the .init3 hook. 0x8 (WDRF) = the watchdog
      * caught a lockup last boot; 0x1 PORF, 0x2 EXTRF, 0x4 BORF.
      */
-    Serial.print(F("Reset cause: 0x"));
-    Serial.print(boot_mcusr, HEX);
-    Serial.print(F("\r\n"));
+    FLOG.print(F("Reset cause: 0x"));
+    FLOG.print(boot_mcusr, HEX);
+    FLOG.print(F("\r\n"));
     /*
      * Configure the ADC chip here for SPI protocol.
     */
     SPISettings settings(ADC_CLK, MSBFIRST, SPI_MODE0);
     SPI.begin();
     SPI.beginTransaction(settings);
-    Serial.print(F("Configured SPI interface \r\n"));
+    FLOG.print(F("Configured SPI interface \r\n"));
 
     /*
      * Configure all Alarm Ports here
@@ -1272,13 +1277,13 @@ void setup() {
     setup_alarm();
     disable_alarm();
 
-    Serial.print(F("Configured Alarms \r\n"));
+    FLOG.print(F("Configured Alarms \r\n"));
 
     digitalWrite(PIN_GREEN_LED, HIGH);
     init_time_g = millis();
 
     bma456.initialize(RANGE_2G, ODR_100_HZ, NORMAL_AVG4, CONTINUOUS);
-    Serial.print(F("Configured BMA456 \r\n"));
+    FLOG.print(F("Configured BMA456 \r\n"));
 
     /* (TWI timeout call goes here when WIRE_TIMEOUT fits -- see above.) */
 
@@ -1292,15 +1297,15 @@ void setup() {
                                                   BMA4_DISABLE,
                                                   ANYMOTION_INT_LINE);
         if (rslt != BMA4_OK) {
-            Serial.print(F("AnyMotion config FAILED : "));
-            Serial.print(rslt);
-            Serial.print(F("\r\n"));
+            FLOG.print(F("AnyMotion config FAILED : "));
+            FLOG.print(rslt);
+            FLOG.print(F("\r\n"));
         } else {
-            Serial.print(F("AnyMotion armed thr="));
-            Serial.print(ANYMOTION_THRESHOLD);
-            Serial.print(F(" dur="));
-            Serial.print(ANYMOTION_DURATION);
-            Serial.print(F("\r\n"));
+            FLOG.print(F("AnyMotion armed thr="));
+            FLOG.print(ANYMOTION_THRESHOLD);
+            FLOG.print(F(" dur="));
+            FLOG.print(ANYMOTION_DURATION);
+            FLOG.print(F("\r\n"));
         }
     }
 
@@ -1355,7 +1360,7 @@ void initialization()
             delay(100);   
         }
 
-        Serial.print(F("Device initialized completely \r\n"));
+        FLOG.print(F("Device initialized completely \r\n"));
         digitalWrite(PIN_PIEZO, LOW);
         digitalWrite(PIN_GREEN_LED, LOW);
         digitalWrite(PIN_CHASE_LED, HIGH);
@@ -1465,7 +1470,7 @@ void loop()
                     brn_start = millis();
                     enable_alarm();
                     enable_chase_leds();
-                    Serial.print(F("BRN: continuous alarm armed, FSM bypassed\r\n"));
+                    FLOG.print(F("BRN: continuous alarm armed, FSM bypassed\r\n"));
                 }
             } else if ((millis() - brn_last) >= 1000UL) {
                 brn_last = millis();
@@ -1493,19 +1498,19 @@ void loop()
                     wdt_reset();
                 }
 
-                Serial.print(F("BRN t="));
-                Serial.print((millis() - brn_start) / 1000UL);
-                Serial.print(F("s vcc_blast="));
-                Serial.print(v_blast);
-                Serial.print(F(" vcc_quiet="));
-                Serial.print(v_quiet);
-                Serial.print(F(" bat="));
-                Serial.print(read_adc_pc2());
-                Serial.print(F(" tw="));
-                Serial.print(twi1_guard_trips1());
-                Serial.print(F(" ov="));
-                Serial.print(sample_overrun);
-                Serial.print(F("\r\n"));
+                FLOG.print(F("BRN t="));
+                FLOG.print((millis() - brn_start) / 1000UL);
+                FLOG.print(F("s vcc_blast="));
+                FLOG.print(v_blast);
+                FLOG.print(F(" vcc_quiet="));
+                FLOG.print(v_quiet);
+                FLOG.print(F(" bat="));
+                FLOG.print(read_adc_pc2());
+                FLOG.print(F(" tw="));
+                FLOG.print(twi1_guard_trips1());
+                FLOG.print(F(" ov="));
+                FLOG.print(sample_overrun);
+                FLOG.print(F("\r\n"));
             }
 
             /* FSM deliberately not run. */
@@ -1518,7 +1523,7 @@ void loop()
         /*
          * Phase 4 of the idle-current test compiles nothing out -- it gates the
          * emitters at runtime, so the ONLY difference from phase 1 is whether
-         * Serial.print runs. That is what makes the difference between the two
+         * FLOG.print runs. That is what makes the difference between the two
          * readings attributable to logging rather than to a different build.
          *
          * poll_acc_int_status() is deliberately NOT gated: it is an I2C
@@ -1873,20 +1878,20 @@ void emit_burst_log()
     head = burst_head;
     interrupts();
 
-    Serial.print(F("BURST k="));
-    Serial.print(burst_kind ? F("arr") : F("dep"));
-    Serial.print(F(" pre="));
-    Serial.print(burst_kind ? (BURST_N - BURST_POST_ARR) : (BURST_N - BURST_POST_DEP));
-    Serial.print(F(" n="));
-    Serial.print(BURST_N);
-    Serial.print(F(" signed_mmss="));
+    FLOG.print(F("BURST k="));
+    FLOG.print(burst_kind ? F("arr") : F("dep"));
+    FLOG.print(F(" pre="));
+    FLOG.print(burst_kind ? (BURST_N - BURST_POST_ARR) : (BURST_N - BURST_POST_DEP));
+    FLOG.print(F(" n="));
+    FLOG.print(BURST_N);
+    FLOG.print(F(" signed_mmss="));
 
     /* Oldest first: the ring is full, so the oldest entry is at head. */
     for (i = 0; i < BURST_N; i++) {
-        Serial.print(burst[(uint8_t)((head + i) % BURST_N)]);
-        Serial.print(' ');
+        FLOG.print(burst[(uint8_t)((head + i) % BURST_N)]);
+        FLOG.print(' ');
     }
-    Serial.print(F("\r\n"));
+    FLOG.print(F("\r\n"));
 
     /*
      * Jog verdict, departure bursts only -- see the block above JOG_VERDICT_ARMED.
@@ -1916,23 +1921,23 @@ void emit_burst_log()
 
         ratio_pct = (pri > 0) ? (uint8_t)((opp * 100) / pri) : 0;
 
-        Serial.print(F("JOGV pos="));  Serial.print(pos);
-        Serial.print(F(" neg="));      Serial.print(neg);
-        Serial.print(F(" ratio="));    Serial.print(ratio_pct);
-        Serial.print(F(" opk="));      Serial.print(sv);
-        Serial.print(F(" verdict="));
+        FLOG.print(F("JOGV pos="));  FLOG.print(pos);
+        FLOG.print(F(" neg="));      FLOG.print(neg);
+        FLOG.print(F(" ratio="));    FLOG.print(ratio_pct);
+        FLOG.print(F(" opk="));      FLOG.print(sv);
+        FLOG.print(F(" verdict="));
         if (ratio_pct >= JOG_OPP_RATIO_PCT && sv >= JOG_OPP_PEAK_MMSS) {
-            Serial.print(F("JOG"));
+            FLOG.print(F("JOG"));
 #if JOG_VERDICT_ARMED
             ms.jog_release();
 #endif
         } else {
-            Serial.print(F("RUN"));
+            FLOG.print(F("RUN"));
         }
 #if JOG_VERDICT_ARMED
-        Serial.print(F(" (armed)\r\n"));
+        FLOG.print(F(" (armed)\r\n"));
 #else
-        Serial.print(F(" (unarmed)\r\n"));
+        FLOG.print(F(" (unarmed)\r\n"));
 #endif
     }
 
@@ -1968,11 +1973,11 @@ void emit_ramp_log()
     bool now = ramp_hit();
 
     if (now && !last) {
-        Serial.print(F("RAMP latched mean="));
-        Serial.print(ramp_mean_get());
-        Serial.print(F(" dir="));
-        Serial.print(ramp_dir_get());
-        Serial.print(F("\r\n"));
+        FLOG.print(F("RAMP latched mean="));
+        FLOG.print(ramp_mean_get());
+        FLOG.print(F(" dir="));
+        FLOG.print(ramp_dir_get());
+        FLOG.print(F("\r\n"));
     }
     last = now;
 }
@@ -2018,17 +2023,17 @@ void emit_arm_log()
          * margin against ARM_REV_SAMPLES: ro=8 opened on the last possible
          * sample, ro=24 had 3x headroom. g=0 with ro=7 is a near miss.
          */
-        Serial.print(F("ARM q="));
-        Serial.print(hi);
-        Serial.print(F(" a="));
-        Serial.print(armed ? 1 : 0);
-        Serial.print(F(" v="));
-        Serial.print(arm_via);
-        Serial.print(F(" g="));
-        Serial.print(rgate ? 1 : 0);
-        Serial.print(F(" ro="));
-        Serial.print(ropp);
-        Serial.print(F("\r\n"));
+        FLOG.print(F("ARM q="));
+        FLOG.print(hi);
+        FLOG.print(F(" a="));
+        FLOG.print(armed ? 1 : 0);
+        FLOG.print(F(" v="));
+        FLOG.print(arm_via);
+        FLOG.print(F(" g="));
+        FLOG.print(rgate ? 1 : 0);
+        FLOG.print(F(" ro="));
+        FLOG.print(ropp);
+        FLOG.print(F("\r\n"));
     }
     last_state = st;
 }
@@ -2092,13 +2097,66 @@ void emit_sample_log()
         lat_monitor.add(s.ax / 1000.0f, s.ay / 1000.0f, s.t_ms);
     }
 
+    /*
+     * Health line -- the production build's only window on itself.
+     *
+     * At FALCON_LOG 1 the per-sample line is gone, so ov= and the sample rate
+     * go with it. Those two numbers are exactly what session A's verification
+     * clause has to compare between a logging build and a shipping one: the
+     * blocking print is the sole cause of ring overrun, so a quieter build
+     * feeds its detectors MORE samples than the population every threshold on
+     * file was measured on. n= is that measurement, in samples actually
+     * published over the interval.
+     *
+     * One line per HEALTH_PERIOD_MS. Cheap enough to leave on in service and
+     * far too sparse to throttle the consumer the way the per-sample line does.
+     */
+#if FALCON_LOG == 1
+    {
+        static uint32_t health_last_ms = 0;
+        static uint16_t health_n       = 0;
+
+        health_n++;
+        if ((uint32_t)(s.t_ms - health_last_ms) >= HEALTH_PERIOD_MS) {
+            uint8_t tw = twi1_guard_trips1();
+            FLOG.print(F("HEALTH t="));
+            FLOG.print(s.t_ms);
+            FLOG.print(F(" n="));
+            FLOG.print(health_n);
+            FLOG.print(F(" ov="));
+            FLOG.print(overrun);
+            FLOG.print(F(" er="));
+            FLOG.print(err_total);
+            FLOG.print(F(" st="));
+            FLOG.print(s.fsm_state);
+            if (tw) {
+                FLOG.print(F(" tw="));
+                FLOG.print(tw);
+            }
+            FLOG.print(F("\r\n"));
+            health_last_ms = s.t_ms;
+            health_n       = 0;
+        }
+    }
+#endif
+
+
+    /*
+     * The periodic sample line: 99% of the log by bytes, and a BLOCKING print
+     * in the same loop() pass that drains one sample from the ring. Compiled
+     * out below FALCON_LOG 2 -- see falcon_log.h for why that is not a
+     * print-only change. Everything above this point is detector input
+     * (vel_window, lat_monitor) and is never compiled out.
+     */
+#if FALCON_LOG >= 2
+
     if (++decimate < LOG_DECIMATE_N) {
         return;
     }
     decimate = 0;
 
-    Serial.print(F("t="));
-    Serial.print(s.t_ms);
+    FLOG.print(F("t="));
+    FLOG.print(s.t_ms);
 
     if (s.err_run) {
         /*
@@ -2106,23 +2164,23 @@ void emit_sample_log()
          * value, so a dead sensor is visible in the log instead of looking
          * like a stationary car.
          */
-        Serial.print(F(" a=ERR er="));
-        Serial.print(s.err_run);
+        FLOG.print(F(" a=ERR er="));
+        FLOG.print(s.err_run);
     } else {
-        Serial.print(F(" a="));
-        Serial.print(s.accel / 1000.0f, 3);
-        Serial.print(F(" avg="));
-        Serial.print(s.avg / 1000.0f, 3);
+        FLOG.print(F(" a="));
+        FLOG.print(s.accel / 1000.0f, 3);
+        FLOG.print(F(" avg="));
+        FLOG.print(s.avg / 1000.0f, 3);
     }
 
-    Serial.print(F(" st="));
-    Serial.print(s.fsm_state);
-    Serial.print(F(" rd="));
-    Serial.print(s.read_us);
-    Serial.print(F(" ov="));
-    Serial.print(overrun);
-    Serial.print(F(" im="));
-    Serial.print(acc_int_count);
+    FLOG.print(F(" st="));
+    FLOG.print(s.fsm_state);
+    FLOG.print(F(" rd="));
+    FLOG.print(s.read_us);
+    FLOG.print(F(" ov="));
+    FLOG.print(overrun);
+    FLOG.print(F(" im="));
+    FLOG.print(acc_int_count);
 
     /*
      * Velocity window: signed integral and how much of it was actually
@@ -2131,10 +2189,10 @@ void emit_sample_log()
      * one thing a capture must not hide. Costs ~14 characters a line, about
      * 5% more of the 9600 baud budget.
      */
-    Serial.print(F(" w="));
-    Serial.print(vel_window.w(), 3);
-    Serial.print(F(" cv="));
-    Serial.print(vel_window.coverage_ms());
+    FLOG.print(F(" w="));
+    FLOG.print(vel_window.w(), 3);
+    FLOG.print(F(" cv="));
+    FLOG.print(vel_window.coverage_ms());
 
     /*
      * Lateral axes. Exploration only -- nothing reads these yet. The question
@@ -2142,10 +2200,10 @@ void emit_sample_log()
      * parked one, which would give a cruise-confirm and 3 s false-alarm veto
      * that z physically cannot (see the sample_log_t comment).
      */
-    Serial.print(F(" x="));
-    Serial.print(s.ax / 1000.0f, 3);
-    Serial.print(F(" y="));
-    Serial.print(s.ay / 1000.0f, 3);
+    FLOG.print(F(" x="));
+    FLOG.print(s.ax / 1000.0f, 3);
+    FLOG.print(F(" y="));
+    FLOG.print(s.ay / 1000.0f, 3);
 
     /*
      * The lateral metric the release path actually decides on, and the quiet
@@ -2156,10 +2214,10 @@ void emit_sample_log()
      * fact -- and, during the buzzer bench test, what shows whether the
      * metric ever gets under the threshold at all.
      */
-    Serial.print(F(" m="));
-    Serial.print(lat_monitor.m(), 3);
-    Serial.print(F(" q="));
-    Serial.print(lat_monitor.quiet_run());
+    FLOG.print(F(" m="));
+    FLOG.print(lat_monitor.m(), 3);
+    FLOG.print(F(" q="));
+    FLOG.print(lat_monitor.quiet_run());
 
     /*
      * Raw arrival peak. The log is decimated, so this is the ONLY way the
@@ -2167,8 +2225,8 @@ void emit_sample_log()
      * carrying the brake bounce is very unlikely to be one of the printed
      * ones.
      */
-    Serial.print(F(" pk="));
-    Serial.print(arrival_peak_get(), 2);
+    FLOG.print(F(" pk="));
+    FLOG.print(arrival_peak_get(), 2);
 
     /*
      * B2 -- beacon state on the PERIODIC line, not only on ACC-INT lines.
@@ -2179,8 +2237,8 @@ void emit_sample_log()
      * edge-triggered and absent for exactly the runs where the question
      * matters.
      */
-    Serial.print(F(" bz="));
-    Serial.print(get_buzzer_status() ? 1 : 0);
+    FLOG.print(F(" bz="));
+    FLOG.print(get_buzzer_status() ? 1 : 0);
 
     /*
      * B4 -- the RETIRED arrival bucket, printed separately from pk=.
@@ -2199,15 +2257,15 @@ void emit_sample_log()
      * No new state -- the buckets already exist for the arrival gate. This is
      * printing, not machinery.
      */
-    Serial.print(F(" cp="));
+    FLOG.print(F(" cp="));
     noInterrupts();
     float cp_r = arr_peak_prev;
     interrupts();
-    Serial.print(cp_r, 2);
+    FLOG.print(cp_r, 2);
 
     if (err_total) {
-        Serial.print(F(" et="));
-        Serial.print(err_total);
+        FLOG.print(F(" et="));
+        FLOG.print(err_total);
     }
 
     /*
@@ -2223,11 +2281,13 @@ void emit_sample_log()
      */
     uint8_t tw = twi1_guard_trips1();
     if (tw) {
-        Serial.print(F(" tw="));
-        Serial.print(tw);
+        FLOG.print(F(" tw="));
+        FLOG.print(tw);
     }
 
-    Serial.print(F("\r\n"));
+    FLOG.print(F("\r\n"));
+#endif  /* FALCON_LOG >= 2 */
+
 }
 
 void enable_timer()
@@ -2409,17 +2469,17 @@ void emit_acc_int_log()
      */
     ms.notify_any_motion(when);
 
-    Serial.print(F("ACC-INT n="));
-    Serial.print(count);
-    Serial.print(F(" t="));
-    Serial.print(when);
-    Serial.print(F(" st="));
-    Serial.print(ms.get_state());
-    Serial.print(F(" bz="));
-    Serial.print(get_buzzer_status() ? 1 : 0);
-    Serial.print(F(" pin="));
-    Serial.print(digitalRead(PIN_ACC_INT1));
-    Serial.print(F("\r\n"));
+    FLOG.print(F("ACC-INT n="));
+    FLOG.print(count);
+    FLOG.print(F(" t="));
+    FLOG.print(when);
+    FLOG.print(F(" st="));
+    FLOG.print(ms.get_state());
+    FLOG.print(F(" bz="));
+    FLOG.print(get_buzzer_status() ? 1 : 0);
+    FLOG.print(F(" pin="));
+    FLOG.print(digitalRead(PIN_ACC_INT1));
+    FLOG.print(F("\r\n"));
 }
 
 /*
@@ -2461,7 +2521,7 @@ void poll_acc_int_status()
      * pin, or a failed read. Otherwise this would add a line every second.
      */
     if (rslt != BMA4_OK) {
-        Serial.print(F("ACC-STAT read FAILED\r\n"));
+        FLOG.print(F("ACC-STAT read FAILED\r\n"));
         return;
     }
 
@@ -2503,9 +2563,9 @@ void poll_acc_int_status()
          * Disable and re-enable the feature. That forces the sensor to take a
          * fresh reference at the level the device actually sits at now.
          */
-        Serial.print(F("ACC-STAT STUCK "));
-        Serial.print(stuck_polls);
-        Serial.print(F(" polls, re-arming any-motion\r\n"));
+        FLOG.print(F("ACC-STAT STUCK "));
+        FLOG.print(stuck_polls);
+        FLOG.print(F(" polls, re-arming any-motion\r\n"));
 
         stuck_polls = 0;
 
@@ -2514,23 +2574,23 @@ void poll_acc_int_status()
                                          BMA4_DISABLE,
                                          ANYMOTION_INT_LINE);
         if (rslt != BMA4_OK) {
-            Serial.print(F("ACC-STAT re-arm FAILED : "));
-            Serial.print(rslt);
-            Serial.print(F("\r\n"));
+            FLOG.print(F("ACC-STAT re-arm FAILED : "));
+            FLOG.print(rslt);
+            FLOG.print(F("\r\n"));
         }
         return;
     }
 
     if (status != 0 || digitalRead(PIN_ACC_INT1) != 0) {
-        Serial.print(F("ACC-STAT s=0x"));
-        Serial.print(status, HEX);
-        Serial.print(F(" pin="));
-        Serial.print(digitalRead(PIN_ACC_INT1));
-        Serial.print(F(" n="));
-        Serial.print(acc_int_count);
-        Serial.print(F(" sk="));
-        Serial.print(stuck_polls);
-        Serial.print(F("\r\n"));
+        FLOG.print(F("ACC-STAT s=0x"));
+        FLOG.print(status, HEX);
+        FLOG.print(F(" pin="));
+        FLOG.print(digitalRead(PIN_ACC_INT1));
+        FLOG.print(F(" n="));
+        FLOG.print(acc_int_count);
+        FLOG.print(F(" sk="));
+        FLOG.print(stuck_polls);
+        FLOG.print(F("\r\n"));
     }
 }
 
@@ -2705,13 +2765,13 @@ static void bench_battery_service()
 
     if (!bb_on && now >= BB_CHIRP_ON_MS) {
         bb_on = true;
-        Serial.print(F("BB: forcing low-battery alarm ON\r\n"));
+        FLOG.print(F("BB: forcing low-battery alarm ON\r\n"));
         enable_battery_alarm();
     }
 
     if (!bb_off && now >= BB_CHIRP_OFF_MS) {
         bb_off = true;
-        Serial.print(F("BB: clearing low-battery alarm\r\n"));
+        FLOG.print(F("BB: clearing low-battery alarm\r\n"));
         disable_battery_alarm();
     }
 
@@ -2738,14 +2798,14 @@ static void bench_battery_service()
     }
     digitalWrite(BAT_ADC_ENABLE, LOW);
 
-    Serial.print(F("BB t="));
-    Serial.print(now / 1000UL);
-    Serial.print(F("s raw"));
+    FLOG.print(F("BB t="));
+    FLOG.print(now / 1000UL);
+    FLOG.print(F("s raw"));
     for (uint8_t i = 0; i < BB_TAPS; i++) {
-        Serial.print(F(" "));
-        Serial.print(bb_taps[i]);
-        Serial.print(F("ms="));
-        Serial.print(c[i]);
+        FLOG.print(F(" "));
+        FLOG.print(bb_taps[i]);
+        FLOG.print(F("ms="));
+        FLOG.print(c[i]);
     }
 
     /*
@@ -2757,13 +2817,13 @@ static void bench_battery_service()
      * cannot be fully independent. Good enough to see whether the node has
      * settled by 10 ms; not a substitute for a scope if it has not.
      */
-    Serial.print(F(" mv10="));
-    Serial.print((uint16_t)(((uint32_t)c[3] * 3100UL) / 1023UL));
-    Serial.print(F(" vcc="));
-    Serial.print(read_vcc_mv());
-    Serial.print(F(" bat="));
-    Serial.print(battery_alarm_status_g);
-    Serial.print(F("\r\n"));
+    FLOG.print(F(" mv10="));
+    FLOG.print((uint16_t)(((uint32_t)c[3] * 3100UL) / 1023UL));
+    FLOG.print(F(" vcc="));
+    FLOG.print(read_vcc_mv());
+    FLOG.print(F(" bat="));
+    FLOG.print(battery_alarm_status_g);
+    FLOG.print(F("\r\n"));
 }
 #endif /* BATTERY_BENCH */
 
@@ -2825,8 +2885,8 @@ void check_for_battery_voltage()
 
     battery_v = read_adc_pc2_voltage();
 
-    Serial.print(F("  Voltage value : "));
-    Serial.print(battery_v);
+    FLOG.print(F("  Voltage value : "));
+    FLOG.print(battery_v);
 
     digitalWrite(BAT_ADC_ENABLE, LOW);
 
@@ -2847,7 +2907,7 @@ void check_for_battery_voltage()
      */
     if (settled_samples < BATTERY_SETTLE_SAMPLES) {
         settled_samples++;
-        Serial.print(F("  (settling, ignored)\r\n"));
+        FLOG.print(F("  (settling, ignored)\r\n"));
         return;
     }
 
@@ -2873,11 +2933,11 @@ void check_for_battery_voltage()
      * what the logged number meant; a log that states the pack figure directly
      * cannot start that argument again.
      */
-    Serial.print(F("  avg : "));
-    Serial.print(battery_avg.avg());
-    Serial.print(F("  pack_mv : "));
-    Serial.print((uint16_t)(battery_avg.avg() * VBATT_DIVIDER));
-    Serial.print(F("\r\n"));
+    FLOG.print(F("  avg : "));
+    FLOG.print(battery_avg.avg());
+    FLOG.print(F("  pack_mv : "));
+    FLOG.print((uint16_t)(battery_avg.avg() * VBATT_DIVIDER));
+    FLOG.print(F("\r\n"));
 
     /*
      * Decide on the rolling average, never on a single sample, and use separate
@@ -2886,7 +2946,7 @@ void check_for_battery_voltage()
      */
     if (battery_avg.avg() < BATTERY_LOW_THRESHOLD) {
         if (battery_alarm_status_g == 0) {
-            Serial.print(F("  LOW Battery detected \r\n"));
+            FLOG.print(F("  LOW Battery detected \r\n"));
         }
         enable_battery_alarm();
 
@@ -2898,7 +2958,7 @@ void check_for_battery_voltage()
          * the serial back-feed in §10.1, is harder to achieve than it sounds.
          */
         if (battery_alarm_status_g) {
-            Serial.print(F("  Battery recovered, alarm cleared \r\n"));
+            FLOG.print(F("  Battery recovered, alarm cleared \r\n"));
         }
         disable_battery_alarm();
     }

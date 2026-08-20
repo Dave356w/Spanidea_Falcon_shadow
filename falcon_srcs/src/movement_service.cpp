@@ -1,4 +1,5 @@
 #include "movement_service.h"
+#include "falcon_log.h"
 
 /*
  * Polled departure threshold, on |acceleration_avg - zero_calib|.
@@ -137,7 +138,7 @@ MovementService::MovementService(RollingAvg<float, 32> *acc_avg)
     reset_counter = 100;
     zero_calib_value = 0.0;
 
-    Serial.print(F("Initialing FSM \r\n"));
+    FLOG.print(F("Initialing FSM \r\n"));
 
     state = MotionStates::STATE_ERROR_RESET;
     last_state = MotionStates::STATE_ERROR_RESET;
@@ -286,11 +287,11 @@ void MovementService::notify_any_motion(uint32_t edge_ms)
      */
     if (!rearm_cleared &&
         (int32_t)(edge_ms - monitor_entered_ms) < (int32_t)MONITOR_REARM_MS) {
-        Serial.print(F("FSM: any-motion ignored, re-arm blanking t="));
-        Serial.print((int32_t)(edge_ms - monitor_entered_ms));
-        Serial.print(F(" q="));
-        Serial.print(lat_monitor.quiet_run());
-        Serial.print(F("\r\n"));
+        FLOG.print(F("FSM: any-motion ignored, re-arm blanking t="));
+        FLOG.print((int32_t)(edge_ms - monitor_entered_ms));
+        FLOG.print(F(" q="));
+        FLOG.print(lat_monitor.quiet_run());
+        FLOG.print(F("\r\n"));
         return;
     }
 
@@ -330,7 +331,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_CALIBERATION:
         if (last_state != MotionStates::STATE_CALIBERATION) {
-            Serial.print(F("FSM: Performing Self Calibration \r\n"));
+            FLOG.print(F("FSM: Performing Self Calibration \r\n"));
             last_state = MotionStates::STATE_CALIBERATION;
             /*
              * Learn the lateral noise floor over the same window that
@@ -392,13 +393,13 @@ void MovementService::fsm_run()
 
             ok = lat_monitor.calib_finish();
 
-            Serial.print(F("XY: calib b="));
-            Serial.print(lat_monitor.buckets());
-            Serial.print(F(" peak="));
-            Serial.print(lat_monitor.calib_peak(), 4);
-            Serial.print(F(" mv="));
-            Serial.print(calib_moved ? 1 : 0);
-            Serial.print(F("\r\n"));
+            FLOG.print(F("XY: calib b="));
+            FLOG.print(lat_monitor.buckets());
+            FLOG.print(F(" peak="));
+            FLOG.print(lat_monitor.calib_peak(), 4);
+            FLOG.print(F(" mv="));
+            FLOG.print(calib_moved ? 1 : 0);
+            FLOG.print(F("\r\n"));
 
             /*
              * ─── §XY-BMAX: the per-second maxima, in time order ──────────────
@@ -416,7 +417,7 @@ void MovementService::fsm_run()
              * ⚠️ WHY NOT JUST LOG THE METRIC AT FULL RATE INSTEAD. Tempting --
              * `m=` is already in the sample line -- but LOG_DECIMATE_N thins it
              * 8:1, and un-thinning it during calibration would be actively
-             * DANGEROUS. Serial.print blocks loop(), loop() drains the sample
+             * DANGEROUS. FLOG.print blocks loop(), loop() drains the sample
              * ring, and ~20% of samples are already lost to overrun. The metric
              * is |Δax|+|Δay| between CONSECUTIVE samples, so a lost sample
              * widens dt and INFLATES m -- which inflates the learned threshold,
@@ -428,12 +429,12 @@ void MovementService::fsm_run()
              * Printed on EVERY attempt, including the ones that get retried --
              * a rejected window is exactly the case worth studying.
              */
-            Serial.print(F("XY: bmax"));
+            FLOG.print(F("XY: bmax"));
             for (uint8_t i = 0; i < lat_monitor.buckets(); i++) {
-                Serial.print(F(" "));
-                Serial.print(lat_monitor.bucket(i), 4);
+                FLOG.print(F(" "));
+                FLOG.print(lat_monitor.bucket(i), 4);
             }
-            Serial.print(F("\r\n"));
+            FLOG.print(F("\r\n"));
 
             /*
              * Retry rather than trust a window that saw movement or came back
@@ -442,9 +443,9 @@ void MovementService::fsm_run()
              */
             if ((!ok || calib_moved) && calib_attempts < CALIB_RETRIES) {
                 calib_attempts++;
-                Serial.print(F("FSM: NOT READY - recalibrating, attempt "));
-                Serial.print(calib_attempts + 1);
-                Serial.print(F("\r\n"));
+                FLOG.print(F("FSM: NOT READY - recalibrating, attempt "));
+                FLOG.print(calib_attempts + 1);
+                FLOG.print(F("\r\n"));
                 start_timer = millis();
                 lat_monitor.calib_begin(millis());
                 calib_moved = false;
@@ -453,13 +454,13 @@ void MovementService::fsm_run()
 
             if (!ok || calib_moved) {
                 lat_monitor.arm_fallback();
-                Serial.print(F("FSM: READY (fallback) - site not measurable, "
+                FLOG.print(F("FSM: READY (fallback) - site not measurable, "
                                "expect a twitchy device \r\n"));
             } else if (lat_monitor.noisy()) {
-                Serial.print(F("FSM: READY (noisy) - lateral floor at the "
+                FLOG.print(F("FSM: READY (noisy) - lateral floor at the "
                                "clamp \r\n"));
             } else {
-                Serial.print(F("FSM: READY \r\n"));
+                FLOG.print(F("FSM: READY \r\n"));
             }
 
             /*
@@ -499,17 +500,17 @@ void MovementService::fsm_run()
             /* The raw peak detector measures against the same baseline. */
             arrival_zero_set(zero_calib_value);
 
-            Serial.print(F("-------------------------------------\r\n"));
-            Serial.print(F("Zero-Calib-Value : "));
-            Serial.print(zero_calib_value, 6);
-            Serial.print(F("\r\n"));
-            Serial.print(F("Threshold-Value  : "));
-            Serial.print(threshold_value, 6);
-            Serial.print(F("\r\n"));
-            Serial.print(F("XY-Still-Value   : "));
-            Serial.print(lat_monitor.still(), 4);
-            Serial.print(F("\r\n"));
-            Serial.print(F("-------------------------------------\r\n"));
+            FLOG.print(F("-------------------------------------\r\n"));
+            FLOG.print(F("Zero-Calib-Value : "));
+            FLOG.print(zero_calib_value, 6);
+            FLOG.print(F("\r\n"));
+            FLOG.print(F("Threshold-Value  : "));
+            FLOG.print(threshold_value, 6);
+            FLOG.print(F("\r\n"));
+            FLOG.print(F("XY-Still-Value   : "));
+            FLOG.print(lat_monitor.still(), 4);
+            FLOG.print(F("\r\n"));
+            FLOG.print(F("-------------------------------------\r\n"));
 
             /*
              * Now make the noise, and re-anchor afterwards so the first
@@ -548,7 +549,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_MONITORING:
         if (last_state != MotionStates::STATE_MONITORING) {
-            Serial.print(F("FSM: Transitioned to STATE_MONITORING \r\n"));
+            FLOG.print(F("FSM: Transitioned to STATE_MONITORING \r\n"));
             last_state = MotionStates::STATE_MONITORING;
             /*
              * Start the re-arm blanking window, and discard anything already
@@ -586,9 +587,9 @@ void MovementService::fsm_run()
             (millis() - monitor_entered_ms) >= MONITOR_REARM_MIN_MS &&
             lat_monitor.quiet_run() >= MONITOR_REARM_QUIET) {
             rearm_cleared = true;
-            Serial.print(F("FSM: re-arm blank cleared early, settled at "));
-            Serial.print(millis() - monitor_entered_ms);
-            Serial.print(F(" ms\r\n"));
+            FLOG.print(F("FSM: re-arm blank cleared early, settled at "));
+            FLOG.print(millis() - monitor_entered_ms);
+            FLOG.print(F(" ms\r\n"));
         }
 
         present_accel = acceleration_avg_ref->avg();
@@ -622,7 +623,7 @@ void MovementService::fsm_run()
          */
         if (any_motion_pending) {
             any_motion_pending = false;
-            Serial.print(F("FSM: Departure latched (any-motion) \r\n"));
+            FLOG.print(F("FSM: Departure latched (any-motion) \r\n"));
             burst_trigger(BURST_POST_DEP, 0);
             vel_departure = vel_window.valid() ? vel_window.w() : 0.0f;
             start_timer = millis();
@@ -659,12 +660,12 @@ void MovementService::fsm_run()
                 vel_reported = true;
                 vel_departure = vel_window.w();
 
-                Serial.print(F("VEL: departure w="));
-                Serial.print(vel_departure, 3);
-                Serial.print(F(" cov="));
-                Serial.print(vel_window.coverage_ms());
+                FLOG.print(F("VEL: departure w="));
+                FLOG.print(vel_departure, 3);
+                FLOG.print(F(" cov="));
+                FLOG.print(vel_window.coverage_ms());
 #if VEL_ARMED
-                Serial.print(F(" LATCH\r\n"));
+                FLOG.print(F(" LATCH\r\n"));
                 start_timer = millis();
                 set_state(STATE_MOVEMENT_DETECTED);
 #else
@@ -673,7 +674,7 @@ void MovementService::fsm_run()
                  * the log and the FSM is left alone, exactly as §11 introduced
                  * any-motion before §12 promoted it.
                  */
-                Serial.print(F(" obs\r\n"));
+                FLOG.print(F(" obs\r\n"));
                 vel_departure = 0.0f;
 #endif
             }
@@ -684,7 +685,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_MOVEMENT_DETECTED:
         if (last_state != MotionStates::STATE_MOVEMENT_DETECTED) {
-            Serial.print(F("FSM: Transitioned to STATE_MOVEMENT_DETECTED \r\n"));
+            FLOG.print(F("FSM: Transitioned to STATE_MOVEMENT_DETECTED \r\n"));
             last_state = MotionStates::STATE_MOVEMENT_DETECTED;
         }
 
@@ -713,9 +714,9 @@ void MovementService::fsm_run()
              */
             vel_window.reset(millis());
 
-            Serial.print(F("FSM: departure velocity w="));
-            Serial.print(vel_departure, 3);
-            Serial.print(F("\r\n"));
+            FLOG.print(F("FSM: departure velocity w="));
+            FLOG.print(vel_departure, 3);
+            FLOG.print(F("\r\n"));
 
             enable_alarm();
             enable_chase_leds();
@@ -725,7 +726,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_MOVING:
         if (last_state != MotionStates::STATE_MOVING) {
-            Serial.print(F("FSM: Transitioned to STATE_MOVING \r\n"));
+            FLOG.print(F("FSM: Transitioned to STATE_MOVING \r\n"));
             last_state = MotionStates::STATE_MOVING;
             /*
              * Quiet observed before the beacon started says nothing about the
@@ -799,7 +800,7 @@ void MovementService::fsm_run()
          */
         if (jog_release_pending) {
             jog_release_pending = false;
-            Serial.print(F("FSM: Release (jog verdict) \r\n"));
+            FLOG.print(F("FSM: Release (jog verdict) \r\n"));
             start_timer = millis();
             set_state(STATE_DECELERATING);
             break;
@@ -828,11 +829,11 @@ void MovementService::fsm_run()
                 arrival_peak_hit()) {
 
                 arrival_seen = true;
-                Serial.print(F("FSM: Arrival (any-motion), edges "));
-                Serial.print(arrival_edge_count);
-                Serial.print(F(" peak "));
-                Serial.print(arrival_peak_get(), 3);
-                Serial.print(F("\r\n"));
+                FLOG.print(F("FSM: Arrival (any-motion), edges "));
+                FLOG.print(arrival_edge_count);
+                FLOG.print(F(" peak "));
+                FLOG.print(arrival_peak_get(), 3);
+                FLOG.print(F("\r\n"));
                 start_timer = millis();
                 set_state(STATE_DECELERATING);
                 break;
@@ -853,9 +854,9 @@ void MovementService::fsm_run()
              */
             if (arrival_peak_hit()) {
                 arrival_seen = true;
-                Serial.print(F("FSM: Arrival (polled), peak "));
-                Serial.print(arrival_peak_get(), 3);
-                Serial.print(F("\r\n"));
+                FLOG.print(F("FSM: Arrival (polled), peak "));
+                FLOG.print(arrival_peak_get(), 3);
+                FLOG.print(F("\r\n"));
                 start_timer = millis();
                 set_state(STATE_DECELERATING);
                 break;
@@ -876,19 +877,19 @@ void MovementService::fsm_run()
              */
             if (!ramp_reported && ramp_hit()) {
                 ramp_reported = true;
-                Serial.print(F("FSM: Arrival (ramp) mean="));
-                Serial.print(ramp_mean_get());
-                Serial.print(F(" dir="));
-                Serial.print(ramp_dir_get());
+                FLOG.print(F("FSM: Arrival (ramp) mean="));
+                FLOG.print(ramp_mean_get());
+                FLOG.print(F(" dir="));
+                FLOG.print(ramp_dir_get());
 #if RAMP_ARMED
-                Serial.print(F(" (armed)\r\n"));
+                FLOG.print(F(" (armed)\r\n"));
                 arrival_seen = true;
                 burst_trigger(BURST_POST_ARR, 1);
                 start_timer = millis();
                 set_state(STATE_DECELERATING);
                 break;
 #else
-                Serial.print(F(" (unarmed)\r\n"));
+                FLOG.print(F(" (unarmed)\r\n"));
                 burst_trigger(BURST_POST_ARR, 1);
 #endif
             }
@@ -909,14 +910,14 @@ void MovementService::fsm_run()
          * is a fault -- log it as one so it is not mistaken for a normal release.
          */
         if ((current_time - movement_start_timer) > LATCH_FAILSAFE_MS) {
-            Serial.print(F("FSM: FAILSAFE - no arrival detected, releasing latch \r\n"));
+            FLOG.print(F("FSM: FAILSAFE - no arrival detected, releasing latch \r\n"));
             start_timer = millis();
             set_state(STATE_DECELERATING);
         }
         break;
     case MotionStates::STATE_DECELERATING:
         if (last_state != MotionStates::STATE_DECELERATING) {
-            Serial.print(F("FSM: Transitioned to STATE_DECELERATING \r\n"));
+            FLOG.print(F("FSM: Transitioned to STATE_DECELERATING \r\n"));
             last_state = MotionStates::STATE_DECELERATING;
             stop_confirm_timer = millis();
 
@@ -973,7 +974,7 @@ void MovementService::fsm_run()
          * moving enough to restart the confirm window.
          */
         if ((millis() - start_timer) > LATCH_FAILSAFE_MS) {
-            Serial.print(F("FSM: FAILSAFE - never settled, forcing stop \r\n"));
+            FLOG.print(F("FSM: FAILSAFE - never settled, forcing stop \r\n"));
             disable_alarm();
             disable_chase_leds();
             set_state(STATE_STOPPED);
@@ -982,7 +983,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_STOPPED:
         if (last_state != MotionStates::STATE_STOPPED) {
-            Serial.print(F("FSM: Transitioned to STATE_STOPPED \r\n"));
+            FLOG.print(F("FSM: Transitioned to STATE_STOPPED \r\n"));
             last_state = MotionStates::STATE_STOPPED;
 
             acceleration_avg_ref->fill(zero_calib_value);
@@ -992,11 +993,11 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_ERROR_RESET:
         if (last_state != MotionStates::STATE_ERROR_RESET) {
-            Serial.print(F("FSM: Transitioned to STATE_ERROR_RESET \r\n"));
+            FLOG.print(F("FSM: Transitioned to STATE_ERROR_RESET \r\n"));
             last_state = MotionStates::STATE_ERROR_RESET;
         }
 
-        //Serial.print(F("FSM: Device in ERROR_RESET state \r\n"));
+        //FLOG.print(F("FSM: Device in ERROR_RESET state \r\n"));
         if (reset_counter == 0) {
             set_state(STATE_CALIBERATION);
             start_timer = millis();

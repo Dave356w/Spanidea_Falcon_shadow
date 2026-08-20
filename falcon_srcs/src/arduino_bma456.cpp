@@ -28,6 +28,7 @@
 */
 
 #include "arduino_bma456.h"
+#include "falcon_log.h"
 
 #ifdef __AVR__
 
@@ -93,9 +94,9 @@ static void bma_delay_ms(uint32_t ms) {
 void BMA456::initialize(MA456_RANGE range, MBA456_ODR odr, MA456_BW bw, MA456_PERF_MODE mode) {
     uint16_t    init_status = 0;
 
-    Serial.print("Address :");
-    Serial.print(BMA4_I2C_ADDR_PRIMARY);
-    Serial.print("\r\n");
+    FLOG.print("Address :");
+    FLOG.print(BMA4_I2C_ADDR_PRIMARY);
+    FLOG.print("\r\n");
 
     Wire1.begin();
     TWSR1 = 0x00;   // prescaler = 1
@@ -120,25 +121,25 @@ void BMA456::initialize(MA456_RANGE range, MBA456_ODR odr, MA456_BW bw, MA456_PE
     init_status = bma456_init(&accel);
 
     if (init_status != 0) {
-        Serial.print("BMA456-Init Failed :");
-        Serial.print(init_status);
-        Serial.print("\r\n");
-        Serial.print("Chip-ID :");
-        Serial.print(accel.chip_id);
-        Serial.print("\r\n");
+        FLOG.print("BMA456-Init Failed :");
+        FLOG.print(init_status);
+        FLOG.print("\r\n");
+        FLOG.print("Chip-ID :");
+        FLOG.print(accel.chip_id);
+        FLOG.print("\r\n");
         return;
     } else {
-        Serial.print("BMA456 : Initialization done \r\n");
+        FLOG.print("BMA456 : Initialization done \r\n");
     }
 
     bma4_set_command_register(0xB6, &accel); // reset device
 
     delay(500); // wait for POR finish
-    Serial.print("BMA456 : Writing configurations .. ");
+    FLOG.print("BMA456 : Writing configurations .. ");
 
     bma456_write_config_file(&accel);
 
-    Serial.print(" Done \r\n");
+    FLOG.print(" Done \r\n");
     accel_conf.odr = (uint8_t)odr;
     accel_conf.range = (uint8_t)range;
     accel_conf.bandwidth = (uint8_t)bw;
@@ -157,7 +158,7 @@ void BMA456::initialize(MA456_RANGE range, MBA456_ODR odr, MA456_BW bw, MA456_PE
     }
 
     bma4_set_accel_enable(BMA4_ENABLE, &accel);
-    Serial.print("BMA456 : Completed configuration \r\n");
+    FLOG.print("BMA456 : Completed configuration \r\n");
 }
 
 uint16_t BMA456::configureAnyMotion(uint16_t threshold, uint16_t duration,
