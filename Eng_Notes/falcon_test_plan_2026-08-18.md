@@ -771,10 +771,19 @@ items 5 and 12 behind session A. Section 3.
 
 If only one bench session and one car session are available:
 
-- **Bench: session A.** Everything else that needs firmware is behind it.
+- ~~**Bench: session A.** Everything else that needs firmware is behind it.~~
+  **Done 2026-08-20 (§2). The bench slot now goes to B1**, the missed-departure
+  signature — this plan's own "most dangerous failure", still invisible in the
+  log. It is unblocked: 706 bytes free on the test build.
 - **Car: session C.** It is the only test covering a failure this project may
   have introduced, it needs no instrumentation, and ten terminal stops is under
   an hour.
+
+**Also unblocked 2026-08-20: the three bench test builds now link.** All of
+`brownout_test` (20406), `bench_battery` (31660) and `idle_current` (31832)
+failed the size check at 32490 before session A. Each is a bench measurement
+this project has been carrying as unmeasured — the 243 s brownout, the battery
+trip point, and quiescent current, which has never been measured at all.
 
 ~~If only a desk hour is available, **session G** needs no hardware and unblocks
 the largest body of stalled analysis.~~ **Session G was run 2026-08-20 — §8.**
