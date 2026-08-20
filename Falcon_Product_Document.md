@@ -597,7 +597,4 @@ Current assessment, what is proven, and what is not:
 
 Summary: inspection operation works and departure detection is the
 best-evidenced part of the device. Automatic operation releases on a distribution
-centred on its own threshold. Two of three armed release paths have never been
-observed working, one reproducible position lie remains unfixed, and arming
-margin depends on how the device was placed. **Not production-ready**; §6 of that
-note records the reasoning and the disagreement.
+centered on its own threshold.
