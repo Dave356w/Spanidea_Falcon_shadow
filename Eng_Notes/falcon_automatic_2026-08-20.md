@@ -150,6 +150,55 @@ peak detector misses, and no such stop has been recorded. The 3-of-11 runs where
 the peak collector armed by a single sample are the closest this has come to
 needing it.
 
+## 5a. ✅ `ARM_REV_SAMPLES` 8 → 15, on replay evidence
+
+Run against the full corpus — **227 departure bursts, 226 paired arrivals, four
+machines** (Dave, 2026-08-20: the 300, 350 and 500 fpm sessions are all
+different elevators, plus the 150 fpm hydraulic).
+
+The 8 was chosen on 2026-08-12 against 89 bursts using the `RAMPFIRED` column.
+**That column reads zero at every value from 3 to 20, so it cannot discriminate
+and never could.** `ARMED-INTO-RAMP` is the metric that can — armed at a moment
+when the next block still meets the ramp floor *and* still carries the
+departure's sign, i.e. the ramp qualifies once the burst ends.
+
+| `rev_n` | DEPRAMP | INTO-RAMP | arr armed | arr ramp |
+|---|---|---|---|---|
+| **8** (was) | 0/227 | **5/227** | 151/226 | 69/226 |
+| 13 | 0/227 | 1/227 | 126/226 | 68/226 |
+| 14 | 0/227 | 1/227 | 121/226 | 68/226 |
+| **15** (now) | 0/227 | **0/227** | 115/226 | 66/226 |
+
+15 is the smallest clean value. Confirmed after the change:
+
+```
+rule       armed   RAMPFIRED   ARMED-INTO-RAMP    peak
+rev       10/227      0/227         0/227        5/227   ok
+union    159/227      2/227         3/227       26/227   <- UNSAFE
+```
+
+`rev` is clean, its false-peak count fell 17 → 5, and the **union improved as a
+side effect** (INTO-RAMP 7 → 3, peak 33 → 26) because it contains the reversal
+branch.
+
+**Cost, checked against today's three captures specifically:** ramp fires 10/23
+arrivals at `rev=15` against the union's 11/23, and all safety columns are 0/23.
+One ramp fire given up on the machines just measured — on a detector that has
+fired ~28 times across every session and **never once been the path that
+released the beacon.**
+
+Flashed and verified: 32176 bytes, `calib b=6`, READY, blank cleared 2605 ms.
+
+⚠️ **This does not touch the peak collector.** It arms on the quiet-OR-reversal
+union and quiet has won that race on every run ever recorded, so §2's starved
+quiet counter is unaffected — and cannot be settled by replay at all, because
+the arming counters run continuously across cruise the decimated log does not
+contain.
+
+⬜ **Watch:** the ramp now needs 15 + 3 blocks = 51 samples (~2.0 s) of
+deceleration rather than 44. A very short deceleration could fall inside it.
+Revert is this constant alone.
+
 ## 6. What this session did not settle
 
 - **No re-latch, no missed departure, no suppression.** `dq=0` on all eleven.

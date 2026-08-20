@@ -405,7 +405,51 @@ static volatile bool     arr_q_frozen  = false;
  * session: v=2 on a short run is the path working, v=2 during a departure is
  * the failure the replay says cannot happen -- disarm on sight if it appears.
  */
-#define ARM_REV_SAMPLES    8    /* consecutive opposite-signed samples       */
+/*
+ * ⭐ 8 -> 15 on 2026-08-20, on replay evidence against the FULL corpus.
+ *
+ * The 8 was chosen on 2026-08-12 against 89 departure bursts using
+ * arming_replay.py's RAMPFIRED column, which reads zero at every value from 3
+ * to 20 -- so that column cannot discriminate and never could.
+ *
+ * ARMED-INTO-RAMP is the metric that can, and the tool calls it "the real
+ * safety metric" for a reason: a departure burst ends 2.4 s after the trigger
+ * but a real departure ramp keeps going, so "did it fire inside the window"
+ * under-counts. INTO-RAMP asks the honest question -- did the rule arm at a
+ * moment when the NEXT block still met the ramp floor AND still carried the
+ * departure's sign. If so, the ramp qualifies once the burst ends.
+ *
+ * Swept over 227 departure bursts / 226 paired arrivals, four machines:
+ *
+ *      rev_n   DEPRAMP   INTO-RAMP   arr armed   arr ramp
+ *          8    0/227      5/227      151/226     69/226   <- was here
+ *         13    0/227      1/227      126/226     68/226
+ *         14    0/227      1/227      121/226     68/226
+ *         15    0/227      0/227      115/226     66/226   <- first clean
+ *
+ * 15 is the SMALLEST value that reaches zero. The cost is 3 arrival ramp fires
+ * in 226 (69 -> 66), and it lands on the detector that has fired ~28 times
+ * across every session and has NEVER ONCE been the path that released the
+ * beacon -- the polled peak always gets there first, because the deceleration
+ * plateau is itself above ARRIVAL_PEAK_VALUE. So the capability given up is
+ * capability that has never been used, and the hazard removed is the one that
+ * would release the beacon on a moving car.
+ *
+ * ⚠️ THIS ONLY MOVES THE RAMP GATE. The peak collector arms on the
+ * quiet-OR-reversal union, and quiet has won that race on every run ever
+ * recorded (v=2 has never fired), so raising this does not touch it. The
+ * starved-quiet problem measured on 2026-08-20 -- cruise lateral 0.134-0.649
+ * against a 0.06 still threshold, q=0 through an entire 13.6 s cruise, and q
+ * arming at exactly 5 on 3 of 11 contract-speed runs -- is UNAFFECTED by this
+ * change and cannot be settled by replay at all: the arming counters run
+ * continuously across cruise that the decimated log does not contain.
+ * falcon_automatic_2026-08-20.md §2, §4.
+ *
+ * ⬜ Cost to watch: the ramp now needs 15 + 3 blocks = 51 samples (~2.0 s) of
+ * deceleration rather than 44. A very short deceleration could fall inside it.
+ * Revert is this constant alone.
+ */
+#define ARM_REV_SAMPLES    15   /* consecutive opposite-signed samples       */
 #define ARM_DEP_SIGN_N     25   /* samples used to fix the departure's sign  */
 
 static volatile int32_t  arr_dep_acc  = 0;

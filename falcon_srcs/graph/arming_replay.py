@@ -65,7 +65,7 @@ from collections import Counter
 # Keep these in step with the firmware or the replay is fiction.
 ARRIVAL_QUIET_MSS_MM = 150     # ARRIVAL_QUIET_MSS 0.15f, in milli-m/s^2
 ARRIVAL_ARM_SAMPLES = 5        # quiet samples needed to arm
-ARM_REV_SAMPLES = 8            # consecutive opposite-signed samples to arm
+ARM_REV_SAMPLES = 15           # mirrors main.cpp; 8 -> 15 on 2026-08-20, see there
 ARM_DEP_SIGN_N = 25            # samples used to fix the departure's sign
 ARRIVAL_PEAK_VALUE_MM = 450    # ARRIVAL_PEAK_VALUE 0.45, in milli-m/s^2
 RAMP_BLOCK_N = 12
