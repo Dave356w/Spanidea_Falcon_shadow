@@ -15,7 +15,7 @@ describes this build unless a line says otherwise.
 | | |
 |---|---|
 | Tag | **`build-2026-08-20`** on `Falcon_Rel_EFT` — the authoritative reference for this build |
-| Commit | `976b4a5`. The **firmware** last changed at `6483f9d`; everything after it is documentation plus `platformio.ini` flags for `bench_battery` and `idle_current`, so the `ATmega328PB` binary is byte-identical from `6483f9d` onward |
+| Firmware commit | `6483f9d` — the last commit that changed `falcon_srcs/src` or `lib`. Later commits on the tag are documentation and `platformio.ini` flags for `bench_battery` / `idle_current` only, so the `ATmega328PB` binary is byte-identical from `6483f9d` onward. **Resolve the tag, not this hash, to get the tree.** |
 | Environment | `[env:ATmega328PB]`, `pio run -e ATmega328PB` |
 | Build flags | `-DTWI_FREQ=25000L -Wl,--relax` (`FALCON_LOG` defaults to 2) |
 | Flash | **32176 / 32256 bytes — 80 bytes free** |
