@@ -111,17 +111,34 @@ eleven, not a clean bill.
 
 ## 4. ⚠️ Cruise starves the quiet counter — the mechanism behind §2
 
-Measured during the first 4→1 (13.6 s at 300 fpm):
+☠️ **CORRECTED 2026-08-20 after Dave asked "is lateral quiet the right threshold
+for function?" — the first draft of this section named the WRONG CHANNEL.**
+There are two quiet counters and I conflated them:
+
+| counter | channel | compared against | what it gates |
+|---|---|---|---|
+| `arr_quiet` — the `q=` on the **ARM line** | **vertical**, `\|accel − arr_zero\|` | `ARRIVAL_QUIET_MSS` 0.15 | **arrival arming** (`arr_armed`) |
+| `lat_monitor.quiet_run()` — the `q=` on the **sample line** | **lateral**, `\|Δax\|+\|Δay\|` | learned `XY_STILL` ≈ 0.06 | the **re-arm blank** only |
+
+The lateral figures below are therefore evidence about the **re-arm blank**, not
+about arrival arming. The conclusion survives, but it has to be carried by the
+vertical channel:
 
 ```
-lateral m 0.134 .. 0.649    q = 0 for the ENTIRE cruise
+lateral m 0.134 .. 0.649   through a 13.6 s 300 fpm cruise   (re-arm counter)
+vertical cp  0.27 .. 0.29  cruise peak, 2026-08-20           (arming counter)
 ```
 
-`XY-Still` on this mounting is **0.06**. Cruise lateral runs **2× to 10× the
-still threshold, continuously**, so the quiet counter never advances while the
-car moves. `q=5` therefore does not mean "five quiet cruise samples" — **all
-five were accumulated from the post-stop ringdown.** The gate arms *during the
-arrival it is supposed to be armed before*.
+**`ARRIVAL_QUIET_MSS` is 0.15 and measured cruise `cp` reaches 0.27–0.29.** So
+the *arming* counter is starved during cruise too — by roughly 2×, on its own
+channel. `q=5` on the ARM line therefore still does not mean five quiet cruise
+samples.
+
+⬜ **What is NOT established:** exactly where those five samples came from on a
+given run. That needs the continuous vertical stream, which the decimated log
+does not carry. The first draft asserted "all five from the post-stop ringdown"
+as fact; it is a hypothesis consistent with `cp` > `ARRIVAL_QUIET_MSS`, no
+more.
 
 That inverts the recorded model. 08-12 measured `q=119` on a two-floor run and
 concluded "a run with real cruise has unlimited quiet to arm on". Here a
