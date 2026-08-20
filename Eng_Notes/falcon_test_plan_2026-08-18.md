@@ -561,9 +561,29 @@ survived three of those and was refuted by the fourth.
 Any future rule faces the same problem. Labelling is the highest-value work in
 this plan that needs no elevator and no firmware.
 
-**Method.** Work through `falcon_srcs/datasets/` against the session notes,
-marking each departure burst as run, jog, disturbance, or unknown. Unknown is a
-valid label and should not be guessed. Record the labelling basis per record.
+**Method.** ⚠️ **Superseded 2026-08-20 by
+`Eng_Notes/falcon_corpus_labelling_2026-08-20.md`**, which is the runnable
+procedure. `graph/session_g.py` (new, validated against the committed corpus)
+prints the census and emits a blank worksheet. Run it before committing the day.
+
+**Census measured 2026-08-20, and it changes what this session can conclude.**
+273 departures across 56 captures; 211 carry a departure burst; 62 carry none
+(the instrument landed 2026-08-11, so all of 08-06/07/10 is empty). *The plan's
+387 figure is not reproducible from the corpus — reconcile or supersede it.*
+
+Three findings the plan did not anticipate:
+
+- **Departure bursts fire on the ANY-MOTION path only** — the
+  `burst_trigger(BURST_POST_DEP, 0)` call sits inside `if (any_motion_pending)`.
+  Departures the polled or velocity path caught produce no burst, so the corpus
+  excludes by construction the runs the backstop caught.
+- **`span_ms` is not a run duration.** `ACC-INT` is edge-triggered and cruise is
+  quiet by construction, so in most runs both edges sit at the departure. 2-edge
+  median span is 1146 ms, which is not a 1.1 s ride. Do not label from it.
+- **The binding constraint is notes coverage, not burst coverage.** Nothing
+  inside a capture says run vs jog — `end_path` is circular for the same reason
+  `JOGV verdict=` is — so the dated session notes are the only independent
+  source, and they are per-session narrative rather than per-record.
 
 **Exit criterion.** A labelled corpus, and a count of how many records could be
 labelled with confidence. If that count is low, the conclusion is that future
