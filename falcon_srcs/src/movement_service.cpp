@@ -151,6 +151,7 @@ MovementService::MovementService(RollingAvg<float, 32> *acc_avg)
     blank_discards     = 0;
     last_discard_ms    = 0;
     latch_path         = 0;
+    polled_blank_reported = false;
     arrival_edge_count = 0;
     arrival_edge_first = 0;
     vel_departure      = 0.0f;
@@ -566,6 +567,7 @@ void MovementService::fsm_run()
             blank_discards     = 0;
             last_discard_ms    = 0;
             latch_path         = 0;
+            polled_blank_reported = false;
 
             /*
              * Clear the window for the same reason MONITOR_REARM_MS exists:
@@ -613,10 +615,59 @@ void MovementService::fsm_run()
          * STATE_MOVEMENT_DETECTED state.
          */
 
+        /*
+         * ⚠️ THE POLLED PATH IS RE-ARM BLANKED TOO, since 2026-08-20. Same
+         * condition as notify_any_motion(), deliberately -- see
+         * falcon_b1_2026-08-20.md §2.3.
+         *
+         * It was not, and MONITOR_REARM_MS has gated any-motion alone since
+         * 2026-08-07. That was survivable only while the polled path was
+         * unreachable: DEFAULT_THRESHOLD_VALUE was 0.40 and reached 1 of 82
+         * departures. The self-calibrated threshold clamps to Z_THRESH_MIN
+         * (0.040) in every mounting measured, so the ungated path became the
+         * SENSITIVE one and started latching first.
+         *
+         * Measured cost of leaving it ungated: two taps on a bench produced
+         * nine latch/alarm/release cycles in 90 s, seven of them re-latching
+         * 541-1556 ms into MONITORING on the alarm's own ringdown. That is the
+         * 2026-08-07 failure this blank was added to prevent, arriving through
+         * the door it does not cover.
+         *
+         * ⚠️ THE COST OF THE GATE, stated plainly: a genuine departure inside
+         * the blank is now missed by this path as well. That is the §14.4
+         * catastrophic direction -- but any-motion, the path that actually
+         * catches slow departures, has been blanked in exactly this window
+         * since 08-07. This makes the two consistent rather than adding a new
+         * blind spot, and the window can only shorten (rearm_cleared latches
+         * as soon as the lateral is measured settled).
+         */
         if (delta_accel > threshold_value) {
-            if (!latch_path) latch_path = 2;
-            start_timer = millis();
-            set_state(STATE_MOVEMENT_DETECTED);
+            if (!rearm_cleared &&
+                (int32_t)(millis() - monitor_entered_ms) < (int32_t)MONITOR_REARM_MS) {
+                /*
+                 * Rising edge only. This test runs every fsm_run() pass, and a
+                 * ringdown holds delta above threshold for hundreds of them.
+                 */
+                if (!polled_blank_reported) {
+                    polled_blank_reported = true;
+                    blank_discards++;
+                    last_discard_ms = millis();
+                    FLOG.print(F("FSM: polled ignored, re-arm blanking t="));
+                    FLOG.print((int32_t)(millis() - monitor_entered_ms));
+                    /* Float, counter-intuitively: Print::print(double,int) is
+                     * already linked for VEL/ARM, so it is 14 bytes CHEAPER
+                     * here than casting to an integer would be. Measured. */
+                    FLOG.print(F(" d="));
+                    FLOG.print(delta_accel, 4);
+                    FLOG.print(F("\r\n"));
+                }
+            } else {
+                if (!latch_path) latch_path = 2;
+                start_timer = millis();
+                set_state(STATE_MOVEMENT_DETECTED);
+            }
+        } else {
+            polled_blank_reported = false;
         }
         /*
          * Departure via the BMA456 any-motion interrupt.

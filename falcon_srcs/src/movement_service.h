@@ -671,8 +671,16 @@ class MovementService {
      *                         THIS LATCH IS THE STOP
      *
      * td is milliseconds since the last discard, or -1 when there was none.
+ *
+ * ⚠️ dq COUNTS BOTH PATHS as of 2026-08-20. It began as "any-motion edges the
+ * blank discarded"; the polled path is now blanked too and its suppressions
+ * increment the same counter. That is the more useful reading for the question
+ * this instrument exists to answer -- "was motion evidence thrown away earlier
+ * in this episode, and how long ago" -- and the log line names which path it
+ * was in either case.
      */
-    uint8_t  blank_discards;       /* edges the re-arm blank ate, this episode */
+    uint8_t  blank_discards;       /* motion evidence the blank ate, this episode */
+    bool     polled_blank_reported;/* rising-edge guard for the polled suppress */
     uint32_t last_discard_ms;      /* when the last one was eaten              */
     uint8_t  latch_path;           /* what latched: 0 none 1 any-motion
                                       2 polled 3 velocity. First setter wins,
