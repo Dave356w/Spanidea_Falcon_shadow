@@ -187,7 +187,7 @@ Current values and the arithmetic linking them are in §4.8.
 ```
 power on (device already placed on the counterweight)
    │
-   ├─ STATE_CALIBERATION ── 6 s: learn the z zero and the lateral floor
+   ├─ STATE_CALIBERATION ── learn the z zero and the lateral floor
    │        rejected and retried if movement is seen
    │        1 chirp = good · 3 chirps = fell back
    │                      + apparent all-LED flash
@@ -204,7 +204,7 @@ power on (device already placed on the counterweight)
    │                        └─────────────────────────┬──────────────────────┘
    │                                                  │
    │                                       STATE_DECELERATING
-   │                            5 s of continuous quiet required
+   │                            2.5 s of continuous quiet required
    │                                                  │
    │                                        STATE_STOPPED
    └──────────────────── beacon OFF ──────────────────┘
@@ -212,7 +212,7 @@ power on (device already placed on the counterweight)
 
 | `st=` | state | meaning |
 |---|---|---|
-| 1 | `STATE_CALIBERATION` | 6 s learning window at power-on |
+| 1 | `STATE_CALIBERATION` | learning window at power-on |
 | 2 | `STATE_MONITORING` | parked, watching for a departure |
 | 3 | `STATE_MOVEMENT_DETECTED` | departure seen, dwelling before the beacon |
 | 4 | `STATE_MOVING` | beacon latched, hunting the arrival |
@@ -222,7 +222,7 @@ power on (device already placed on the counterweight)
 
 ## 4.2 Calibration
 
-Ten seconds at power-on learns the **z zero** (the 1 g pedestal in this
+N seconds at power-on learns the **z zero** (the 1 g pedestal in this
 mounting's attitude) and the **lateral noise floor** (`XY_STILL`). An any-motion
 edge during the window means the counterweight moved while its own noise floor
 was being measured — the window is discarded and retried, up to `CALIB_RETRIES`.
