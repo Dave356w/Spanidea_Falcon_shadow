@@ -28,8 +28,18 @@ Two questions, one capture.
 Reference: MONITOR_REARM_MS 6000 (cap), MONITOR_REARM_MIN_MS 2500 (floor, was
 1500 until 2026-08-19), MONITOR_REARM_QUIET 8. STOP_CONFIRM_MS 5000 is the
 PRIMARY defence -- the blank is explicitly the backstop, not the fix.
+
+Usage:
+    ./session_c.py <capture.log>
+
+Takes ONE capture -- the session C run, ten terminal-floor stops with the
+logger going. Raw captures live in falcon_srcs/logs/ (gitignored, so only on
+the machine that recorded them); the distilled corpus in falcon_srcs/datasets/
+also works but carries no periodic sample lines, and this tool needs them for
+quiet_run(). A datasets/ file will parse and report "no sample lines".
 """
 import io
+import os
 import re
 import sys
 
@@ -87,11 +97,29 @@ def main():
         except (AttributeError, ValueError):
             pass
 
+    if len(sys.argv) < 2:
+        print("usage: session_c.py <capture.log>", file=sys.stderr)
+        print("  one session C capture -- ten terminal-floor stops, logger running.",
+              file=sys.stderr)
+        print("  raw captures are in falcon_srcs/logs/ (gitignored). A file from",
+              file=sys.stderr)
+        print("  falcon_srcs/datasets/ parses but carries no periodic sample lines,",
+              file=sys.stderr)
+        print("  which this tool needs -- it will report \"no sample lines\".",
+              file=sys.stderr)
+        return 2
     path = sys.argv[1]
+    if not os.path.isfile(path):
+        print("no such capture: %s" % path, file=sys.stderr)
+        return 2
     samples, events = parse(path)
     if not samples:
-        print("  no sample lines")
-        return
+        print("  no sample lines in %s -- this tool needs the periodic" % path,
+              file=sys.stderr)
+        print("  't= .. st= .. q=' stream, which the datasets/ corpus drops.",
+              file=sys.stderr)
+        print("  Use the raw capture from falcon_srcs/logs/.", file=sys.stderr)
+        return 1
     t_of = {i: t for i, t, st, q in samples}
 
     print("  Session C -- re-arm regression + quiet sizing      %s" % path)
@@ -177,4 +205,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

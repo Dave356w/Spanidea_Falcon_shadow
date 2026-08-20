@@ -29,8 +29,17 @@ whose departure was SILENT. A departure caught by the polled backstop prints
 nothing at all -- no latch line, no burst, no jog verdict -- because
 "Departure latched (any-motion)" sits inside if (any_motion_pending). One such
 run was silently dropped from this analysis on 2026-08-19. That is item B3.
+
+Usage:
+    ./session_d.py <capture.log>
+
+Takes ONE capture -- the session D run. Raw captures live in falcon_srcs/logs/
+(gitignored, so only on the machine that recorded them); the distilled corpus
+in falcon_srcs/datasets/ carries no periodic sample lines, and this tool needs
+them for the cruise ceiling.
 """
 import io
+import os
 import re
 import sys
 
@@ -98,8 +107,32 @@ def main():
         except (AttributeError, ValueError):
             pass
 
+    if len(sys.argv) < 2:
+        print("usage: session_d.py <capture.log>", file=sys.stderr)
+        print("  one session D capture. Raw captures are in falcon_srcs/logs/",
+              file=sys.stderr)
+        print("  (gitignored). Files from falcon_srcs/datasets/ carry no periodic",
+              file=sys.stderr)
+        print("  sample lines, which this tool needs for the cruise ceiling.",
+              file=sys.stderr)
+        return 2
     path = sys.argv[1]
+    if not os.path.isfile(path):
+        print("no such capture: %s" % path, file=sys.stderr)
+        return 2
     samples, runs = parse(path)
+    if not samples:
+        print("  no sample lines in %s -- this tool needs the periodic" % path,
+              file=sys.stderr)
+        print("  't= .. st= .. cp= .. pk=' stream, which the datasets/ corpus",
+              file=sys.stderr)
+        print("  drops. Use the raw capture from falcon_srcs/logs/.",
+              file=sys.stderr)
+        return 1
+    if not runs:
+        print("  no runs in %s -- nothing segments on "
+              "STATE_MOVING -> \"Arrival (\"." % path, file=sys.stderr)
+        return 1
     print("  Session D -- arrival gate margin      %s" % path)
     print("  cruise window [+%.0fs, -%.0fs]   gate %.2f   arm samples %d\n"
           % (CRUISE_SETTLE_MS / 1000.0, ARRIVAL_TAIL_MS / 1000.0,
@@ -156,4 +189,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
