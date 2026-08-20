@@ -172,6 +172,60 @@ callout and no arrival.
 ⬜ **Still no jog under 900.** The one gentle jog in the corpus remains the
 2026-08-18 `opk=381`, and §5a.2 is the hypothesis for why.
 
+## 6a. 🔴 The long runs — and a cruise ceiling of 0.29 at 18 fpm
+
+Two long runs closed the session, 18 fpm, roughly four minutes each.
+**The up run was not captured** — the logger had been stopped at 12:19:45 when
+Dave asked for the write-up, and it was treated as the end of testing rather
+than a checkpoint. What survives of it is only what the device's own counters
+carried forward: `im=` 5 → 46 (41 any-motion edges, so the car was seen
+throughout) and a return to MONITORING, so it latched and released correctly.
+No latch line, no arrival peak, no ARM margins. **Capture through the write-up
+next time.**
+
+The down run was captured in full (`datasets/260820-122600.log`):
+
+| | |
+|---|---|
+| MOVING | **224.4 s** — the longest slow run on record |
+| Departure | any-motion, `opk=67 ratio=0`, `dq=0`, `ml=107594` |
+| Cruise | lateral `m` 0.001–0.198, **`cp` max 0.29** |
+| Arrival | polled, **1.031** (2.29×) |
+| ARM | `q=255 a=1 v=1 g=1 ro=8` |
+
+### 6a.1 Open item 8, measured at the requirement speed
+
+**`ARRIVAL_QUIET_MSS` is 0.15, justified in source as "above cruise raw max
+0.0875". This run put cruise at 0.29 — 3.3× that stated maximum and nearly 2×
+the gate.**
+
+It also removes a speed assumption. The 08-18 note recorded ceilings of 0.23,
+0.23 and 0.28 and attributed them to *faster* runs, implying slow runs are
+quiet. At 18 fpm — the slowest this car goes, and the requirement speed — cruise
+reaches **0.29**, higher than any of them. **Cruise content on this machine is
+not a function of speed**, so the quiet gate cannot be justified by "this is a
+slow-run device".
+
+The predicted consequence — "if cruise exceeds the quiet gate, the quiet run
+resets continuously and the quiet arming path cannot arm" — did **not** occur:
+`q` reached 255. That is because the quiet counter runs on the **lateral**
+channel while `cp` is **vertical**, the two-axis split recorded on 08-19. **The
+gate survived by which axis it happens to watch, not by margin.** Anything that
+moves it onto the vertical channel inherits a 0.29 cruise against a 0.15 gate.
+
+Separation itself is fine: arrival 1.031 against cruise 0.29 is 3.6×.
+
+### 6a.2 Ring overrun tracks ALARM duration, not travel
+
+`ov` grew **37 → 89 across the unlogged 4-minute up run**, then only **3** across
+the 224 s down run's cruise. Steady-state monitoring produced zero growth all
+day. So the cost is the beacon — piezo blanking and burst dumps competing with
+the one-sample-per-`loop()` drain — not motion.
+
+⚠️ **Every threshold on file was measured on runs of tens of seconds.** A
+four-minute alarm is a regime none of them were derived in, and it is also the
+product's stated worst case.
+
 ## 7. What this session did not do
 
 - **It is not session C.** That needs automatic operation: the failure is a
