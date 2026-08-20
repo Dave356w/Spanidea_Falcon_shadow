@@ -9,31 +9,72 @@ reference to session history.
 
 ## 1. Build definition
 
+**⭐ CURRENT PRIMARY BUILD — updated 2026-08-20.** Everything below the table
+describes this build unless a line says otherwise.
+
 | | |
 |---|---|
-| Commit | `26e38df` on `Falcon_Rel_EFT` |
+| Commit | `6483f9d` on `Falcon_Rel_EFT`, tagged `build-2026-08-20` |
 | Environment | `[env:ATmega328PB]`, `pio run -e ATmega328PB` |
-| Build flags | `-DTWI_FREQ=25000L -Wl,--relax` |
-| Flash | 32188 / 32256 bytes — **68 bytes free** |
-| RAM | 1366 / 2048 bytes |
+| Build flags | `-DTWI_FREQ=25000L -Wl,--relax` (`FALCON_LOG` defaults to 2) |
+| Flash | **32176 / 32256 bytes — 80 bytes free** |
+| RAM | **1499 / 2048 bytes** |
 | MCU | ATmega328PB, signature `0x1e9516`, F_CPU 1 MHz (internal 8 MHz RC ÷ 8) |
 | Fuses | `lfuse 0x62`, `hfuse 0xD9`, `efuse 0xF5` (BOD 2.7 V), `lock 0xFF` |
-| Upload | ISP, `stk500`, COM6 |
-| Reproducibility | Clean rebuild from committed source produces 32188 bytes |
+| Upload | ISP, `stk500`. **The programmer re-enumerates constantly** — find it with a signature read, do not trust a committed port. `platformio.ini` has the command. |
+| Reproducibility | Clean rebuild from committed source produces 32176 bytes |
+
+**What changed on 2026-08-20** (`falcon_session_a_2026-08-20.md`,
+`falcon_b1_2026-08-20.md`):
+
+- `RollingAvg` holds a fixed member array; **`malloc`/`free`/`realloc` are gone
+  from the image** and `rd=` fell 11464 → 10362 µs. RAM rose 1366 → 1499 because
+  those arrays are now *counted* rather than taken invisibly from the heap.
+- **`FALCON_LOG`** compiles logging out; see §1.1.
+- **B1**: every latch prints its path and context —
+  `FSM: Departure latched (polled) ml= q= dq= td=`.
+- 🔴 **The polled departure path is now re-arm blanked**, which it never was.
+  §3.5.
+
+⚠️ **80 bytes free is not headroom.** Session A recovered 644 and B1 plus the
+re-arm gate spent 626 of it. Further instrumentation on this env — B3 is the
+outstanding one — needs the space recovered again or must be measured on
+`production`.
 
 No bootloader is present (`BOOTRST = 1`), which is why opening the serial port
 does not reset the board.
 
 ### 1.1 Bench/diagnostic builds
 
-| Environment | Purpose | Size | Safe in a car |
-|---|---|---|---|
-| `ATmega328PB` | shipping | 32188 | yes |
-| `bench_battery` | battery instrumentation, forced chirp | 31546 | no |
-| `idle_current` | stepped quiescent-current measurement | — | no |
-| `brownout_test` | bypasses FSM | 21086 | no |
+Rebuilt and re-measured 2026-08-20. `FALCON_LOG` is 2 unless stated.
+
+| Environment | Purpose | `FALCON_LOG` | Size | Safe in a car |
+|---|---|---|---|---|
+| `ATmega328PB` | **the primary build**, full logging, every threshold measured on it | 2 | **32176** | yes |
+| `production` | events + a `HEALTH` line every 30 s, no per-sample line | 1 | 31706 | yes — but read §1.2 |
+| `production_silent` | nothing on the wire; −343 B RAM | 0 | 25590 | yes — but read §1.2, and it cannot be diagnosed |
+| `bench_battery` | battery instrumentation, forced chirp | 1 | 31806 | no |
+| `idle_current` | stepped quiescent-current measurement | 0 | 25866 | no |
+| `brownout_test` | bypasses FSM | 2 | 20434 | no |
 
 Sizes differ enough that a mis-flash is identifiable by inspection.
+
+`bench_battery` and `idle_current` are pinned below level 2 because they no
+longer fit at it (32280 and 32474). `idle_current` is silent for a second and
+better reason: the logging it exists to measure around costs ~1.10 mA of the
+~3.2 mA idle draw, so measuring quiescent current with the log running measures
+the log.
+
+### 1.2 ⚠️ Before shipping a `production` build
+
+Measured 2026-08-20: sample throughput is **25.00 / 25.00 / 25.01 Hz** across
+the reference, level 2 and level 1 builds, with `ov` flat in all three. A
+quieter build does **not** feed its detectors more samples, so no threshold on
+file is invalidated by shipping one. That closes session A's verification
+clause in the negative.
+
+It is **not** a licence to lower `LOG_DECIMATE_N`, which is separately refuted
+(§2.2). And no `production` build has run in a car.
 
 ---
 
@@ -42,17 +83,27 @@ Sizes differ enough that a mis-flash is identifiable by inspection.
 The build is the most reliable measured to date. It is not yet a production
 candidate. The blocking items below are ordered by consequence.
 
-### 2.1 Flash headroom is exhausted — 68 bytes
+### 2.1 ~~Flash headroom is exhausted — 68 bytes~~ — RESOLVED 2026-08-20
 
-This is the binding constraint on all further work. `-DWIRE_TIMEOUT`, the
-correct fix for the I2C driver's unbounded waits, requires 1198 bytes and cannot
-be compiled. The current mitigation for a TWI wedge is the watchdog, which
-recovers by rebooting and recalibrating — during which the beacon is off.
+Session A recovered 644 bytes by giving `RollingAvg` a fixed member array, and
+`FALCON_LOG` recovers a further 470 at level 1 or 6586 at level 0. B1 and the
+polled re-arm gate then spent 626, leaving **80 free on the primary build** and
+**550 on `production`**.
 
-Recovering space requires either the bma4 driver replacement (approximately
-4.9 KB, since the vendored driver is an obsolete variant with a config blob five
-times larger than the current Bosch API), or removing serial logging from the
-shipping build.
+⚠️ **Two things this section asserted are no longer true:**
+
+- **`-DWIRE_TIMEOUT` is not the reason to want headroom.** It was superseded on
+  2026-08-12 by the vendored `lib/Wire1` spin guard, which bounds all seven TWI
+  wait sites for **124 bytes**. This section's 1198-byte framing predates that
+  and should not be used to justify the driver swap.
+- **The bma4 driver replacement does not recover ~4.9 KB.** `bma456_config_file`
+  is 6144 bytes of feature-engine blob that any-motion depends on and the swap
+  cannot reclaim; the driver code is ~1500. See `falcon_ramp_armed_2026-08-12.md`
+  §8.
+
+**The swap is not needed for headroom.** What remains binding is that the
+primary build is again close to full, so further instrumentation belongs on
+`production` or waits for the next recovery.
 
 ### 2.2 Serial logging is compiled into the shipping build
 
@@ -65,8 +116,11 @@ draw.**
 | on | 13.0 d | 15.6 d |
 | off | 19.8 d | 23.8 d |
 
-No compile-time option to remove it currently exists. Adding one recovers both
-standby life and flash.
+~~No compile-time option to remove it currently exists.~~ **Added 2026-08-20:
+`FALCON_LOG`, three levels, one source — see §1.1 and `src/falcon_log.h`.** The
+flash saving is measured (470 bytes at level 1, 6586 at level 0, plus 343 bytes
+of RAM at level 0). ⬜ **The 1.10 mA is still arithmetic, not a measurement** —
+`idle_current` now builds and is the env that would settle it.
 
 **Added 2026-08-19 — two consequences of the logging path that were not
 recorded here.**
@@ -375,8 +429,37 @@ produces no burst and no `JOGV` line. This is an instrumentation gap.
 ### 3.5 Re-arm blanking
 
 On entering `STATE_MONITORING`, queued any-motion edges are discarded and a
-blanking window opens. Edges timestamped within it are ignored, which prevents
-both a delivery-ordering artefact and residual stop ringing from re-latching.
+blanking window opens. Motion evidence inside it is ignored, which prevents both
+a delivery-ordering artefact and residual stop ringing from re-latching.
+
+🔴 **Corrected 2026-08-20: until that date this blanked the ANY-MOTION PATH
+ONLY.** The polled departure test in `fsm_run()` was gated by nothing and went
+live the instant `STATE_MONITORING` was entered. That was survivable while the
+polled path was unreachable — `DEFAULT_THRESHOLD_VALUE` was 0.40 and reached 1
+of 82 departures — but the self-calibrated threshold clamps to `Z_THRESH_MIN`
+(0.040) in every mounting measured, so the **ungated path became the sensitive
+one and started latching first, by about 50 ms**.
+
+Measured cost of that gap: two taps on a bench produced **nine
+latch/alarm/release cycles in 90 s**, seven of them re-latching 541–1556 ms into
+MONITORING on the alarm's own ringdown — the 2026-08-07 failure this blank
+exists to prevent, arriving through the door it did not cover. Both paths are
+now blanked identically and suppressions print:
+
+```
+FSM: polled ignored, re-arm blanking t=426 d=0.0652
+FSM: any-motion ignored, re-arm blanking t=475 q=0
+```
+
+Verified: the same provocation now produces zero latches inside the blank.
+`falcon_b1_2026-08-20.md` §2.3.
+
+⚠️ **The cost, accepted deliberately:** a genuine departure inside the blank is
+now missed by the polled path too. Any-motion, the path that actually catches
+slow departures, has been blanked in this exact window since 08-07, so this
+makes the two consistent rather than opening a new blind spot — but it has not
+been tested in a car, and only a slow-run session can say whether that window is
+ever occupied.
 
 The window ends when the lateral has been measured quiet
 (`lat_monitor.quiet_run() >= MONITOR_REARM_QUIET`), floored by
@@ -481,12 +564,15 @@ Values that carry safety consequence, with derivation and evidence status.
 
 Ordered by consequence. Items are measured unless stated.
 
-1. **Flash headroom exhausted (68 bytes).** Blocks the TWI timeout fix and all
-   further work. §2.1. **Named candidate not previously listed here
-   (2026-08-19): `RollingAvg` still allocates with `new`**, so malloc and free
-   are linked into the image. Costed at 586 bytes in the superseded 2026-08-14
-   plan (its session D4) and dropped from the 2026-08-18 plan by oversight. It
-   also defeats the stated reason the vendored Wire driver avoids `new`.
+1. ~~**Flash headroom exhausted (68 bytes).**~~ **RESOLVED 2026-08-20 — §2.1.**
+   The named candidate was right: `RollingAvg` was allocating with `new`, and
+   giving it a fixed member array recovered **644 bytes** (costed at 586) and
+   removed `malloc`/`free`/`realloc` from the image entirely. `FALCON_LOG`
+   recovers a further 470 at level 1 or 6586 at level 0. ⚠️ The TWI-timeout
+   framing above is itself stale: `-DWIRE_TIMEOUT` was superseded on 2026-08-12
+   by the vendored `lib/Wire1` spin guard for 124 bytes. **What remains is that
+   80 bytes free is not headroom** — B1 and the polled re-arm gate spent 626 of
+   the recovery, so further instrumentation belongs on `production`.
 2. **Arrival gate has no margin at low speed.** Mode of the distribution sits on
    the threshold; four measurements at 1.02–1.03x. §2.5. **2026-08-19: the
    CRUISE CEILING half is measured — 0.060–0.080 across five logged runs, both
@@ -576,14 +662,25 @@ Two method notes:
 
 ## 7. Instrumentation gaps
 
-1. The log cannot distinguish a departure latched at the start of travel from
-   one latched at the stop. This is the signature of the project's most
-   dangerous failure and it has to be reconstructed by hand.
+1. ~~The log cannot distinguish a departure latched at the start of travel from
+   one latched at the stop.~~ **CLOSED 2026-08-20 by B1** —
+   `FSM: Departure latched (path) ml= q= dq= td=`. `dq` counts motion evidence
+   the re-arm blank discarded this episode and `td` says how long ago, which is
+   the reconstruction the 08-18 session did by hand. `dq≥1` with `td` of a few
+   seconds is the missed-departure signature; `dq=0`, or a large `td`, means the
+   latch stands on its own. Verified on the bench to read `dq=3 td=90129` across
+   three real discards. ⬜ Not yet seen against a real missed departure, which
+   is a 17–35 fpm car event. `falcon_b1_2026-08-20.md`.
 2. `bz` prints only on `ACC-INT` lines, never on the periodic sample line, so
    the log cannot establish whether the beacon was sounding at a given moment.
 3. Lateral `m` does not reveal slow travel — it reads at rest levels during a
    20 fpm run — so a missed departure leaves almost no trace.
-4. The polled departure path produces no burst and no jog verdict.
+4. The polled departure path produces no burst and no jog verdict. **Half
+   closed 2026-08-20: it now PRINTS.** B1 emits the latch line at the state
+   transition, which every path passes exactly once, so a polled departure is no
+   longer silent and run counts taken from `Departure latched` no longer
+   undercount. The burst and the jog verdict are still absent — that is B3, and
+   it remains outstanding.
    **Confirmed live 2026-08-19, and it is worse than "no burst": the path
    prints NOTHING.** `FSM: Departure latched (any-motion)` sits inside
    `if (any_motion_pending)`, so a polled departure enters MOVEMENT_DETECTED

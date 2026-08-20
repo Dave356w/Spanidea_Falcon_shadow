@@ -164,7 +164,12 @@ raises an interrupt. This is the only departure detector that works: the
 firmware's own polled average spans 1.28 s and flattens a departure ramp to
 nothing — it has never caught one in a hoistway.
 
-A polled threshold test remains as a redundant path, and costs nothing.
+A polled threshold test remains as a redundant path. ⚠️ **"Costs nothing" was
+true only while its threshold was the fixed 0.40, which reached 1 of 82
+departures.** Since the threshold became self-calibrated (2026-08-18) it clamps
+to `Z_THRESH_MIN` 0.040 in every mounting measured, and the path went from
+near-unreachable to the *first* to latch — which is how it came to produce false
+departures on a stationary bench. It is re-arm blanked as of 2026-08-20.
 
 ### 5.2 Arrival — three paths, all reaching the same exit
 
@@ -443,7 +448,7 @@ t=123456 a=9.750 avg=9.763 st=4 rd=11584 ov=39 tk=1703 im=3
 | `avg=` | 32-sample rolling average (1.28 s) |
 | `st=` | FSM state, §4 |
 | `tw=` | TWI wait-guard trips, printed only when nonzero. Wedged transactions the vendored Wire1 caught and recovered by re-initialising the peripheral; each one would previously have frozen the sample ISR until the watchdog fired. See `lib/Wire1/src/utility/twi1.c`. |
-| `rd=` | duration of the I2C read, µs (~11500 — 29% of the sample period) |
+| `rd=` | duration of the I2C read, µs. **~10360 as of 2026-08-20** (was ~11500): `calc_avg()` sums 32 floats per sample and the array moved from the heap to a fixed member, so the compiler addresses it directly. 26% of the sample period. |
 | `ov=` | samples lost to ring overrun |
 | `tk=` | ISR ticks since boot; compare against printed lines to separate "ISR not firing" from "print path losing samples" |
 | `im=` | cumulative any-motion edge count |
@@ -491,6 +496,47 @@ t=123456 a=9.750 avg=9.763 st=4 rd=11584 ov=39 tk=1703 im=3
 | `boot_mcusr` | `.noinit` | reset cause, captured before constructors |
 
 ---
+
+### 8.1 The latch line — added 2026-08-20 (B1)
+
+Every departure latch prints exactly one of these, whatever caught it. Before
+2026-08-20 only the any-motion path printed and the polled path was **silent**,
+so any run count taken from `Departure latched` undercounted — and undercounted
+exactly the runs the backstop caught.
+
+```
+FSM: Departure latched (polled) ml=91848 q=181 dq=3 td=90129
+```
+
+| field | meaning |
+|---|---|
+| `(path)` | `any-motion`, `polled`, `velocity`, or `unknown` |
+| `ml=` | ms since `STATE_MONITORING` was entered |
+| `q=` | `lat_monitor.quiet_run()` at the latch |
+| `dq=` | motion evidence the re-arm blank discarded this episode, **both paths** |
+| `td=` | ms since the last discard, or −1 if there was none |
+
+**Reading it for a missed departure** — the failure where the departure edge is
+thrown away and the latch happens at the *stop*, leaving the beacon over a car
+that has already arrived:
+
+- `dq=0` → nothing was discarded; this latch is the first motion evidence of the
+  episode → **departure at the start of travel**.
+- `dq≥1` and `td` a few seconds → something was discarded shortly before this
+  latch → **the discard was probably the real departure and this latch is the
+  stop**.
+- `dq≥1` and `td` very large → discards happened, but long ago; this latch
+  stands on its own.
+
+Suppressions print their own lines, and are what `dq` counts:
+
+```
+FSM: polled ignored, re-arm blanking t=426 d=0.0652
+FSM: any-motion ignored, re-arm blanking t=475 q=0
+```
+
+`d=` is the polled excursion that was suppressed, in m/s² — compare it against
+`Threshold-Value` to judge whether the gate is hiding something real.
 
 ## 8a. Method — tuning a threshold by replaying logged bursts
 
@@ -607,7 +653,7 @@ changing one.
 | `LATCH_FAILSAFE_MS` | **240000** | ⚠️ a placeholder around the brownout, not a tuning value — the hardware dies at ~243 s |
 | `STOP_CONFIRM_MS` | 5000 | continuous quiet before silencing |
 | `STOP_BAND_VALUE` | 0.10 | what "stopped" means to the confirm timer |
-| `MONITOR_REARM_MS` | 6000 | deafness after a release, so arrival ringing cannot re-latch |
+| `MONITOR_REARM_MS` | 6000 | deafness after a release, so arrival ringing cannot re-latch. ⚠️ **Gated the any-motion path ONLY until 2026-08-20** — the polled test was ungated and, once `threshold_value` became self-calibrated and clamped to 0.040, was latching ~50 ms *before* any-motion. Two bench taps produced nine alarm cycles in 90 s. Both paths blanked identically now; suppressions print as `polled ignored` / `any-motion ignored`. `falcon_b1_2026-08-20.md` §2.3 |
 | `MOVEMENT_DETECTION_TIMEOUT_MS` | 200 | dwell before the beacon sounds. ⚠️ **A CEILING, NOT A FLOOR** — `STATE_MOVEMENT_DETECTED` exits early whenever `\|w\| > \|vel_departure\|`, and `vel_departure` logs as `0.000` on every run, so the real dwell is usually much shorter. Until `74e2f1c` the ramp detector's safety silently depended on this being ≥200 ms; §5.3. Do not treat it as a guaranteed delay |
 | `CALIB_TIMEOUT_MS` / `CALIB_RETRIES` | **6000** / 2 | calibration window and retries (10000 -> 6000 on 2026-08-14; `XY_CALIB_BUCKETS` 10 -> 6 and `XY_CALIB_MIN_BUCKETS` 6 -> 4 with it) |
 
