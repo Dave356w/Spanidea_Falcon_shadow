@@ -1,4 +1,4 @@
-# Automatic operation at contract speed, 2026-08-20 — session C's table, and both arming gates at minimum on one run
+# Automatic operation at contract speed, 2026-08-20 — session C's table, and the peak collector arming by one sample
 
 **In-car, automatic, 300 fpm, 4-floor building, Dave dispatching.** Build
 `build-2026-08-20`. Capture `falcon_srcs/datasets/260820-140000.log`.
@@ -29,7 +29,7 @@ Aggregates:
 
 - **arrivals 0.459–0.657, every one inside 1.46×**, three below 1.10×
 - **`q`: 5, 5, 5, 6, 6, 8, 8, 9, 10, 16, 35** — three at the floor
-- **`ro`: 4, 6, 6, 7, 8, 8, 9, 9, 10, 12, 13** — `g=0` on **4 of 11**
+- **`ro`: 4, 6, 6, 7, 8, 8, 9, 9, 10, 12, 13** — `g=0` at the ARM print on 4 of 11, but the ramp gate opened on **all eleven** shortly after (§2a)
 - **ramp 11/11, `dir=100` every time, mean 471–511**
 
 ⚠️ **`dep path` is EVALUATION order, not detection order.** The polled test runs
@@ -139,9 +139,16 @@ exactly the 487–501 band from 08-12. Every single one latched **after** the pe
 detector had already released.
 
 Lifetime it has now fired ~28 times and has never once been the path that
-released the beacon, because it is gated on the same `arr_armed` flag as the
-detector it exists to back up. §2 is what that costs: when arming is marginal
-both go off together.
+released the beacon — not because it shares a gate (it does not; `ramp_gate` is
+independent and reversal-only) but because **the peak detector always gets there
+first**. The deceleration plateau is itself above `ARRIVAL_PEAK_VALUE`, so the
+polled peak crosses on the ramp's leading edge while the ramp verdict needs
+~1.76 s of sustained one-signed deceleration.
+
+⬜ **So its value is still entirely theoretical.** It is insurance for a stop the
+peak detector misses, and no such stop has been recorded. The 3-of-11 runs where
+the peak collector armed by a single sample are the closest this has come to
+needing it.
 
 ## 6. What this session did not settle
 
@@ -149,5 +156,7 @@ both go off together.
 - **The polled re-arm gate added this morning cost nothing** — shortest dwell was
   `ml=6718`, well outside the ~2.5 s blank, so a departure inside the blank
   remains untested in a car.
-- **`v=2` still has never fired.** The reversal path was *unavailable* four
-  times; it has still never been the path that armed.
+- **`v=2` still has never fired.** Quiet has won the arming race on every run
+  ever recorded, so the union's reversal branch has never been the path that
+  armed the peak collector — which is exactly why `ramp_gate` had to be a
+  separate counter rather than `arm_via == 2`.
