@@ -52,6 +52,17 @@ before committing — `BURST k=dep` 12, `k=arr` 14, `JOGV` 12, `RAMP` 14, `ARM`
 ⚠️ `BURST k=dep` is **12 against 14 departures**. That is not a distillation
 loss — two runs emitted no departure burst at all. See the note, §2.
 
+## Added 2026-08-21 pm — `260821-105230.log`
+
+6 automatic runs at 350 fpm, same machine and session as `260821-101915.log`,
+build **`67ca85b`** — the B3 verification runs, and the first capture where
+**every departure carries a burst** (6/6; the morning's build gave 12/14).
+Both `(polled)` latches printed `(armed)`, confirming `burst_dep_am` records
+detection rather than evaluation order. Zero `(obs)` lines yet — no
+polled-only departure has occurred since the flash; the next one prints it.
+Write-up: `falcon_START_HERE_2026-08-21.md` §3. All 6 runs labelled `run` in
+`session_g_labels.csv`.
+
 ## Verified equivalent
 
 `graph/jog_window_replay.py` produces byte-identical output against either

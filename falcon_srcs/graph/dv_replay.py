@@ -85,6 +85,7 @@ MODE = {
  '260820-150000': ('automatic', 300, 'falcon_automatic_2026-08-20: first automatic operation at contract speed, 300 fpm'),
  '260820-152131': ('automatic', 300, 'falcon_ramp_priority_2026-08-20 §7: "the 1-4 / 4-1 sequence", 11 runs, same installation'),
  '260821-101915': ('automatic', 350, 'falcon_350fpm_2026-08-21: 14 automatic runs at 350 fpm, cab, Dave driving -- the out-of-sample test of this tool'),
+ '260821-105230': ('automatic', 350, 'falcon_START_HERE_2026-08-21 §3: the B3 verification runs, same machine and session as 260821-101915, build 67ca85b'),
  '260811-122214': ('unknown', None, 'named in no session note'),
 }
 
