@@ -356,9 +356,22 @@ What *can* be measured offline, and was:
 - **`STOP_LATERAL_QUIET` 8 is supported directly.** The same predicate at the
   same value already runs as `MONITOR_REARM_QUIET`, and it prints when it is
   satisfied: **102 occurrences of `re-arm blank cleared early, settled at N ms`
-  across nine captures — min 1507, p50 2506, p90 2556, max 5767.** p50 sits on
-  `MONITOR_REARM_MIN_MS` 2500, which floors it, so the true settle is at or
-  below that in most runs.
+  across nine captures — min 1507, max 5767.**
+
+  ⚠️ **Read the distribution, not the median.** 95 of the 102 sit at or within
+  100 ms of `MONITOR_REARM_MIN_MS` 2500, which floors them — those are
+  *censored*, and say only "quiet by 2.5 s", not when. The informative subsets
+  are the two ends:
+
+  - **19 uncensored**, from the 08-18 captures which predate the floor:
+    **1507–1589 ms**. The lateral reached eight consecutive quiet metrics
+    within ~1.6 s of beacon-off on every one.
+  - **7 above the floor: 2605, 2637, 2768, 2867, 3522, 5079, 5767 ms.** These
+    are the cost tail and they are what the added-delay estimate must be built
+    on, not the median.
+
+  ⚠️ It also mixes builds — the sub-2500 values can only come from firmware
+  without the floor — so this is a pooled observation, not a controlled one.
 - **`XY_STILL` is not pinned at its clamp.** 56 calibrations on file learn
   0.0350–0.1920 against clamps of [0.02, 0.40]. (An earlier draft of this note
   confused this with the *Z* threshold, which does clamp to `Z_THRESH_MIN` in

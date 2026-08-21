@@ -489,12 +489,27 @@ static_assert(XY_CALIB_MIN_BUCKETS <= XY_CALIB_BUCKETS,
  * MONITOR_REARM_QUIET, and it prints when it is satisfied. Across the corpus:
  *
  *     "re-arm blank cleared early, settled at N ms"
- *     n=102   min 1507   p50 2506   p90 2556   max 5767
+ *     n=102   min 1507   max 5767
  *
  * So eight consecutive quiet metrics after a real stop is not a hope, it is a
- * hundred measured occurrences on four machines. (p50 sits on top of
- * MONITOR_REARM_MIN_MS 2500, which floors it -- the true settle is at or below
- * that in most runs, censored from below.)
+ * hundred measured occurrences on four machines.
+ *
+ * ⚠️ READ THE DISTRIBUTION, NOT THE MEDIAN, and this corrects a first draft
+ * that quoted p50 2506 as though it were a settle time. 95 of the 102 sit at
+ * or within 100 ms of MONITOR_REARM_MIN_MS 2500, which FLOORS them: they say
+ * "quiet by 2.5 s", not when. The two informative ends:
+ *
+ *   19 uncensored (08-18 captures, which predate the floor)   1507 - 1589 ms
+ *   7 above the floor    2605 2637 2768 2867 3522 5079 5767 ms
+ *
+ * The seven are the cost tail and are what the added-delay expectation must be
+ * built on. THE ADDED ALARM IS THEREFORE NOT "~2.5 s" -- on the worst stop
+ * measured the lateral did not reach eight quiet metrics until 5.8 s after the
+ * beacon would have stopped today, and the confirm window cannot even begin
+ * accumulating until it does.
+ *
+ * ⚠️ It also pools builds -- a value below 2500 can only come from firmware
+ * without the floor -- so treat it as observation, not a controlled result.
  *
  * It also FITS INSIDE THE BEEP. Eight metrics span 320 ms at 25 Hz and the
  * alarm's longest contiguous listening window is 600 ms (alarm.h), so the
