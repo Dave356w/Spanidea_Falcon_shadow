@@ -123,7 +123,41 @@ and 0.965 against 1.27–1.32 mid-shaft, ramp mean 523/509 against 595–611, an
 lateral contrast 1.1–1.2×. **Three quantities moving together.** Whether that
 reproduces at inspection speed is unknown and cheap to find out.
 
-## 4.4 Whatever it takes to make `Threshold-Value` exceed its floor
+## 4.4 ⭐ A deliberate quick-reversal batch — measure window B on purpose
+
+Added after the 08-21 wrap-up, from Dave's own observation: *move, stop,
+reverse direction, and move again before the arrival has settled* — the new
+run is not acknowledged while the old one is ending. Two windows, opposite
+safety character:
+
+- **Window A — reversal BEFORE the release.** Still in `STATE_DECELERATING`;
+  the movement restarts the confirm window and the second run is subsumed in
+  the first alarm. No new `Departure latched` prints, but **the beacon is ON
+  while the car moves — the correct direction.** Accounting cost only. The
+  §4.2 veto *widens* this window by delaying releases.
+- **🔴 Window B — reversal AFTER the release, inside the re-arm blank, before
+  the lateral settles.** Both live departure paths are blanked (polled too,
+  since 08-20), and the rest-gate never fires because quiet never comes — the
+  car is already moving. The blank runs to its 6000 ms cap; after it, cruise
+  emits no fresh any-motion edges, so the run can stay invisible until the
+  brake latches it — **item 11's shape**. The rest-gated fix's 0-misses-in-24
+  was validated on properly spaced runs; Dave confirms his testing always
+  spaced them. This is the residual exposure.
+
+**The batch:** pairs of short runs with a reversal at varying gaps after
+beacon-off — immediately, ~1 s, ~2 s, ~4 s — plus a few reversing *before*
+beacon-off (window A). Call each aloud. Score: did the second departure
+latch, on which path, and how long after true motion start.
+
+⚠️ **The blank is load-bearing — do not conclude 'shorten it'.** It exists
+because of the HYDRO jerk-at-rest: a down valve levels in smoothly, then a
+jerk at rest re-latched a trip that had already ended (the 2026-08-07 guard).
+A reversal-before-rest keeps the gate closed *by design*. Any fix must
+distinguish jerk-at-rest from a genuine new departure by SHAPE or sign, not
+by time — and that is a corpus question first: hydro captures and jog bursts
+are on file to score a candidate against before any firmware moves.
+
+## 4.5 Whatever it takes to make `Threshold-Value` exceed its floor
 
 It has read **0.040000 — the clamp floor — on every mounting on file**, so the
 self-calibrating polled threshold has never actually been demonstrated to learn
@@ -180,6 +214,18 @@ show the window was quiet (see §5 trap 1).
 4. 🟠 **Arming rests on the minimum.** `q` hit exactly `ARRIVAL_ARM_SAMPLES` (5)
    on two of fourteen runs. The reversal backup (`ro` ≥ 15) was available on two.
 5. 🟠 **`ARRIVAL_QUIET_MSS` 0.15 against measured cruise 0.27–0.29.**
+5a. 🟠 **§4.2 adds a measured release delay, and the tail is real.** Every
+   `DECELERATING → STOPPED` interval, measured from the captures: pre-veto
+   (54 runs, 08-20) median 9.6 s, max 11.4 s — a hard ceiling. Veto armed
+   (22 runs, 08-21) median 10.9 s, **p90 15.3 s, max 17.1 s**, `SL: held` on
+   all 22. Dave noticed it from the car unprompted. NOT correlated with low
+   contrast — the 17.1 s worst case had the day's HIGHEST `mx/xs` (4.4×), so
+   these are stops where the lateral genuinely kept ringing; the veto was
+   doing what it is specified to do. Bounded by the 60 s cap. Whether ~15 s
+   worst-case to beacon-off is acceptable is a product call; the knobs are
+   `STOP_LATERAL_QUIET` or a tighter cap, and any loosening trades back
+   toward the 08-20 failure direction. Measurement: `decel_time.py` method,
+   nearest-following-sample timestamps, good to ~1 sample.
 6. **Quiescent current has never been measured.** `idle_current` builds.
 7. **Battery divider — three answers, no meter.**
 8. **No written definition of production ready.** The only exit criteria in the
