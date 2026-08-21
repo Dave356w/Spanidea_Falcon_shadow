@@ -241,11 +241,33 @@ unusable on the other, and `g=` is not the discriminator —
   26 bursts against 33 latches in `260820-150000.log`.
 - `bz=` on periodic lines is closed (B2); `m=`/`q=` are logged, which is what
   makes §5's replay possible at all.
-- ⚠️ **CORRECTED 2026-08-21: there is headroom, and this line was wrong.** It
-  quoted `falcon_START_HERE_2026-08-20.md` §1's "80 free", which predates the
-  `RollingAvg` and `FALCON_LOG` recoveries. `platformio.ini`'s measured table,
-  same source and same day, is the authority: **`ATmega328PB` 706 free,
-  `production` 1134, `production_silent` 6902.** §4 fits.
+- ⛔ **THE CORRECTION ABOVE WAS ITSELF WRONG, AND IT BROKE THE BUILD.
+  Re-corrected 2026-08-21 afternoon against real `pio run` output.** It said
+  `falcon_START_HERE_2026-08-20.md` §1's "80 free" predated the `RollingAvg`
+  and `FALCON_LOG` recoveries and promoted `platformio.ini`'s table instead.
+  **That is backwards.** The `platformio.ini` table is the stale one: it was
+  measured at `b79298c`, and START_HERE §2 records the **626 bytes B1 spent
+  afterwards** on latch-attribution instrumentation. 706 − 626 = 80, which is
+  exactly what §1 says. A baseline build of `345613f` on the bench machine
+  reproduces START_HERE to the byte on all three environments — **32176 /
+  31706 / 25590, i.e. 80 / 550 / 6666 free.**
+
+  The consequence is in §4.2. **`ATmega328PB` overflowed by 498 bytes,
+  `production` by 72 and `bench_battery` by 184** — three of five environments
+  did not build, including the one that ships and the one every test session
+  must use. Recovered in `ce28d9d`, out of the log plumbing rather than out of
+  §4.2, which ships unchanged: **32112 / 31746 / 31838, i.e. 144 / 510 / 418
+  free**, and RAM 1505 → 1493, flashed and verified on the bench. Full
+  account: `falcon_flash_budget_2026-08-21.md`.
+
+  ⚠️ **The method failure is the transferable part.** Both wrong numbers came
+  from reading a committed table instead of running the compiler, and the cost
+  estimate that sat beside them was *fine* — +588 predicted, +578 and +622
+  measured. An estimate is only as good as the budget it is charged against.
+  `api.registry.platformio.org` was blocked in the environment that wrote this
+  note, so a whole-image build genuinely was not possible there; the error was
+  not saying so loudly enough, and treating a committed table as an authority.
+  **Build it, on the bench machine, before quoting free space.**
 
 ---
 
@@ -288,20 +310,41 @@ bench-session watch items are there.
 **Measured cost** — `avr-g++ -mmcu=atmega328p -Os`, same flags both sides, the
 translation unit before and after:
 
-| | flash (.text + .progmem) | against free | spare |
+⛔ **THE `against free` COLUMN BELOW IS WRONG — it uses `platformio.ini`'s stale
+table, see S10. The estimate was good; the budget was not.** Struck through and
+replaced by the whole-image `pio run` numbers underneath.
+
+| | flash, estimated | ~~against free~~ | ~~spare~~ |
 |---|---|---|---|
-| `FALCON_LOG` 1 / 2 | **+588 B** | 1134 on `production` | 546 |
-| " | " | 706 on `ATmega328PB` | **118** ⚠️ |
-| `FALCON_LOG` 0 | **+214 B** | 6902 on `production_silent` | 6688 |
+| `FALCON_LOG` 1 / 2 | **+588 B** | ~~1134 on `production`~~ | ~~546~~ |
+| " | " | ~~706 on `ATmega328PB`~~ | ~~118~~ |
+| `FALCON_LOG` 0 | **+214 B** | ~~6902 on `production_silent`~~ | ~~6688~~ |
 
-RAM **+6 B** (`sizeof(MovementService)` 70 → 76).
+**Measured for real, `pio run` on the bench machine, `345613f` → `4c253b7`:**
 
-⚠️ **The `FALCON_LOG` 2 env is now tight**, and this project's own rule is that
-80 bytes is not headroom. 118 is not much more. `production` is comfortable and
-it is what ships, but `FALCON_LOG` 2 is the build every test session must use,
-so **build it for real before the bench session.** Of the 588, the `SL: rel`
-line is 173 — it was 264 until `m=` and `xs=` were dropped from it, `xs` being
-recoverable from the calibration block at the top of every capture.
+| env | before | after | free before | result |
+|---|---|---|---|---|
+| `ATmega328PB` (FALCON_LOG 2) | 32176 | 32754 | 80 | **498 OVER** ⛔ |
+| `production` (FALCON_LOG 1) | 31706 | 32328 | 550 | **72 OVER** ⛔ |
+| `bench_battery` | — | 32440 | — | **184 OVER** ⛔ |
+| `production_silent` (FALCON_LOG 0) | 25590 | 25842 | 6666 | ok |
+
+So the term costs **+578 on `ATmega328PB` and +622 on `production`** against
+the +588 estimated — the estimate was sound to within about 6%. RAM **+6 B**
+(`sizeof(MovementService)` 70 → 76), as predicted.
+
+⚠️ **`SL: rel` is 173 bytes** by the stub measurement. Measured whole-image it
+is **80–84** — the stub over-counts because it cannot see what the linker
+shares. Do not budget from stub numbers.
+
+✅ **Resolved in `ce28d9d`**: 642 bytes recovered from the log plumbing —
+`flog_kv`/`flog_kvf`/`flog_kvt` fold 94 label+value pairs, `flog_nl()` replaces
+27 separate copies of `F("\r\n")`, 15 duplicated fragments move to shared
+`PROGMEM`, `flog_state()` shares one prefix across the six transition lines,
+and `flog_fixed()` retires `Print::print(double, int)`. **§4.2 itself was not
+touched and ships armed.** `ATmega328PB` 32112 (144 free), `production` 31746
+(510 free), `bench_battery` 31838 (418 free), RAM 1505 → 1493. Flashed and
+verified. See `falcon_flash_budget_2026-08-21.md`.
 
 ⚠️ Indicative, not exact: measured
 against a stub `Arduino.h` (`Print` declared but not defined, so the `F()`

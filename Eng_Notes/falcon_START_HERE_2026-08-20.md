@@ -70,12 +70,23 @@ fails often, and the notes should not be read that way.
 
 ## 1. Build on the device and in the repo
 
-| | |
-|---|---|
-| Tag | `build-2026-08-20` |
-| Plus | `ARM_REV_SAMPLES` 8 → 15 (commit `f75b0b7`, flashed and verified) |
-| `ATmega328PB` | 32176 / 32256 — 80 free, RAM 1499 |
-| Envs | `production` (31706), `production_silent` (25590), `bench_battery`, `idle_current`, `brownout_test` — all build |
+⚠️ **SUPERSEDED 2026-08-21.** The sizes below were correct on 08-20 — a
+baseline build of `345613f` reproduces them to the byte — but the lateral term
+of `falcon_fsm_logic_and_shortcomings_2026-08-21.md` §4.2 then pushed three of
+five environments past the end of flash. Recovered in `ce28d9d`; the current
+numbers are the right-hand column and `falcon_flash_budget_2026-08-21.md` has
+the account.
+
+| | | now (`ce28d9d`, flashed and verified) |
+|---|---|---|
+| Tag | `build-2026-08-20` | |
+| Plus | `ARM_REV_SAMPLES` 8 → 15 (commit `f75b0b7`, flashed and verified) | lateral veto in `STATE_DECELERATING`, armed, capped at 60 s |
+| `ATmega328PB` | 32176 / 32256 — 80 free, RAM 1499 | **32112 — 144 free, RAM 1493** |
+| Envs | `production` (31706), `production_silent` (25590), `bench_battery`, `idle_current`, `brownout_test` — all build | `production` **31746**, `production_silent` **25854**, `bench_battery` **31838** — all six build |
+
+⭐ **Do not quote a free-space number from a note or from `platformio.ini`.**
+Both were stale within a day and it cost a build. `pio run -e <env>` takes
+three seconds on the bench machine.
 
 Ports on the bench machine: **COM5 = log UART, COM7 = ISP**. Confirm with a
 signature read; the programmer re-enumerates constantly.
