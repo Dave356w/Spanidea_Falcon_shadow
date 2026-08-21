@@ -148,6 +148,9 @@ MovementService::MovementService(RollingAvg<float, 32> *acc_avg)
     stop_confirm_timer = 0;
     monitor_entered_ms = 0;
     rearm_cleared      = false;
+    lat_hold_reported  = false;
+    lat_hold_expired   = false;
+    lat_run_peak       = 0.0f;
     blank_discards     = 0;
     last_discard_ms    = 0;
     latch_path         = 0;
@@ -820,6 +823,7 @@ void MovementService::fsm_run()
              * run that has just begun.
              */
             lat_monitor.clear_quiet();
+            lat_run_peak = 0.0f;      /* contrast is per run -- see SL: rel */
             jog_release_pending = false;   /* no verdict from a past run   */
             ramp_reported       = false;
 
@@ -844,6 +848,16 @@ void MovementService::fsm_run()
          */
 
         current_time = millis();
+
+        /*
+         * Worst lateral seen while actually travelling. Compared against
+         * XY_STILL at the release, this is what says whether the lateral veto
+         * discriminates on THIS installation or is silently inert -- see the
+         * SL: rel block in the header.
+         */
+        if (lat_monitor.m() > lat_run_peak) {
+            lat_run_peak = lat_monitor.m();
+        }
 
         /*
          * Latched: the alarm holds from departure until an arrival transient is
@@ -1007,6 +1021,8 @@ void MovementService::fsm_run()
             FLOG.print(F("FSM: Transitioned to STATE_DECELERATING \r\n"));
             last_state = MotionStates::STATE_DECELERATING;
             stop_confirm_timer = millis();
+            lat_hold_reported  = false;
+            lat_hold_expired   = false;
 
             /*
              * Record the stop at full rate. Placed at the entry to this state
@@ -1050,7 +1066,64 @@ void MovementService::fsm_run()
             stop_confirm_timer = millis();
         }
 
+        /*
+         * ⭐ LATERAL CORROBORATION. The band above is the VERTICAL channel and
+         * a cruising car reads 1 g on it exactly as a parked one does, so on
+         * its own it cannot tell them apart -- see the STOP_LATERAL_QUIET
+         * block in the header for the release on a moving car that passed it.
+         *
+         * A VETO, never a release: it can only restart the confirm window, so
+         * it can only ever extend an alarm. An unarmed or low-contrast lateral
+         * channel makes quiet_run() climb and this term disappears, leaving
+         * exactly the behaviour that ships today.
+         */
+        if (!lat_hold_expired &&
+            (millis() - start_timer) > STOP_LATERAL_MAX_HOLD_MS) {
+            lat_hold_expired = true;
+            FLOG.print(F("SL: cap - lateral never settled, releasing on the "
+                         "band alone\r\n"));
+        }
+
+        if (!lat_hold_expired &&
+            lat_monitor.armed() &&
+            lat_monitor.quiet_run() < STOP_LATERAL_QUIET) {
+#if STOP_LATERAL_ARMED
+            stop_confirm_timer = millis();
+#endif
+            /*
+             * Rising edge only -- this runs every pass and the hold can last
+             * seconds. Printed even when unarmed: that is the whole point of
+             * STOP_LATERAL_ARMED 0, which observes the cost without paying it.
+             */
+            if (!lat_hold_reported) {
+                lat_hold_reported = true;
+                FLOG.print(F("SL: held t="));
+                FLOG.print((int32_t)(millis() - start_timer));
+                FLOG.print(F(" m="));
+                FLOG.print(lat_monitor.m(), 3);
+                FLOG.print(F(" q="));
+                FLOG.print(lat_monitor.quiet_run());
+                FLOG.print(F(" xs="));
+                FLOG.print(lat_monitor.still(), 4);
+#if STOP_LATERAL_ARMED
+                FLOG.print(F(" (armed)\r\n"));
+#else
+                FLOG.print(F(" (obs)\r\n"));
+#endif
+            }
+        }
+
         if ((millis() - stop_confirm_timer) > STOP_CONFIRM_MS) {
+            /*
+             * Every normal release, held or not. mx against xs is the contrast
+             * that says whether the veto had any grip here; see the header.
+             */
+            FLOG.print(F("SL: rel mx="));
+            FLOG.print(lat_run_peak, 3);
+            FLOG.print(F(" q="));
+            FLOG.print(lat_monitor.quiet_run());
+            FLOG.print(F("\r\n"));
+
             disable_alarm();
             disable_chase_leds();
             set_state(STATE_STOPPED);

@@ -241,8 +241,11 @@ unusable on the other, and `g=` is not the discriminator —
   26 bursts against 33 latches in `260820-150000.log`.
 - `bz=` on periodic lines is closed (B2); `m=`/`q=` are logged, which is what
   makes §5's replay possible at all.
-- **80 bytes free** on `production`. Anything in §4 lands on `production_silent`
-  (~6.6 KB free) or buys room from `FALCON_LOG` first.
+- ⚠️ **CORRECTED 2026-08-21: there is headroom, and this line was wrong.** It
+  quoted `falcon_START_HERE_2026-08-20.md` §1's "80 free", which predates the
+  `RollingAvg` and `FALCON_LOG` recoveries. `platformio.ini`'s measured table,
+  same source and same day, is the authority: **`ATmega328PB` 706 free,
+  `production` 1134, `production_silent` 6902.** §4 fits.
 
 ---
 
@@ -274,6 +277,38 @@ Addresses **S1**, and mitigates **S3** as a side effect. Measured today; §5 has
 the numbers and the tool. This is the only proposal here with evidence behind it.
 
 ## 4.2 ⭐ Require lateral stillness before silencing
+
+**✅ IMPLEMENTED 2026-08-21** — `movement_service.h` (`STOP_LATERAL_ARMED`,
+`STOP_LATERAL_QUIET`, `STOP_LATERAL_MAX_HOLD_MS`) and the `STATE_DECELERATING`
+case in `movement_service.cpp`. Shipped **armed but capped at 60 s**, with
+`STOP_LATERAL_ARMED 0` as a one-constant revert that keeps the logging. Read the
+`STOP_LATERAL_QUIET` block in the header before changing any of it — the
+bench-session watch items are there.
+
+**Measured cost** — `avr-g++ -mmcu=atmega328p -Os`, same flags both sides, the
+translation unit before and after:
+
+| | flash (.text + .progmem) | against free | spare |
+|---|---|---|---|
+| `FALCON_LOG` 1 / 2 | **+588 B** | 1134 on `production` | 546 |
+| " | " | 706 on `ATmega328PB` | **118** ⚠️ |
+| `FALCON_LOG` 0 | **+214 B** | 6902 on `production_silent` | 6688 |
+
+RAM **+6 B** (`sizeof(MovementService)` 70 → 76).
+
+⚠️ **The `FALCON_LOG` 2 env is now tight**, and this project's own rule is that
+80 bytes is not headroom. 118 is not much more. `production` is comfortable and
+it is what ships, but `FALCON_LOG` 2 is the build every test session must use,
+so **build it for real before the bench session.** Of the 588, the `SL: rel`
+line is 173 — it was 264 until `m=` and `xs=` were dropped from it, `xs` being
+recoverable from the calibration block at the top of every capture.
+
+⚠️ Indicative, not exact: measured
+against a stub `Arduino.h` (`Print` declared but not defined, so the `F()`
+strings and the call sequence survive `-Os`) and without the link-time
+`-Wl,--relax`. `api.registry.platformio.org` is blocked by this environment's
+network policy, so a whole-image `pio run` was not possible. **Build before
+flashing.**
 
 Addresses **S1** and **S2** in one place, and it is four lines.
 
@@ -317,12 +352,45 @@ judged too long, add `STOP_LATERAL_MAX_HOLD_MS` (60 s is more than five times
 the 11 s the measured event needed), after which the lateral term is dropped and
 logged.
 
-**Before flight:** replay it. Every capture carries `m=` and `q=` on the sample
-line, so "how long after each real release does `q` reach N" is answerable
-offline for all 231 releases on file. Score `STOP_LATERAL_QUIET` from that
-distribution rather than from `MONITOR_REARM_QUIET`'s 8. ⚠️ Sample lines are
-decimated 8:1, so a replay can establish that the veto *would have held* — one
-loud logged sample is sufficient evidence — but not the exact delay.
+**Before flight — ⚠️ CORRECTED 2026-08-21, and the correction matters.** This
+paragraph said to replay it because "every capture carries `m=` and `q=` on the
+sample line". **It does not.** `datasets/` holds the *distilled event corpus*;
+the periodic sample line is stripped from all but one capture
+(`260810-095551.log`, and that is a pre-25 Hz build). The raw captures are
+gitignored and live only on the bench machine, so **the release-delay replay
+cannot be run against what is committed.**
+
+What *can* be measured offline, and was:
+
+- **`STOP_LATERAL_QUIET` 8 is supported directly.** The same predicate at the
+  same value already runs as `MONITOR_REARM_QUIET`, and it prints when it is
+  satisfied: **102 occurrences of `re-arm blank cleared early, settled at N ms`
+  across nine captures — min 1507, max 5767.**
+
+  ⚠️ **Read the distribution, not the median.** 95 of the 102 sit at or within
+  100 ms of `MONITOR_REARM_MIN_MS` 2500, which floors them — those are
+  *censored*, and say only "quiet by 2.5 s", not when. The informative subsets
+  are the two ends:
+
+  - **19 uncensored**, from the 08-18 captures which predate the floor:
+    **1507–1589 ms**. The lateral reached eight consecutive quiet metrics
+    within ~1.6 s of beacon-off on every one.
+  - **7 above the floor: 2605, 2637, 2768, 2867, 3522, 5079, 5767 ms.** These
+    are the cost tail and they are what the added-delay estimate must be built
+    on, not the median.
+
+  ⚠️ It also mixes builds — the sub-2500 values can only come from firmware
+  without the floor — so this is a pooled observation, not a controlled one.
+- **`XY_STILL` is not pinned at its clamp.** 56 calibrations on file learn
+  0.0350–0.1920 against clamps of [0.02, 0.40]. (An earlier draft of this note
+  confused this with the *Z* threshold, which does clamp to `Z_THRESH_MIN` in
+  most calibrations — different constant, S6.)
+- ⬜ **What those 102 settles do NOT cover: the piezo was silent in every one
+  of them.** They are `STATE_MONITORING` events. This test runs in
+  `STATE_DECELERATING` with the beacon still sounding, which is the one
+  unmeasured thing and the reason the implementation carries a cap. See the
+  `STOP_LATERAL_QUIET` block in `movement_service.h` for the two coupling
+  mechanisms, of which the differencing gap is the one to watch.
 
 ## 4.3 Answer S9 from the departure burst, not from a new sensor
 
@@ -502,9 +570,9 @@ Four limits, all of which push the reported cost **up**:
    deferrals. A burst replay cannot close this on its own.
 2. **Re-run `graph/arming_replay.py`.** The rule touches what `arr_hit` means,
    and the standing instruction after any change to arming is to re-run it.
-3. **Cost the flash.** 80 bytes free on `production`; a second block accumulator
-   and its gate will not fit. `production_silent` has room, or buy it from
-   `FALCON_LOG` first.
+3. **Cost the flash.** `production` has 1134 bytes free per `platformio.ini`'s
+   measured table (not the 80 an earlier draft quoted — see S10), so a second
+   block accumulator and its gate should fit. Measure it rather than assume.
 4. **Ship it unarmed first**, as the ramp detector was: print
    `PKC dir= mean= would_defer=` at every crossing and fly it before it is
    allowed to change a release. That protocol is what caught the ramp's
