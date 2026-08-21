@@ -30,6 +30,28 @@ Measured 2026-08-20 by `graph/session_g.py`: **56 captures, 273 departures,
 predates the kind marker. *(An earlier revision of this file said 387; that
 figure is not reproducible and is superseded.)*
 
+## Added 2026-08-21 — `260821-101915.log`
+
+14 automatic runs at **350 fpm**, build `ce28d9d`, the first car data carrying
+the `SL:` lateral lines. Write-up: `Eng_Notes/falcon_350fpm_2026-08-21.md`.
+All 14 runs are labelled `run` in `session_g_labels.csv`, from the floors Dave
+called aloud as each one started.
+
+⚠️ **The filename timestamp is DERIVED, not recorded.** The capture that holds
+it is `device-monitor-260820-152131.log`, which had been running since 08-20
+15:45; the car session is the boot at 10:19 on 08-21, computed from device
+uptime against the file's mtime and good to about a minute.
+
+⭐ **Distilled by dropping only the periodic `^t=... a=` sample line**, not by
+an allow-list of known prefixes. The allow-list is how `RAMP latched` went
+missing from the whole corpus until 2026-08-20; a drop-list cannot lose a line
+kind nobody thought of. Every event count was checked against the raw capture
+before committing — `BURST k=dep` 12, `k=arr` 14, `JOGV` 12, `RAMP` 14, `ARM`
+14, `SL: held` 14, `SL: rel` 14, departures 14, arrivals 14, all exact.
+
+⚠️ `BURST k=dep` is **12 against 14 departures**. That is not a distillation
+loss — two runs emitted no departure burst at all. See the note, §2.
+
 ## Verified equivalent
 
 `graph/jog_window_replay.py` produces byte-identical output against either

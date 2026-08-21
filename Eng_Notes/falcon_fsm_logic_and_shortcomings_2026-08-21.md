@@ -448,11 +448,29 @@ Score it over the **227 departure bursts on four machines** already in
 veto ships behind that flag and S9 closes; if it does not, say so and the veto
 stays dead. Either outcome is worth having, and it costs no car time.
 
-This is also the honest route to **S8**: the same integral is `vel_window`'s, and
-`vel_departure` currently logs `0.000` on every run because the window is reset
-at the exit from `STATE_MOVEMENT_DETECTED` (`cpp:802`) after only a 200 ms dwell.
-Capturing peak `|w|` over the first few seconds of `STATE_MOVING` before the
-reset would make the field mean something.
+✅ **DONE 2026-08-21, and Δv SEPARATES.** `graph/dv_replay.py` scores it over
+the whole corpus; `falcon_350fpm_2026-08-21.md` §4 has the result and the
+out-of-sample test. Headline: **automatic 0.932–1.391 against inspection
+0.000–0.452, separated 2.1×**, and no threshold in 0.60–0.90 m/s produces a
+single false-automatic across all 141 inspection bursts. Gating the veto on it
+takes its cost from **96 NO-RELEASE in 208 runs to 5**, with every inspection
+capture at zero, **and it prevents the confirmed release on a moving car.**
+
+⚠️ Two qualifications that belong with the headline. The gate is blind on runs
+with no departure burst — **2 of 14 at contract speed on 08-21**, which is why
+S10/B3 is now a prerequisite. And it is not strictly safer than the shipping
+peak: one run is `OK` under the peak and `MOVING` under both vetoes, on a weak
+lateral call, and that needs resolving before anything ships.
+
+This is also the honest route to **S8**: the same integral is `vel_window`'s.
+
+⚠️ **CORRECTED 2026-08-21 pm — `vel_departure` does NOT log `0.000` on every
+run.** The 08-21 350 fpm session logged `w=-0.110`, `w=0.156` and `w=0.000` on
+different runs of the same build, so the field is sometimes populated and the
+reset at `cpp:802` does not always beat it. The claim was made from reading the
+code, not from a capture. What is still true is that it is **unreliable**, and
+capturing peak `|w|` over the first few seconds of `STATE_MOVING` before the
+reset would make it mean something.
 
 ## 4.4 Two agreeing calibration windows (S6)
 
