@@ -445,6 +445,121 @@ static_assert(XY_CALIB_MIN_BUCKETS <= XY_CALIB_BUCKETS,
 #define STOP_BAND_VALUE                (0.10)
 
 /*
+ * ─── LATERAL CORROBORATION OF THE RELEASE, 2026-08-21 ───────────────────────
+ *
+ * THE DEFECT THIS CLOSES. STOP_BAND_VALUE above tests the VERTICAL channel,
+ * and at constant velocity an accelerometer reads 1 g exactly as it does
+ * parked (§3 -- it is the same physics that killed the stillness backstop and
+ * the sensor's no-motion feature). So the confirm cannot tell a cruising car
+ * from a stopped one, and on 2026-08-20 it did not:
+ *
+ *     t=155254  FSM: Arrival (polled), peak 0.472   <- a cruise transient
+ *     t=156499  st=5  a=9.774                       <- 0.07 from a ~9.70 zero,
+ *                                                      INSIDE the 0.10 band
+ *     ... beacon silent for 11 s of confirmed travel ...
+ *
+ * The device had the evidence and did not consult it. Through those same
+ * eleven seconds the LATERAL metric read 0.205-0.884 against a rest level of
+ * 0.005-0.05 (falcon_false_release_2026-08-20.md §2).
+ *
+ * ⭐ WHY THIS IS SAFE, AND WHY IT IS NOT THE REMOVED x/y RELEASE PATH.
+ *
+ * The path removed on 2026-08-09 was a RELEASE: "lateral says still ->
+ * silence". Its failure mode is that a low-contrast installation reports still
+ * during a real move and the beacon goes quiet -- §14.4's catastrophic
+ * direction, which is why 1.19x contrast retired it.
+ *
+ * This is the OPPOSITE POLARITY. Lateral says MOVING -> do NOT silence. It is
+ * a veto on the silencing step and can only ever EXTEND an alarm. A dead,
+ * unarmed or low-contrast lateral channel makes quiet_run() climb, the term
+ * vanishes, and the behaviour is exactly what ships today. There is no input
+ * to this test that produces a release the current firmware would not also
+ * produce.
+ *
+ * ⭐ AND IT COVERS EVERY RELEASE PATH FROM ONE PLACE. disable_alarm() is
+ * reachable from exactly two lines in flight, both in STATE_DECELERATING, so
+ * the jog verdict, the any-motion cluster, the polled peak, the ramp and the
+ * failsafe all pass through this test. The jog verdict's one measured error --
+ * 1 false JOG in 63 labelled real departures, a genuine run silenced -- fires
+ * on a MOVING car, so this fences it at no extra cost.
+ *
+ * ── STOP_LATERAL_QUIET 8: measured on this exact channel ──────────────────
+ *
+ * The same predicate, at the same value, already runs in STATE_MONITORING as
+ * MONITOR_REARM_QUIET, and it prints when it is satisfied. Across the corpus:
+ *
+ *     "re-arm blank cleared early, settled at N ms"
+ *     n=102   min 1507   p50 2506   p90 2556   max 5767
+ *
+ * So eight consecutive quiet metrics after a real stop is not a hope, it is a
+ * hundred measured occurrences on four machines. (p50 sits on top of
+ * MONITOR_REARM_MIN_MS 2500, which floors it -- the true settle is at or below
+ * that in most runs, censored from below.)
+ *
+ * It also FITS INSIDE THE BEEP. Eight metrics span 320 ms at 25 Hz and the
+ * alarm's longest contiguous listening window is 600 ms (alarm.h), so the
+ * requirement is satisfiable within one sequence's quiet phase and does not
+ * depend on the 4 s beat between the status poll and the beep cycle.
+ *
+ * Negative evidence, same channel, same capture: the false release held q=0
+ * for the whole eleven seconds.
+ *
+ * ⚠️ THE ONE THING NOT MEASURED, AND IT IS THE REASON FOR THE CAP BELOW. All
+ * 102 of those settles happened in STATE_MONITORING, where THE PIEZO IS
+ * SILENT. This test runs in STATE_DECELERATING, where it is still sounding,
+ * and falcon_zxy_logic_2026-08-09.md §4 scenario 10 is exactly "buzzer
+ * coupling while beaconing -- held above threshold -- never releases".
+ *
+ * Two mechanisms, and the second is the one to watch:
+ *   1. vibration coupling -- largely handled, the sample ISR does not read at
+ *      all while the piezo is driven (main.cpp:2450), so those samples never
+ *      reach the metric;
+ *   2. ⬜ THE DIFFERENCING GAP -- m is |dax| + |day| between CONSECUTIVE
+ *      UNBLANKED samples, and XY_MAX_DT_MS is 1200, so the metric spanning a
+ *      200 ms blast+ringdown is still accepted and is a 200 ms difference
+ *      where every other metric is a 40 ms one. On a still car that is
+ *      noise-limited and harmless; on any residual oscillation it is
+ *      amplified, once per 800 ms sequence. This has never been measured.
+ *      If the bench shows it, the fix is a dt filter in lateral.cpp for THIS
+ *      consumer -- not a looser threshold.
+ *
+ * 🔴 FAILURE DIRECTION IF THIS IS WRONG. Too strict -> the beacon holds over a
+ * stopped car, which is a position lie, bounded by the cap below and then by
+ * LATCH_FAILSAFE_MS. Too loose -> exactly today's behaviour, no worse. Neither
+ * end reaches silence over a moving car.
+ *
+ * ⚠️ FIRST BENCH SESSION: watch for "SL: held" appearing on EVERY release and
+ * "SL: cap" firing at all. Either means the lateral does not settle under the
+ * beacon and mechanism 2 above is real. Set STOP_LATERAL_ARMED 0 and diagnose
+ * from the SL lines -- the revert is that one constant.
+ */
+#define STOP_LATERAL_ARMED             1     /* 0 = observe only, log and release */
+#define STOP_LATERAL_QUIET             8     /* consecutive quiet lateral metrics */
+
+/*
+ * Bound on how long the lateral term may hold a release that the vertical band
+ * alone would have made.
+ *
+ * WHY A CAP AT ALL, when LATCH_FAILSAFE_MS already bounds this state. Because
+ * the unmeasured risk above is SYSTEMATIC, not occasional: if the beacon's own
+ * blanking keeps the metric above the threshold, it does so on EVERY release,
+ * and without a cap every stop becomes a 600 s alarm. That is a worse product
+ * than the one this is fixing. A cap turns an unmeasured systematic risk into
+ * a bounded one that announces itself in the log.
+ *
+ * 60 s covers the measured event -- eleven seconds of travel after a false
+ * release -- by 5.5x, and bounds the regression to a minute.
+ *
+ * ⬜ WHAT IT GIVES UP, stated plainly: a false release early in a long express
+ * run whose remaining travel exceeds 60 s would still go silent, 60 s later
+ * than today. The measured population does not contain such a run; a 500 fpm
+ * machine over a tall building could. Raise it once the bench has shown the
+ * lateral settles under the beacon, because at that point the cap is only
+ * insurance and its cost is the thing that matters.
+ */
+#define STOP_LATERAL_MAX_HOLD_MS       60000UL
+
+/*
  * How long after entering STATE_MONITORING an any-motion edge is ignored.
  *
  * A harsh stop keeps generating any-motion for a while after the FSM has
@@ -638,6 +753,8 @@ class MovementService {
     uint32_t stop_confirm_timer;   /* start of the settled-at-1g window   */
     uint32_t monitor_entered_ms;   /* when STATE_MONITORING was entered   */
     bool     rearm_cleared;        /* settled seen -> blank ended early    */
+    bool     lat_hold_reported;    /* SL: held printed once this release   */
+    bool     lat_hold_expired;     /* STOP_LATERAL_MAX_HOLD_MS spent       */
 
     /*
      * B1 -- tell a departure latched at the START of travel from one latched

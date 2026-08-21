@@ -148,6 +148,8 @@ MovementService::MovementService(RollingAvg<float, 32> *acc_avg)
     stop_confirm_timer = 0;
     monitor_entered_ms = 0;
     rearm_cleared      = false;
+    lat_hold_reported  = false;
+    lat_hold_expired   = false;
     blank_discards     = 0;
     last_discard_ms    = 0;
     latch_path         = 0;
@@ -1007,6 +1009,8 @@ void MovementService::fsm_run()
             FLOG.print(F("FSM: Transitioned to STATE_DECELERATING \r\n"));
             last_state = MotionStates::STATE_DECELERATING;
             stop_confirm_timer = millis();
+            lat_hold_reported  = false;
+            lat_hold_expired   = false;
 
             /*
              * Record the stop at full rate. Placed at the entry to this state
@@ -1048,6 +1052,53 @@ void MovementService::fsm_run()
 
         if (delta_accel > STOP_BAND_VALUE) {
             stop_confirm_timer = millis();
+        }
+
+        /*
+         * ⭐ LATERAL CORROBORATION. The band above is the VERTICAL channel and
+         * a cruising car reads 1 g on it exactly as a parked one does, so on
+         * its own it cannot tell them apart -- see the STOP_LATERAL_QUIET
+         * block in the header for the release on a moving car that passed it.
+         *
+         * A VETO, never a release: it can only restart the confirm window, so
+         * it can only ever extend an alarm. An unarmed or low-contrast lateral
+         * channel makes quiet_run() climb and this term disappears, leaving
+         * exactly the behaviour that ships today.
+         */
+        if (!lat_hold_expired &&
+            (millis() - start_timer) > STOP_LATERAL_MAX_HOLD_MS) {
+            lat_hold_expired = true;
+            FLOG.print(F("SL: cap - lateral never settled, releasing on the "
+                         "band alone\r\n"));
+        }
+
+        if (!lat_hold_expired &&
+            lat_monitor.armed() &&
+            lat_monitor.quiet_run() < STOP_LATERAL_QUIET) {
+#if STOP_LATERAL_ARMED
+            stop_confirm_timer = millis();
+#endif
+            /*
+             * Rising edge only -- this runs every pass and the hold can last
+             * seconds. Printed even when unarmed: that is the whole point of
+             * STOP_LATERAL_ARMED 0, which observes the cost without paying it.
+             */
+            if (!lat_hold_reported) {
+                lat_hold_reported = true;
+                FLOG.print(F("SL: held t="));
+                FLOG.print((int32_t)(millis() - start_timer));
+                FLOG.print(F(" m="));
+                FLOG.print(lat_monitor.m(), 3);
+                FLOG.print(F(" q="));
+                FLOG.print(lat_monitor.quiet_run());
+                FLOG.print(F(" xs="));
+                FLOG.print(lat_monitor.still(), 4);
+#if STOP_LATERAL_ARMED
+                FLOG.print(F(" (armed)\r\n"));
+#else
+                FLOG.print(F(" (obs)\r\n"));
+#endif
+            }
         }
 
         if ((millis() - stop_confirm_timer) > STOP_CONFIRM_MS) {
