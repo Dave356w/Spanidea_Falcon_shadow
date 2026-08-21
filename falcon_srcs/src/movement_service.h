@@ -557,7 +557,7 @@ static_assert(XY_CALIB_MIN_BUCKETS <= XY_CALIB_BUCKETS,
  * from the SL lines -- the revert is that one constant.
  */
 #define STOP_LATERAL_ARMED             1     /* 0 = observe only, log and release */
-#define STOP_LATERAL_QUIET             8     /* consecutive quiet lateral metrics */
+#define STOP_LATERAL_QUIET             4     /* consecutive quiet lateral metrics */
 
 /*
  * Bound on how long the lateral term may hold a release that the vertical band
