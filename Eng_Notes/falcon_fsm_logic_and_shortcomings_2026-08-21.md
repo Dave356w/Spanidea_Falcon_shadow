@@ -285,6 +285,22 @@ case in `movement_service.cpp`. Shipped **armed but capped at 60 s**, with
 `STOP_LATERAL_QUIET` block in the header before changing any of it — the
 bench-session watch items are there.
 
+**Measured cost** — `avr-g++ -mmcu=atmega328p -Os`, same flags both sides, the
+translation unit before and after:
+
+| | flash (.text + .progmem) | against free |
+|---|---|---|
+| `FALCON_LOG` 1 / 2 | **+415 B** | 1134 on `production`, 706 on `ATmega328PB` |
+| `FALCON_LOG` 0 | **+134 B** | 6902 on `production_silent` |
+
+RAM **+2 B** (`sizeof(MovementService)` 70 → 72). It fits everywhere, with 291
+bytes still spare on the tightest env. ⚠️ Indicative, not exact: measured
+against a stub `Arduino.h` (`Print` declared but not defined, so the `F()`
+strings and the call sequence survive `-Os`) and without the link-time
+`-Wl,--relax`. `api.registry.platformio.org` is blocked by this environment's
+network policy, so a whole-image `pio run` was not possible. **Build before
+flashing.**
+
 Addresses **S1** and **S2** in one place, and it is four lines.
 
 `STATE_DECELERATING` is the single choke point every release path passes
