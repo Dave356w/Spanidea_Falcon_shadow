@@ -288,13 +288,22 @@ bench-session watch items are there.
 **Measured cost** — `avr-g++ -mmcu=atmega328p -Os`, same flags both sides, the
 translation unit before and after:
 
-| | flash (.text + .progmem) | against free |
-|---|---|---|
-| `FALCON_LOG` 1 / 2 | **+415 B** | 1134 on `production`, 706 on `ATmega328PB` |
-| `FALCON_LOG` 0 | **+134 B** | 6902 on `production_silent` |
+| | flash (.text + .progmem) | against free | spare |
+|---|---|---|---|
+| `FALCON_LOG` 1 / 2 | **+588 B** | 1134 on `production` | 546 |
+| " | " | 706 on `ATmega328PB` | **118** ⚠️ |
+| `FALCON_LOG` 0 | **+214 B** | 6902 on `production_silent` | 6688 |
 
-RAM **+2 B** (`sizeof(MovementService)` 70 → 72). It fits everywhere, with 291
-bytes still spare on the tightest env. ⚠️ Indicative, not exact: measured
+RAM **+6 B** (`sizeof(MovementService)` 70 → 76).
+
+⚠️ **The `FALCON_LOG` 2 env is now tight**, and this project's own rule is that
+80 bytes is not headroom. 118 is not much more. `production` is comfortable and
+it is what ships, but `FALCON_LOG` 2 is the build every test session must use,
+so **build it for real before the bench session.** Of the 588, the `SL: rel`
+line is 173 — it was 264 until `m=` and `xs=` were dropped from it, `xs` being
+recoverable from the calibration block at the top of every capture.
+
+⚠️ Indicative, not exact: measured
 against a stub `Arduino.h` (`Print` declared but not defined, so the `F()`
 strings and the call sequence survive `-Os`) and without the link-time
 `-Wl,--relax`. `api.registry.platformio.org` is blocked by this environment's

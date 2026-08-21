@@ -575,6 +575,62 @@ static_assert(XY_CALIB_MIN_BUCKETS <= XY_CALIB_BUCKETS,
 #define STOP_LATERAL_MAX_HOLD_MS       60000UL
 
 /*
+ * ─── "SL: rel" -- WHETHER THE VETO HAS ANY GRIP ON THIS INSTALLATION ────────
+ *
+ * THE GAP THIS CLOSES. After a false arrival the vertical band passes right
+ * through cruise, so the lateral term above becomes the ONLY thing holding the
+ * beacon. On a machine whose lateral does not separate travel from rest there
+ * is therefore no protection at all -- and "SL: held" prints only when the hold
+ * FIRES, so a capture from such a machine is indistinguishable from one where
+ * the mechanism simply was not needed. Absence of protection reads exactly like
+ * absence of need.
+ *
+ * What separates them is CONTRAST, and it has to be measured on the run, not at
+ * the stop: was the lateral loud while the car was moving? So the release line
+ * carries the worst m seen during STATE_MOVING alongside the state at the
+ * moment of silencing:
+ *
+ *     SL: rel mx=0.884 q=37
+ *          |        |      +-- quiet run at the release
+ *          |        +--------- worst metric during TRAVEL
+ *          +------------------ printed on every normal release
+ *
+ * Compare mx against the XY-Still-Value printed in the calibration block at
+ * the top of the capture -- xs is NOT repeated here, deliberately: it is
+ * constant for the deployment and the two fields it replaced cost 91 bytes of
+ * flash on a build with little to spare (see the measurement below).
+ *
+ *   mx >> xs   the channel discriminates here; the veto has grip
+ *   mx ~= xs   ⛔ NO CONTRAST -- the veto is inert on this machine and the
+ *              beacon is no better protected than it was before it existed.
+ *              This is the reading that must not stay invisible.
+ *
+ * 1.19x is the contrast that retired the x/y RELEASE path in 2026-08-09, so
+ * that is the number to compare a suspicious mx/xs ratio against. Note the
+ * asymmetry: low contrast made the old path DANGEROUS and merely makes this one
+ * USELESS -- but useless while looking identical to working is its own hazard,
+ * which is what this line exists to prevent.
+ *
+ * Printed on the confirm-satisfied release only. The failsafe path cannot be
+ * lateral-caused any more -- STOP_LATERAL_MAX_HOLD_MS expires at 60 s and
+ * LATCH_FAILSAFE_MS at 600 -- so it would carry no information there.
+ *
+ * mx is sampled from fsm_run(), one pass per drained sample, and lags by one
+ * pass because the ring is drained after the FSM runs. For a running maximum
+ * that costs nothing. The first sample of a run can still hold the departure
+ * transient's metric, which is legitimately travel and is wanted here.
+ *
+ * ⚠️ COST, MEASURED (avr-g++ -Os, .text + .progmem, same flags both sides):
+ * this line is +173 bytes and the whole lateral change is +588, against 706
+ * free on the ATmega328PB / FALCON_LOG 2 env. THAT LEAVES 118 BYTES, and this
+ * project's own rule is that 80 bytes is not headroom. `production` is
+ * comfortable (1134 free -> 546 spare) and it is what ships, but the FALCON_LOG
+ * 2 build is the one every test session must use. ⛔ BUILD IT FOR REAL BEFORE
+ * THE BENCH SESSION -- the figure above is from a stub Arduino.h without
+ * -Wl,--relax and 118 bytes is inside its error.
+ */
+
+/*
  * How long after entering STATE_MONITORING an any-motion edge is ignored.
  *
  * A harsh stop keeps generating any-motion for a while after the FSM has
@@ -770,6 +826,7 @@ class MovementService {
     bool     rearm_cleared;        /* settled seen -> blank ended early    */
     bool     lat_hold_reported;    /* SL: held printed once this release   */
     bool     lat_hold_expired;     /* STOP_LATERAL_MAX_HOLD_MS spent       */
+    float    lat_run_peak;         /* worst lateral m seen while MOVING    */
 
     /*
      * B1 -- tell a departure latched at the START of travel from one latched

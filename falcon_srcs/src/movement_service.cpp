@@ -150,6 +150,7 @@ MovementService::MovementService(RollingAvg<float, 32> *acc_avg)
     rearm_cleared      = false;
     lat_hold_reported  = false;
     lat_hold_expired   = false;
+    lat_run_peak       = 0.0f;
     blank_discards     = 0;
     last_discard_ms    = 0;
     latch_path         = 0;
@@ -822,6 +823,7 @@ void MovementService::fsm_run()
              * run that has just begun.
              */
             lat_monitor.clear_quiet();
+            lat_run_peak = 0.0f;      /* contrast is per run -- see SL: rel */
             jog_release_pending = false;   /* no verdict from a past run   */
             ramp_reported       = false;
 
@@ -846,6 +848,16 @@ void MovementService::fsm_run()
          */
 
         current_time = millis();
+
+        /*
+         * Worst lateral seen while actually travelling. Compared against
+         * XY_STILL at the release, this is what says whether the lateral veto
+         * discriminates on THIS installation or is silently inert -- see the
+         * SL: rel block in the header.
+         */
+        if (lat_monitor.m() > lat_run_peak) {
+            lat_run_peak = lat_monitor.m();
+        }
 
         /*
          * Latched: the alarm holds from departure until an arrival transient is
@@ -1102,6 +1114,16 @@ void MovementService::fsm_run()
         }
 
         if ((millis() - stop_confirm_timer) > STOP_CONFIRM_MS) {
+            /*
+             * Every normal release, held or not. mx against xs is the contrast
+             * that says whether the veto had any grip here; see the header.
+             */
+            FLOG.print(F("SL: rel mx="));
+            FLOG.print(lat_run_peak, 3);
+            FLOG.print(F(" q="));
+            FLOG.print(lat_monitor.quiet_run());
+            FLOG.print(F("\r\n"));
+
             disable_alarm();
             disable_chase_leds();
             set_state(STATE_STOPPED);
