@@ -89,6 +89,127 @@ static boolean in_isr = false;
 FalconNullLog falcon_null_log;
 #endif
 
+/*
+ * Shared log fragments. F() is PSTR() and PSTR() emits a FRESH static array
+ * at every expansion, so a label used five times was stored five times. These
+ * are the literals that appear more than once; everything used once still
+ * uses F() at the site, where it reads better.
+ */
+const char FS_A[] PROGMEM = " a=";
+const char FS_ARMED[] PROGMEM = " (armed)\r\n";
+const char FS_BAT[] PROGMEM = " bat=";
+const char FS_BZ[] PROGMEM = " bz=";
+const char FS_DIR[] PROGMEM = " dir=";
+const char FS_M[] PROGMEM = " m=";
+const char FS_N[] PROGMEM = " n=";
+const char FS_OV[] PROGMEM = " ov=";
+const char FS_PIN[] PROGMEM = " pin=";
+const char FS_Q[] PROGMEM = " q=";
+const char FS_RULE[] PROGMEM = "-------------------------------------\r\n";
+const char FS_SP[] PROGMEM = " ";
+const char FS_ST[] PROGMEM = " st=";
+const char FS_TW[] PROGMEM = " tw=";
+const char FS_UNARMED[] PROGMEM = " (unarmed)\r\n";
+
+#if FALCON_LOG > 0
+/*
+ * The two shared log primitives declared in falcon_log.h. Read the blocks
+ * there before changing either -- the reason they exist is flash, and the
+ * reason they are noinline is that the saving IS the call site: at -Os the
+ * compiler will happily inline a function this small back into all 27 places
+ * and hand the bytes straight back.
+ */
+void __attribute__((noinline)) flog_nl()
+{
+    FLOG.print(F("\r\n"));
+}
+
+void __attribute__((noinline)) flog_state(const __FlashStringHelper *name)
+{
+    FLOG.print(F("FSM: Transitioned to STATE_"));
+    FLOG.print(name);
+    FLOG.print(F(" \r\n"));
+}
+
+void __attribute__((noinline)) flog_kv(const __FlashStringHelper *label, long v)
+{
+    FLOG.print(label);
+    FLOG.print(v);
+}
+
+void __attribute__((noinline)) flog_kvf(const __FlashStringHelper *label, float v, uint8_t digits)
+{
+    FLOG.print(label);
+    flog_fixed(v, digits);
+}
+
+void __attribute__((noinline)) flog_kvt(const __FlashStringHelper *label, unsigned long t)
+{
+    FLOG.print(label);
+    FLOG.print(t);
+}
+
+void __attribute__((noinline)) flog_fixed(float v, uint8_t digits)
+{
+    if (isnan(v)) { FLOG.print(F("nan")); return; }
+
+    /*
+     * One range test in place of Arduino's isinf() and its two ovf compares.
+     * An infinity fails it and prints `ovf` rather than `inf`; nothing in
+     * graph/ distinguishes them and neither has ever appeared in a capture.
+     */
+    if (!(v > -1000000.0f && v < 1000000.0f)) { FLOG.print(F("ovf")); return; }
+
+    if (v < 0.0f) { FLOG.print('-'); v = -v; }
+
+    /*
+     * Integer part first, and the subtraction that follows is EXACT -- both
+     * operands are representable and within a factor of two of each other, so
+     * Sterbenz applies. Arduino instead adds its rounding term to the whole
+     * value before splitting, which is where its accuracy goes: at a ~9.7
+     * calibration zero the ULP is 9.5e-7, one whole count of the 6th decimal,
+     * so the term it is trying to add is smaller than the number can hold.
+     */
+    uint32_t ip   = (uint32_t)v;
+    float    frac = v - (float)ip;
+
+    /*
+     * Digits are pulled one at a time and rounding is applied at the END, on
+     * what is left over. That is ordinary round-half-up on the float's own
+     * decimal expansion, and it costs no 32-bit division and no scale factor:
+     * measured against exact decimal rounding over the real range of all 21
+     * sites it disagrees on 0.000-0.36% of values, against 0.02-45% for the
+     * Arduino routine this replaces.
+     */
+    char    buf[10];     /* digits is a literal at every site: 2, 3, 4 or 6 */
+    uint8_t n = 0;
+
+    while (n < digits) {
+        frac      *= 10.0f;
+        uint8_t d  = (uint8_t)frac;
+        frac      -= (float)d;
+        buf[n++]   = (char)('0' + d);
+    }
+
+    if (frac >= 0.5f) {
+        int8_t i = (int8_t)n - 1;
+        while (i >= 0) {
+            if (buf[i] != '9') { buf[i]++; break; }
+            buf[i--] = '0';               /* 9 carries left */
+        }
+        if (i < 0) { ip++; }              /* 0.9996 at 3 dp carries to 1.000 */
+    }
+
+    FLOG.print(ip);
+
+    if (digits) {
+        FLOG.print('.');
+        buf[n] = 0;
+        FLOG.print(buf);
+    }
+}
+#endif  /* FALCON_LOG > 0 */
+
 RollingAvg<float, 32> acceleration_avg_g;
 RollingAvg<uint16_t, 8> battery_avg;
 float x = 0, y = 0, z = 0;
@@ -1306,7 +1427,7 @@ void setup() {
      */
     FLOG.print(F("Reset cause: 0x"));
     FLOG.print(boot_mcusr, HEX);
-    FLOG.print(F("\r\n"));
+    flog_nl();
     /*
      * Configure the ADC chip here for SPI protocol.
     */
@@ -1341,15 +1462,12 @@ void setup() {
                                                   BMA4_DISABLE,
                                                   ANYMOTION_INT_LINE);
         if (rslt != BMA4_OK) {
-            FLOG.print(F("AnyMotion config FAILED : "));
-            FLOG.print(rslt);
-            FLOG.print(F("\r\n"));
+            flog_kv(F("AnyMotion config FAILED : "), rslt);
+            flog_nl();
         } else {
-            FLOG.print(F("AnyMotion armed thr="));
-            FLOG.print(ANYMOTION_THRESHOLD);
-            FLOG.print(F(" dur="));
-            FLOG.print(ANYMOTION_DURATION);
-            FLOG.print(F("\r\n"));
+            flog_kv(F("AnyMotion armed thr="), ANYMOTION_THRESHOLD);
+            flog_kv(F(" dur="), ANYMOTION_DURATION);
+            flog_nl();
         }
     }
 
@@ -1542,19 +1660,13 @@ void loop()
                     wdt_reset();
                 }
 
-                FLOG.print(F("BRN t="));
-                FLOG.print((millis() - brn_start) / 1000UL);
-                FLOG.print(F("s vcc_blast="));
-                FLOG.print(v_blast);
-                FLOG.print(F(" vcc_quiet="));
-                FLOG.print(v_quiet);
-                FLOG.print(F(" bat="));
-                FLOG.print(read_adc_pc2());
-                FLOG.print(F(" tw="));
-                FLOG.print(twi1_guard_trips1());
-                FLOG.print(F(" ov="));
-                FLOG.print(sample_overrun);
-                FLOG.print(F("\r\n"));
+                flog_kv(F("BRN t="), (millis() - brn_start) / 1000UL);
+                flog_kv(F("s vcc_blast="), v_blast);
+                flog_kv(F(" vcc_quiet="), v_quiet);
+                flog_kv(FSTR(FS_BAT), read_adc_pc2());
+                flog_kv(FSTR(FS_TW), twi1_guard_trips1());
+                flog_kv(FSTR(FS_OV), sample_overrun);
+                flog_nl();
             }
 
             /* FSM deliberately not run. */
@@ -1924,10 +2036,8 @@ void emit_burst_log()
 
     FLOG.print(F("BURST k="));
     FLOG.print(burst_kind ? F("arr") : F("dep"));
-    FLOG.print(F(" pre="));
-    FLOG.print(burst_kind ? (BURST_N - BURST_POST_ARR) : (BURST_N - BURST_POST_DEP));
-    FLOG.print(F(" n="));
-    FLOG.print(BURST_N);
+    flog_kv(F(" pre="), burst_kind ? (BURST_N - BURST_POST_ARR) : (BURST_N - BURST_POST_DEP));
+    flog_kv(FSTR(FS_N), BURST_N);
     FLOG.print(F(" signed_mmss="));
 
     /* Oldest first: the ring is full, so the oldest entry is at head. */
@@ -1935,7 +2045,7 @@ void emit_burst_log()
         FLOG.print(burst[(uint8_t)((head + i) % BURST_N)]);
         FLOG.print(' ');
     }
-    FLOG.print(F("\r\n"));
+    flog_nl();
 
     /*
      * Jog verdict, departure bursts only -- see the block above JOG_VERDICT_ARMED.
@@ -1979,9 +2089,9 @@ void emit_burst_log()
             FLOG.print(F("RUN"));
         }
 #if JOG_VERDICT_ARMED
-        FLOG.print(F(" (armed)\r\n"));
+        FLOG.print(FSTR(FS_ARMED));
 #else
-        FLOG.print(F(" (unarmed)\r\n"));
+        FLOG.print(FSTR(FS_UNARMED));
 #endif
     }
 
@@ -2017,11 +2127,9 @@ void emit_ramp_log()
     bool now = ramp_hit();
 
     if (now && !last) {
-        FLOG.print(F("RAMP latched mean="));
-        FLOG.print(ramp_mean_get());
-        FLOG.print(F(" dir="));
-        FLOG.print(ramp_dir_get());
-        FLOG.print(F("\r\n"));
+        flog_kv(F("RAMP latched mean="), ramp_mean_get());
+        flog_kv(FSTR(FS_DIR), ramp_dir_get());
+        flog_nl();
     }
     last = now;
 }
@@ -2067,17 +2175,12 @@ void emit_arm_log()
          * margin against ARM_REV_SAMPLES: ro=8 opened on the last possible
          * sample, ro=24 had 3x headroom. g=0 with ro=7 is a near miss.
          */
-        FLOG.print(F("ARM q="));
-        FLOG.print(hi);
-        FLOG.print(F(" a="));
-        FLOG.print(armed ? 1 : 0);
-        FLOG.print(F(" v="));
-        FLOG.print(arm_via);
-        FLOG.print(F(" g="));
-        FLOG.print(rgate ? 1 : 0);
-        FLOG.print(F(" ro="));
-        FLOG.print(ropp);
-        FLOG.print(F("\r\n"));
+        flog_kv(F("ARM q="), hi);
+        flog_kv(FSTR(FS_A), armed ? 1 : 0);
+        flog_kv(F(" v="), arm_via);
+        flog_kv(F(" g="), rgate ? 1 : 0);
+        flog_kv(F(" ro="), ropp);
+        flog_nl();
     }
     last_state = st;
 }
@@ -2163,21 +2266,15 @@ void emit_sample_log()
         health_n++;
         if ((uint32_t)(s.t_ms - health_last_ms) >= HEALTH_PERIOD_MS) {
             uint8_t tw = twi1_guard_trips1();
-            FLOG.print(F("HEALTH t="));
-            FLOG.print(s.t_ms);
-            FLOG.print(F(" n="));
-            FLOG.print(health_n);
-            FLOG.print(F(" ov="));
-            FLOG.print(overrun);
-            FLOG.print(F(" er="));
-            FLOG.print(err_total);
-            FLOG.print(F(" st="));
-            FLOG.print(s.fsm_state);
+            flog_kvt(F("HEALTH t="), s.t_ms);
+            flog_kv(FSTR(FS_N), health_n);
+            flog_kv(FSTR(FS_OV), overrun);
+            flog_kv(F(" er="), err_total);
+            flog_kv(FSTR(FS_ST), s.fsm_state);
             if (tw) {
-                FLOG.print(F(" tw="));
-                FLOG.print(tw);
+                flog_kv(FSTR(FS_TW), tw);
             }
-            FLOG.print(F("\r\n"));
+            flog_nl();
             health_last_ms = s.t_ms;
             health_n       = 0;
         }
@@ -2199,8 +2296,7 @@ void emit_sample_log()
     }
     decimate = 0;
 
-    FLOG.print(F("t="));
-    FLOG.print(s.t_ms);
+    flog_kvt(F("t="), s.t_ms);
 
     if (s.err_run) {
         /*
@@ -2208,23 +2304,16 @@ void emit_sample_log()
          * value, so a dead sensor is visible in the log instead of looking
          * like a stationary car.
          */
-        FLOG.print(F(" a=ERR er="));
-        FLOG.print(s.err_run);
+        flog_kv(F(" a=ERR er="), s.err_run);
     } else {
-        FLOG.print(F(" a="));
-        FLOG.print(s.accel / 1000.0f, 3);
-        FLOG.print(F(" avg="));
-        FLOG.print(s.avg / 1000.0f, 3);
+        flog_kvf(FSTR(FS_A), s.accel / 1000.0f, 3);
+        flog_kvf(F(" avg="), s.avg / 1000.0f, 3);
     }
 
-    FLOG.print(F(" st="));
-    FLOG.print(s.fsm_state);
-    FLOG.print(F(" rd="));
-    FLOG.print(s.read_us);
-    FLOG.print(F(" ov="));
-    FLOG.print(overrun);
-    FLOG.print(F(" im="));
-    FLOG.print(acc_int_count);
+    flog_kv(FSTR(FS_ST), s.fsm_state);
+    flog_kv(F(" rd="), s.read_us);
+    flog_kv(FSTR(FS_OV), overrun);
+    flog_kv(F(" im="), acc_int_count);
 
     /*
      * Velocity window: signed integral and how much of it was actually
@@ -2233,10 +2322,8 @@ void emit_sample_log()
      * one thing a capture must not hide. Costs ~14 characters a line, about
      * 5% more of the 9600 baud budget.
      */
-    FLOG.print(F(" w="));
-    FLOG.print(vel_window.w(), 3);
-    FLOG.print(F(" cv="));
-    FLOG.print(vel_window.coverage_ms());
+    flog_kvf(F(" w="), vel_window.w(), 3);
+    flog_kv(F(" cv="), vel_window.coverage_ms());
 
     /*
      * Lateral axes. Exploration only -- nothing reads these yet. The question
@@ -2244,10 +2331,8 @@ void emit_sample_log()
      * parked one, which would give a cruise-confirm and 3 s false-alarm veto
      * that z physically cannot (see the sample_log_t comment).
      */
-    FLOG.print(F(" x="));
-    FLOG.print(s.ax / 1000.0f, 3);
-    FLOG.print(F(" y="));
-    FLOG.print(s.ay / 1000.0f, 3);
+    flog_kvf(F(" x="), s.ax / 1000.0f, 3);
+    flog_kvf(F(" y="), s.ay / 1000.0f, 3);
 
     /*
      * The lateral metric the release path actually decides on, and the quiet
@@ -2258,10 +2343,8 @@ void emit_sample_log()
      * fact -- and, during the buzzer bench test, what shows whether the
      * metric ever gets under the threshold at all.
      */
-    FLOG.print(F(" m="));
-    FLOG.print(lat_monitor.m(), 3);
-    FLOG.print(F(" q="));
-    FLOG.print(lat_monitor.quiet_run());
+    flog_kvf(FSTR(FS_M), lat_monitor.m(), 3);
+    flog_kv(FSTR(FS_Q), lat_monitor.quiet_run());
 
     /*
      * Raw arrival peak. The log is decimated, so this is the ONLY way the
@@ -2269,8 +2352,7 @@ void emit_sample_log()
      * carrying the brake bounce is very unlikely to be one of the printed
      * ones.
      */
-    FLOG.print(F(" pk="));
-    FLOG.print(arrival_peak_get(), 2);
+    flog_kvf(F(" pk="), arrival_peak_get(), 2);
 
     /*
      * B2 -- beacon state on the PERIODIC line, not only on ACC-INT lines.
@@ -2281,8 +2363,7 @@ void emit_sample_log()
      * edge-triggered and absent for exactly the runs where the question
      * matters.
      */
-    FLOG.print(F(" bz="));
-    FLOG.print(get_buzzer_status() ? 1 : 0);
+    flog_kv(FSTR(FS_BZ), get_buzzer_status() ? 1 : 0);
 
     /*
      * B4 -- the RETIRED arrival bucket, printed separately from pk=.
@@ -2305,11 +2386,10 @@ void emit_sample_log()
     noInterrupts();
     float cp_r = arr_peak_prev;
     interrupts();
-    FLOG.print(cp_r, 2);
+    flog_fixed(cp_r, 2);
 
     if (err_total) {
-        FLOG.print(F(" et="));
-        FLOG.print(err_total);
+        flog_kv(F(" et="), err_total);
     }
 
     /*
@@ -2325,11 +2405,10 @@ void emit_sample_log()
      */
     uint8_t tw = twi1_guard_trips1();
     if (tw) {
-        FLOG.print(F(" tw="));
-        FLOG.print(tw);
+        flog_kv(FSTR(FS_TW), tw);
     }
 
-    FLOG.print(F("\r\n"));
+    flog_nl();
 #endif  /* FALCON_LOG >= 2 */
 
 }
@@ -2513,17 +2592,12 @@ void emit_acc_int_log()
      */
     ms.notify_any_motion(when);
 
-    FLOG.print(F("ACC-INT n="));
-    FLOG.print(count);
-    FLOG.print(F(" t="));
-    FLOG.print(when);
-    FLOG.print(F(" st="));
-    FLOG.print(ms.get_state());
-    FLOG.print(F(" bz="));
-    FLOG.print(get_buzzer_status() ? 1 : 0);
-    FLOG.print(F(" pin="));
-    FLOG.print(digitalRead(PIN_ACC_INT1));
-    FLOG.print(F("\r\n"));
+    flog_kv(F("ACC-INT n="), count);
+    flog_kvt(F(" t="), when);
+    flog_kv(FSTR(FS_ST), ms.get_state());
+    flog_kv(FSTR(FS_BZ), get_buzzer_status() ? 1 : 0);
+    flog_kv(FSTR(FS_PIN), digitalRead(PIN_ACC_INT1));
+    flog_nl();
 }
 
 /*
@@ -2607,8 +2681,7 @@ void poll_acc_int_status()
          * Disable and re-enable the feature. That forces the sensor to take a
          * fresh reference at the level the device actually sits at now.
          */
-        FLOG.print(F("ACC-STAT STUCK "));
-        FLOG.print(stuck_polls);
+        flog_kv(F("ACC-STAT STUCK "), stuck_polls);
         FLOG.print(F(" polls, re-arming any-motion\r\n"));
 
         stuck_polls = 0;
@@ -2618,9 +2691,8 @@ void poll_acc_int_status()
                                          BMA4_DISABLE,
                                          ANYMOTION_INT_LINE);
         if (rslt != BMA4_OK) {
-            FLOG.print(F("ACC-STAT re-arm FAILED : "));
-            FLOG.print(rslt);
-            FLOG.print(F("\r\n"));
+            flog_kv(F("ACC-STAT re-arm FAILED : "), rslt);
+            flog_nl();
         }
         return;
     }
@@ -2628,13 +2700,10 @@ void poll_acc_int_status()
     if (status != 0 || digitalRead(PIN_ACC_INT1) != 0) {
         FLOG.print(F("ACC-STAT s=0x"));
         FLOG.print(status, HEX);
-        FLOG.print(F(" pin="));
-        FLOG.print(digitalRead(PIN_ACC_INT1));
-        FLOG.print(F(" n="));
-        FLOG.print(acc_int_count);
-        FLOG.print(F(" sk="));
-        FLOG.print(stuck_polls);
-        FLOG.print(F("\r\n"));
+        flog_kv(FSTR(FS_PIN), digitalRead(PIN_ACC_INT1));
+        flog_kv(FSTR(FS_N), acc_int_count);
+        flog_kv(F(" sk="), stuck_polls);
+        flog_nl();
     }
 }
 
@@ -2842,14 +2911,11 @@ static void bench_battery_service()
     }
     digitalWrite(BAT_ADC_ENABLE, LOW);
 
-    FLOG.print(F("BB t="));
-    FLOG.print(now / 1000UL);
+    flog_kv(F("BB t="), now / 1000UL);
     FLOG.print(F("s raw"));
     for (uint8_t i = 0; i < BB_TAPS; i++) {
-        FLOG.print(F(" "));
-        FLOG.print(bb_taps[i]);
-        FLOG.print(F("ms="));
-        FLOG.print(c[i]);
+        flog_kv(FSTR(FS_SP), bb_taps[i]);
+        flog_kv(F("ms="), c[i]);
     }
 
     /*
@@ -2861,13 +2927,10 @@ static void bench_battery_service()
      * cannot be fully independent. Good enough to see whether the node has
      * settled by 10 ms; not a substitute for a scope if it has not.
      */
-    FLOG.print(F(" mv10="));
-    FLOG.print((uint16_t)(((uint32_t)c[3] * 3100UL) / 1023UL));
-    FLOG.print(F(" vcc="));
-    FLOG.print(read_vcc_mv());
-    FLOG.print(F(" bat="));
-    FLOG.print(battery_alarm_status_g);
-    FLOG.print(F("\r\n"));
+    flog_kv(F(" mv10="), (uint16_t)(((uint32_t)c[3] * 3100UL) / 1023UL));
+    flog_kv(F(" vcc="), read_vcc_mv());
+    flog_kv(FSTR(FS_BAT), battery_alarm_status_g);
+    flog_nl();
 }
 #endif /* BATTERY_BENCH */
 
@@ -2929,8 +2992,7 @@ void check_for_battery_voltage()
 
     battery_v = read_adc_pc2_voltage();
 
-    FLOG.print(F("  Voltage value : "));
-    FLOG.print(battery_v);
+    flog_kv(F("  Voltage value : "), battery_v);
 
     digitalWrite(BAT_ADC_ENABLE, LOW);
 
@@ -2977,11 +3039,9 @@ void check_for_battery_voltage()
      * what the logged number meant; a log that states the pack figure directly
      * cannot start that argument again.
      */
-    FLOG.print(F("  avg : "));
-    FLOG.print(battery_avg.avg());
-    FLOG.print(F("  pack_mv : "));
-    FLOG.print((uint16_t)(battery_avg.avg() * VBATT_DIVIDER));
-    FLOG.print(F("\r\n"));
+    flog_kv(F("  avg : "), battery_avg.avg());
+    flog_kv(F("  pack_mv : "), (uint16_t)(battery_avg.avg() * VBATT_DIVIDER));
+    flog_nl();
 
     /*
      * Decide on the rolling average, never on a single sample, and use separate

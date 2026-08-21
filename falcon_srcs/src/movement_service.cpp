@@ -296,11 +296,9 @@ void MovementService::notify_any_motion(uint32_t edge_ms)
         (int32_t)(edge_ms - monitor_entered_ms) < (int32_t)MONITOR_REARM_MS) {
         blank_discards++;
         last_discard_ms = edge_ms;
-        FLOG.print(F("FSM: any-motion ignored, re-arm blanking t="));
-        FLOG.print((int32_t)(edge_ms - monitor_entered_ms));
-        FLOG.print(F(" q="));
-        FLOG.print(lat_monitor.quiet_run());
-        FLOG.print(F("\r\n"));
+        flog_kv(F("FSM: any-motion ignored, re-arm blanking t="), (int32_t)(edge_ms - monitor_entered_ms));
+        flog_kv(FSTR(FS_Q), lat_monitor.quiet_run());
+        flog_nl();
         return;
     }
 
@@ -402,13 +400,10 @@ void MovementService::fsm_run()
 
             ok = lat_monitor.calib_finish();
 
-            FLOG.print(F("XY: calib b="));
-            FLOG.print(lat_monitor.buckets());
-            FLOG.print(F(" peak="));
-            FLOG.print(lat_monitor.calib_peak(), 4);
-            FLOG.print(F(" mv="));
-            FLOG.print(calib_moved ? 1 : 0);
-            FLOG.print(F("\r\n"));
+            flog_kv(F("XY: calib b="), lat_monitor.buckets());
+            flog_kvf(F(" peak="), lat_monitor.calib_peak(), 4);
+            flog_kv(F(" mv="), calib_moved ? 1 : 0);
+            flog_nl();
 
             /*
              * ─── §XY-BMAX: the per-second maxima, in time order ──────────────
@@ -440,10 +435,9 @@ void MovementService::fsm_run()
              */
             FLOG.print(F("XY: bmax"));
             for (uint8_t i = 0; i < lat_monitor.buckets(); i++) {
-                FLOG.print(F(" "));
-                FLOG.print(lat_monitor.bucket(i), 4);
+                flog_kvf(FSTR(FS_SP), lat_monitor.bucket(i), 4);
             }
-            FLOG.print(F("\r\n"));
+            flog_nl();
 
             /*
              * Retry rather than trust a window that saw movement or came back
@@ -452,9 +446,8 @@ void MovementService::fsm_run()
              */
             if ((!ok || calib_moved) && calib_attempts < CALIB_RETRIES) {
                 calib_attempts++;
-                FLOG.print(F("FSM: NOT READY - recalibrating, attempt "));
-                FLOG.print(calib_attempts + 1);
-                FLOG.print(F("\r\n"));
+                flog_kv(F("FSM: NOT READY - recalibrating, attempt "), calib_attempts + 1);
+                flog_nl();
                 start_timer = millis();
                 lat_monitor.calib_begin(millis());
                 calib_moved = false;
@@ -509,17 +502,14 @@ void MovementService::fsm_run()
             /* The raw peak detector measures against the same baseline. */
             arrival_zero_set(zero_calib_value);
 
-            FLOG.print(F("-------------------------------------\r\n"));
-            FLOG.print(F("Zero-Calib-Value : "));
-            FLOG.print(zero_calib_value, 6);
-            FLOG.print(F("\r\n"));
-            FLOG.print(F("Threshold-Value  : "));
-            FLOG.print(threshold_value, 6);
-            FLOG.print(F("\r\n"));
-            FLOG.print(F("XY-Still-Value   : "));
-            FLOG.print(lat_monitor.still(), 4);
-            FLOG.print(F("\r\n"));
-            FLOG.print(F("-------------------------------------\r\n"));
+            FLOG.print(FSTR(FS_RULE));
+            flog_kvf(F("Zero-Calib-Value : "), zero_calib_value, 6);
+            flog_nl();
+            flog_kvf(F("Threshold-Value  : "), threshold_value, 6);
+            flog_nl();
+            flog_kvf(F("XY-Still-Value   : "), lat_monitor.still(), 4);
+            flog_nl();
+            FLOG.print(FSTR(FS_RULE));
 
             /*
              * Now make the noise, and re-anchor afterwards so the first
@@ -558,7 +548,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_MONITORING:
         if (last_state != MotionStates::STATE_MONITORING) {
-            FLOG.print(F("FSM: Transitioned to STATE_MONITORING \r\n"));
+            flog_state(F("MONITORING"));
             last_state = MotionStates::STATE_MONITORING;
             /*
              * Start the re-arm blanking window, and discard anything already
@@ -600,8 +590,7 @@ void MovementService::fsm_run()
             (millis() - monitor_entered_ms) >= MONITOR_REARM_MIN_MS &&
             lat_monitor.quiet_run() >= MONITOR_REARM_QUIET) {
             rearm_cleared = true;
-            FLOG.print(F("FSM: re-arm blank cleared early, settled at "));
-            FLOG.print(millis() - monitor_entered_ms);
+            flog_kv(F("FSM: re-arm blank cleared early, settled at "), millis() - monitor_entered_ms);
             FLOG.print(F(" ms\r\n"));
         }
 
@@ -655,14 +644,12 @@ void MovementService::fsm_run()
                     polled_blank_reported = true;
                     blank_discards++;
                     last_discard_ms = millis();
-                    FLOG.print(F("FSM: polled ignored, re-arm blanking t="));
-                    FLOG.print((int32_t)(millis() - monitor_entered_ms));
+                    flog_kv(F("FSM: polled ignored, re-arm blanking t="), (int32_t)(millis() - monitor_entered_ms));
                     /* Float, counter-intuitively: Print::print(double,int) is
                      * already linked for VEL/ARM, so it is 14 bytes CHEAPER
                      * here than casting to an integer would be. Measured. */
-                    FLOG.print(F(" d="));
-                    FLOG.print(delta_accel, 4);
-                    FLOG.print(F("\r\n"));
+                    flog_kvf(F(" d="), delta_accel, 4);
+                    flog_nl();
                 }
             } else {
                 if (!latch_path) latch_path = 2;
@@ -723,10 +710,8 @@ void MovementService::fsm_run()
                 vel_reported = true;
                 vel_departure = vel_window.w();
 
-                FLOG.print(F("VEL: departure w="));
-                FLOG.print(vel_departure, 3);
-                FLOG.print(F(" cov="));
-                FLOG.print(vel_window.coverage_ms());
+                flog_kvf(F("VEL: departure w="), vel_departure, 3);
+                flog_kv(F(" cov="), vel_window.coverage_ms());
 #if VEL_ARMED
                 FLOG.print(F(" LATCH\r\n"));
                 if (!latch_path) latch_path = 3;
@@ -749,7 +734,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_MOVEMENT_DETECTED:
         if (last_state != MotionStates::STATE_MOVEMENT_DETECTED) {
-            FLOG.print(F("FSM: Transitioned to STATE_MOVEMENT_DETECTED \r\n"));
+            flog_state(F("MOVEMENT_DETECTED"));
             last_state = MotionStates::STATE_MOVEMENT_DETECTED;
 
             /*
@@ -764,19 +749,16 @@ void MovementService::fsm_run()
             FLOG.print(latch_path == 1 ? F("any-motion") :
                        latch_path == 2 ? F("polled") :
                        latch_path == 3 ? F("velocity") : F("unknown"));
-            FLOG.print(F(") ml="));
-            FLOG.print(millis() - monitor_entered_ms);
-            FLOG.print(F(" q="));
-            FLOG.print(lat_monitor.quiet_run());
-            FLOG.print(F(" dq="));
-            FLOG.print(blank_discards);
+            flog_kv(F(") ml="), millis() - monitor_entered_ms);
+            flog_kv(FSTR(FS_Q), lat_monitor.quiet_run());
+            flog_kv(F(" dq="), blank_discards);
             FLOG.print(F(" td="));
             if (blank_discards) {
                 FLOG.print((int32_t)(millis() - last_discard_ms));
             } else {
                 FLOG.print(-1);
             }
-            FLOG.print(F("\r\n"));
+            flog_nl();
         }
 
         /*
@@ -804,9 +786,8 @@ void MovementService::fsm_run()
              */
             vel_window.reset(millis());
 
-            FLOG.print(F("FSM: departure velocity w="));
-            FLOG.print(vel_departure, 3);
-            FLOG.print(F("\r\n"));
+            flog_kvf(F("FSM: departure velocity w="), vel_departure, 3);
+            flog_nl();
 
             enable_alarm();
             enable_chase_leds();
@@ -816,7 +797,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_MOVING:
         if (last_state != MotionStates::STATE_MOVING) {
-            FLOG.print(F("FSM: Transitioned to STATE_MOVING \r\n"));
+            flog_state(F("MOVING"));
             last_state = MotionStates::STATE_MOVING;
             /*
              * Quiet observed before the beacon started says nothing about the
@@ -930,11 +911,9 @@ void MovementService::fsm_run()
                 arrival_peak_hit()) {
 
                 arrival_seen = true;
-                FLOG.print(F("FSM: Arrival (any-motion), edges "));
-                FLOG.print(arrival_edge_count);
-                FLOG.print(F(" peak "));
-                FLOG.print(arrival_peak_get(), 3);
-                FLOG.print(F("\r\n"));
+                flog_kv(F("FSM: Arrival (any-motion), edges "), arrival_edge_count);
+                flog_kvf(F(" peak "), arrival_peak_get(), 3);
+                flog_nl();
                 start_timer = millis();
                 set_state(STATE_DECELERATING);
                 break;
@@ -955,9 +934,8 @@ void MovementService::fsm_run()
              */
             if (arrival_peak_hit()) {
                 arrival_seen = true;
-                FLOG.print(F("FSM: Arrival (polled), peak "));
-                FLOG.print(arrival_peak_get(), 3);
-                FLOG.print(F("\r\n"));
+                flog_kvf(F("FSM: Arrival (polled), peak "), arrival_peak_get(), 3);
+                flog_nl();
                 start_timer = millis();
                 set_state(STATE_DECELERATING);
                 break;
@@ -978,19 +956,17 @@ void MovementService::fsm_run()
              */
             if (!ramp_reported && ramp_hit()) {
                 ramp_reported = true;
-                FLOG.print(F("FSM: Arrival (ramp) mean="));
-                FLOG.print(ramp_mean_get());
-                FLOG.print(F(" dir="));
-                FLOG.print(ramp_dir_get());
+                flog_kv(F("FSM: Arrival (ramp) mean="), ramp_mean_get());
+                flog_kv(FSTR(FS_DIR), ramp_dir_get());
 #if RAMP_ARMED
-                FLOG.print(F(" (armed)\r\n"));
+                FLOG.print(FSTR(FS_ARMED));
                 arrival_seen = true;
                 burst_trigger(BURST_POST_ARR, 1);
                 start_timer = millis();
                 set_state(STATE_DECELERATING);
                 break;
 #else
-                FLOG.print(F(" (unarmed)\r\n"));
+                FLOG.print(FSTR(FS_UNARMED));
                 burst_trigger(BURST_POST_ARR, 1);
 #endif
             }
@@ -1018,7 +994,7 @@ void MovementService::fsm_run()
         break;
     case MotionStates::STATE_DECELERATING:
         if (last_state != MotionStates::STATE_DECELERATING) {
-            FLOG.print(F("FSM: Transitioned to STATE_DECELERATING \r\n"));
+            flog_state(F("DECELERATING"));
             last_state = MotionStates::STATE_DECELERATING;
             stop_confirm_timer = millis();
             lat_hold_reported  = false;
@@ -1097,16 +1073,12 @@ void MovementService::fsm_run()
              */
             if (!lat_hold_reported) {
                 lat_hold_reported = true;
-                FLOG.print(F("SL: held t="));
-                FLOG.print((int32_t)(millis() - start_timer));
-                FLOG.print(F(" m="));
-                FLOG.print(lat_monitor.m(), 3);
-                FLOG.print(F(" q="));
-                FLOG.print(lat_monitor.quiet_run());
-                FLOG.print(F(" xs="));
-                FLOG.print(lat_monitor.still(), 4);
+                flog_kv(F("SL: held t="), (int32_t)(millis() - start_timer));
+                flog_kvf(FSTR(FS_M), lat_monitor.m(), 3);
+                flog_kv(FSTR(FS_Q), lat_monitor.quiet_run());
+                flog_kvf(F(" xs="), lat_monitor.still(), 4);
 #if STOP_LATERAL_ARMED
-                FLOG.print(F(" (armed)\r\n"));
+                FLOG.print(FSTR(FS_ARMED));
 #else
                 FLOG.print(F(" (obs)\r\n"));
 #endif
@@ -1118,11 +1090,9 @@ void MovementService::fsm_run()
              * Every normal release, held or not. mx against xs is the contrast
              * that says whether the veto had any grip here; see the header.
              */
-            FLOG.print(F("SL: rel mx="));
-            FLOG.print(lat_run_peak, 3);
-            FLOG.print(F(" q="));
-            FLOG.print(lat_monitor.quiet_run());
-            FLOG.print(F("\r\n"));
+            flog_kvf(F("SL: rel mx="), lat_run_peak, 3);
+            flog_kv(FSTR(FS_Q), lat_monitor.quiet_run());
+            flog_nl();
 
             disable_alarm();
             disable_chase_leds();
@@ -1143,7 +1113,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_STOPPED:
         if (last_state != MotionStates::STATE_STOPPED) {
-            FLOG.print(F("FSM: Transitioned to STATE_STOPPED \r\n"));
+            flog_state(F("STOPPED"));
             last_state = MotionStates::STATE_STOPPED;
 
             acceleration_avg_ref->fill(zero_calib_value);
@@ -1153,7 +1123,7 @@ void MovementService::fsm_run()
 
     case MotionStates::STATE_ERROR_RESET:
         if (last_state != MotionStates::STATE_ERROR_RESET) {
-            FLOG.print(F("FSM: Transitioned to STATE_ERROR_RESET \r\n"));
+            flog_state(F("ERROR_RESET"));
             last_state = MotionStates::STATE_ERROR_RESET;
         }
 
