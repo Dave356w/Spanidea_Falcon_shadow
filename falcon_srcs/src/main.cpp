@@ -109,6 +109,7 @@ const char FS_RULE[] PROGMEM = "-------------------------------------\r\n";
 const char FS_SP[] PROGMEM = " ";
 const char FS_ST[] PROGMEM = " st=";
 const char FS_TW[] PROGMEM = " tw=";
+const char FS_OBS[] PROGMEM = " (obs)\r\n";
 const char FS_UNARMED[] PROGMEM = " (unarmed)\r\n";
 
 #if FALCON_LOG > 0
@@ -799,6 +800,30 @@ static volatile bool     arr_hit       = false;
  * car, set this back to 0 first and diagnose from the JOGV lines after.
  */
 #define JOG_VERDICT_ARMED   1    /* verdict JOG -> release the latch        */
+
+/*
+ * MAY A POLLED-ONLY DEPARTURE'S VERDICT RELEASE? Default NO, deliberately.
+ *
+ * B3 (2026-08-21) gave the polled path a departure burst, so those runs now
+ * produce a JOGV line for the first time. The line is data and it is wanted.
+ * The RELEASE is a different matter: every threshold the verdict uses --
+ * JOG_OPP_RATIO_PCT, JOG_OPP_PEAK_MMSS -- was derived entirely from bursts
+ * that any-motion triggered, so letting it release a population it has never
+ * been measured on extends a rule past its evidence in the one direction
+ * §14.4 calls catastrophic. The verdict already has ONE measured error of
+ * exactly that kind: 1 false JOG in 63 labelled real departures.
+ *
+ * So a polled-only burst PRINTS its verdict and cannot act on it, and the line
+ * reads `(obs)` instead of `(armed)`. Set this to 1 once those JOGV lines have
+ * been scored -- against what the car did, never against `verdict=`, which is
+ * circular (datasets/README.md).
+ *
+ * ⚠️ This takes NOTHING away from what ships today. A run where any-motion
+ * fired sets burst_dep_am and releases exactly as before, INCLUDING runs that
+ * log `(polled)` because the polled test merely won the evaluation order --
+ * 3 of the 5 polled-latched runs on 2026-08-21 were that case.
+ */
+#define JOG_RELEASE_POLLED  0
 #define JOG_DEADBAND_MMSS   150  /* samples below this feed neither impulse */
 #define JOG_OPP_RATIO_PCT   33   /* opposite/primary >= this -> jog...      */
 #define JOG_OPP_PEAK_MMSS   900  /* ...AND opposite-side peak >= this       */
@@ -928,6 +953,21 @@ static volatile bool     burst_ready = false;  /* frozen, waiting for dump   */
 static volatile uint8_t  burst_kind = 0;       /* 0 = departure, 1 = arrival */
 
 /*
+ * B3: did the ANY-MOTION branch fire on the departure that armed this burst?
+ *
+ * Set by burst_trigger(src=1) and read once, at the dump. It cannot be
+ * contaminated mid-run: the only caller with kind=0 is the departure branch of
+ * fsm_run(), which lives inside `case STATE_MONITORING`, so once the FSM has
+ * left MONITORING nothing can set it again before the dump 3.2 s later.
+ *
+ * ⚠️ It is NOT `latch_path`. latch_path is first-setter-wins EVALUATION order,
+ * so a run that reads `(polled)` may still have had any-motion fire in the same
+ * pass -- 3 of the 5 polled-latched runs on 2026-08-21 did. This flag records
+ * DETECTION, which is what the jog verdict's provenance actually depends on.
+ */
+static volatile bool     burst_dep_am = false;
+
+/*
  * Arm the recorder. `post` is how many samples to keep AFTER the trigger; the
  * remaining BURST_N - post are pre-trigger history.
  *
@@ -966,12 +1006,22 @@ static volatile uint8_t  burst_kind = 0;       /* 0 = departure, 1 = arrival */
  * departure wins, which is the right precedence -- on a movement that brief the
  * departure burst already contains the stop.
  */
-void burst_trigger(uint8_t post, uint8_t kind)
+void burst_trigger(uint8_t post, uint8_t kind, uint8_t src)
 {
     noInterrupts();
     if (!burst_ready && burst_post == 0xFF) {
         burst_post = post;
         burst_kind = kind;
+    }
+    /*
+     * Outside the arm test on purpose. The polled branch runs FIRST and arms
+     * the burst, then the any-motion branch runs in the SAME pass and finds it
+     * already armed -- so recording provenance inside the test would lose the
+     * fact that any-motion also fired, and would silently take the jog release
+     * away from runs that have it today.
+     */
+    if (kind == 0 && src == BURST_SRC_ANYMOTION) {
+        burst_dep_am = true;
     }
     interrupts();
 }
@@ -2079,24 +2129,37 @@ void emit_burst_log()
         FLOG.print(F(" neg="));      FLOG.print(neg);
         FLOG.print(F(" ratio="));    FLOG.print(ratio_pct);
         FLOG.print(F(" opk="));      FLOG.print(sv);
+        /*
+         * ⚠️ NO NEW FIELD HERE, on purpose. `am=` was written and removed: it
+         * would have sat between opk= and verdict=, and session_g.py's JOGV
+         * regex matches `opk=(-?d+)\s+verdict=` -- one inserted field and
+         * every tool that reads jog verdicts silently stops seeing them. The
+         * (armed)/(obs) suffix already carries it: (obs) can only mean a
+         * polled-only departure, since that is the one case the release is
+         * withheld from.
+         */
         FLOG.print(F(" verdict="));
         if (ratio_pct >= JOG_OPP_RATIO_PCT && sv >= JOG_OPP_PEAK_MMSS) {
             FLOG.print(F("JOG"));
 #if JOG_VERDICT_ARMED
-            ms.jog_release();
+            if (burst_dep_am || JOG_RELEASE_POLLED) {
+                ms.jog_release();
+            }
 #endif
         } else {
             FLOG.print(F("RUN"));
         }
 #if JOG_VERDICT_ARMED
-        FLOG.print(FSTR(FS_ARMED));
+        FLOG.print((burst_dep_am || JOG_RELEASE_POLLED)
+                   ? FSTR(FS_ARMED) : FSTR(FS_OBS));
 #else
         FLOG.print(FSTR(FS_UNARMED));
 #endif
     }
 
     noInterrupts();
-    burst_ready = false;
+    burst_ready  = false;
+    burst_dep_am = false;      /* read once, at the dump -- see its block */
     interrupts();
 }
 

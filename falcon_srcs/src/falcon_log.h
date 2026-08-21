@@ -180,6 +180,7 @@ extern const char FS_RULE[] PROGMEM;
 extern const char FS_SP[] PROGMEM;
 extern const char FS_ST[] PROGMEM;
 extern const char FS_TW[] PROGMEM;
+extern const char FS_OBS[] PROGMEM;
 extern const char FS_UNARMED[] PROGMEM;
 
 

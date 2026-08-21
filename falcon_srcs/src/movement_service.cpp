@@ -125,7 +125,7 @@ extern void  arrival_peak_reset();
 extern float arrival_peak_get();
 extern bool  arrival_peak_hit();
 extern void  arrival_zero_set(float z);
-extern void  burst_trigger(uint8_t post, uint8_t kind);
+extern void  burst_trigger(uint8_t post, uint8_t kind, uint8_t src);
 
 /* Ramp detector, maintained in the sampling ISR. See the RAMP_* block there. */
 extern bool     ramp_hit();
@@ -653,6 +653,22 @@ void MovementService::fsm_run()
                 }
             } else {
                 if (!latch_path) latch_path = 2;
+                /*
+                 * B3, 2026-08-21. This path used to emit NO burst and no jog
+                 * verdict, so a departure that any-motion did not see left no
+                 * record of its own shape at all -- and on 2026-08-21, 2 of 14
+                 * runs at 350 fpm were exactly that. Every rule built on the
+                 * departure burst (the dv gate, the jog verdict, anything on
+                 * shape) was blind on them. burst_trigger() is first-arm-wins,
+                 * so calling it here and again from the any-motion branch below
+                 * costs one no-op call on the runs where both fire.
+                 *
+                 * vel_departure is deliberately NOT set here: STATE_MOVEMENT_
+                 * DETECTED already tracks peak |w| for it, which is why the
+                 * field was populated on those two runs despite this branch
+                 * never touching it.
+                 */
+                burst_trigger(BURST_POST_DEP, 0, BURST_SRC_POLLED);
                 start_timer = millis();
                 set_state(STATE_MOVEMENT_DETECTED);
             }
@@ -674,7 +690,7 @@ void MovementService::fsm_run()
         if (any_motion_pending) {
             any_motion_pending = false;
             if (!latch_path) latch_path = 1;
-            burst_trigger(BURST_POST_DEP, 0);
+            burst_trigger(BURST_POST_DEP, 0, BURST_SRC_ANYMOTION);
             vel_departure = vel_window.valid() ? vel_window.w() : 0.0f;
             start_timer = millis();
             set_state(STATE_MOVEMENT_DETECTED);
@@ -961,13 +977,13 @@ void MovementService::fsm_run()
 #if RAMP_ARMED
                 FLOG.print(FSTR(FS_ARMED));
                 arrival_seen = true;
-                burst_trigger(BURST_POST_ARR, 1);
+                burst_trigger(BURST_POST_ARR, 1, 0);
                 start_timer = millis();
                 set_state(STATE_DECELERATING);
                 break;
 #else
                 FLOG.print(FSTR(FS_UNARMED));
-                burst_trigger(BURST_POST_ARR, 1);
+                burst_trigger(BURST_POST_ARR, 1, 0);
 #endif
             }
 
@@ -1018,7 +1034,7 @@ void MovementService::fsm_run()
              * stop behaves better is assumed, not known, and it is the
              * assumption the whole approach rests on.
              */
-            burst_trigger(BURST_POST_ARR, 1);
+            burst_trigger(BURST_POST_ARR, 1, 0);
         }
 
         /*

@@ -122,6 +122,14 @@ static_assert(XY_CALIB_MIN_BUCKETS <= XY_CALIB_BUCKETS,
  * were analysed against a trigger index 40 samples off. The intended 60-post
  * arrival split takes real effect from this change onward.
  */
+/*
+ * B3 (2026-08-21): which detector armed a DEPARTURE burst. Passed to
+ * burst_trigger() so the dump can say whether any-motion fired, independently
+ * of latch_path's evaluation order. Irrelevant for arrival bursts.
+ */
+#define BURST_SRC_ANYMOTION  1
+#define BURST_SRC_POLLED     2
+
 #define BURST_POST_DEP  60  /* departure: 20 pre / 60 post */
 #define BURST_POST_ARR  60  /* arrival:   20 pre / 60 post */
 
