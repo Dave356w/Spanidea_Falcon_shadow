@@ -220,7 +220,33 @@ FSM: Transitioned to STATE_MONITORING
   at 300 fpm. That is still a car measurement and it is still owed.
 
   All six `flog_state()` transitions have now printed — MONITORING,
-  MOVEMENT_DETECTED, MOVING, DECELERATING, STOPPED and back to MONITORING.
+  MOVEMENT_DETECTED, MOVING, DECELERATING, STOPPED and back to MONITORING —
+  across **four complete departure-to-release cycles**, after which the device
+  is back in `STATE_MONITORING`, quiet at `q=255`, beacon off.
+
+## 5.1 🟠 An unplanned finding: `SL: rel` is already earning its 84 bytes
+
+The four releases report:
+
+```
+  SL: rel mx=8.412 q=108        contrast 117x   against xs=0.0720
+  SL: rel mx=5.266 q=108                  73x
+  SL: rel mx=3.068 q=106                  43x
+  SL: rel mx=0.075 q=108        contrast 1.04x  <-- no grip at all
+```
+
+`mx` is the worst lateral seen while travelling and `xs` is `XY_STILL`; their
+ratio is what says whether the lateral veto can discriminate on a given run.
+**One of four bench runs came in at 1.04×** — inside the noise, where the term
+is inert and the release falls back to the vertical band alone, which is
+exactly the 2026-08-09 low-contrast failure mode the `STOP_LATERAL_QUIET`
+block warns about.
+
+⚠️ **Do not read this as a rate.** Four hand taps on a bench are not four car
+runs, and a gentle tap producing little lateral is what you would expect. The
+point is narrower and it is good news: **the diagnostic works.** The line that
+was added to make grip visible made a no-grip run visible on its first
+outing, and the same column will answer the question directly on a car.
 
 ⚠️ **Do not read the bench noise figures as an A/B result.** The parser reports
 sd 0.0068 → 0.0116 and max `d(avg4)` 0.0410 → 0.1060 across the two boots. The
