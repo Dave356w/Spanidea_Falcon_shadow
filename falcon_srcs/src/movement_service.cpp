@@ -131,6 +131,8 @@ extern void  burst_trigger(uint8_t post, uint8_t kind, uint8_t src);
 extern bool     ramp_hit();
 extern uint16_t ramp_mean_get();
 extern uint8_t  ramp_dir_get();
+extern void     redep_begin();
+extern void     redep_end();
 
 MovementService::MovementService(RollingAvg<float, 32> *acc_avg)
 {
@@ -150,6 +152,8 @@ MovementService::MovementService(RollingAvg<float, 32> *acc_avg)
     rearm_cleared      = false;
     lat_hold_reported  = false;
     lat_hold_expired   = false;
+    redep_armed        = false;
+    redep_reported     = false;
     lat_run_peak       = 0.0f;
     blank_discards     = 0;
     last_discard_ms    = 0;
@@ -1015,6 +1019,8 @@ void MovementService::fsm_run()
             stop_confirm_timer = millis();
             lat_hold_reported  = false;
             lat_hold_expired   = false;
+            redep_armed        = false;
+            redep_reported     = false;
 
             /*
              * Record the stop at full rate. Placed at the entry to this state
@@ -1101,6 +1107,33 @@ void MovementService::fsm_run()
             }
         }
 
+        /*
+         * ⭐ RE-DEPARTURE OBSERVER -- OBSERVE ONLY. It cannot change a
+         * release; it records what the block accumulator would have said if
+         * anything were watching this state. See redep_begin() in main.cpp.
+         */
+        if (!redep_armed &&
+            (millis() - stop_confirm_timer) > REDEP_ARM_MS) {
+            redep_armed = true;
+            redep_begin();
+        }
+
+        if (redep_armed && !redep_reported && ramp_hit()) {
+            redep_reported = true;
+            /*
+             * `hold` is the load-bearing number: ms since the last motion the
+             * vertical band could see. Small means the ringdown is still
+             * running and a real detector would have been fooled; near
+             * STOP_CONFIRM_MS means it fired with no margin before the
+             * release. Position in the run is recoverable from the adjacent
+             * sample lines, so `t=` was dropped to fit.
+             */
+            flog_kv(F("REDEP hold="), (int32_t)(millis() - stop_confirm_timer));
+            flog_kv(F(" mean="), ramp_mean_get());
+            flog_kv(FSTR(FS_DIR), ramp_dir_get());
+            flog_nl();
+        }
+
         if ((millis() - stop_confirm_timer) > STOP_CONFIRM_MS) {
             /*
              * Every normal release, held or not. mx against xs is the contrast
@@ -1112,6 +1145,7 @@ void MovementService::fsm_run()
 
             disable_alarm();
             disable_chase_leds();
+            redep_end();          /* observer is per-DECELERATING */
             set_state(STATE_STOPPED);
         }
 
@@ -1123,6 +1157,7 @@ void MovementService::fsm_run()
             FLOG.print(F("FSM: FAILSAFE - never settled, forcing stop \r\n"));
             disable_alarm();
             disable_chase_leds();
+            redep_end();          /* observer is per-DECELERATING */
             set_state(STATE_STOPPED);
         }
         break;

@@ -1072,6 +1072,63 @@ bool ramp_hit()
 uint16_t ramp_mean_get() { return ramp_mean_mmss; }
 uint8_t  ramp_dir_get()  { return ramp_dir_pct;  }
 
+/*
+ * ⭐ RE-DEPARTURE OBSERVER (2026-08-21). OBSERVE ONLY -- nothing here can
+ * change a release, and the FSM path is untouched.
+ *
+ * THE DEFECT IT EXISTS TO MEASURE. STATE_DECELERATING has exactly two exits
+ * and both go to STOPPED, so once the FSM is in it NOTHING is watching for a
+ * new departure -- both detectors live inside case STATE_MONITORING. Run,
+ * stop, and run again before the beacon clears and the second run is invisible
+ * to the FSM. With the lateral veto disarmed the vertical band cannot see a
+ * moving car either, so the confirm completes and the beacon goes quiet
+ * mid-travel. At inspection speed 8 of 11 runs never leave the 0.10 band at
+ * all, so the second run does not even postpone it.
+ *
+ * WHY IT REUSES THE BLOCK ACCUMULATOR. A departure is a sustained one-signed
+ * push and a brake set RINGS -- 112 of 231 arrival bursts never produce a
+ * qualifying block, directionality 0.02-0.42. That separation is measured and
+ * it is the right discriminator. What is NOT measured is the population this
+ * would have to reject: the ringdown AFTER the car reaches rest. The arrival
+ * burst truncates 2.4 s in and 68% are still ramp-shaped when it ends, so
+ * committed data cannot bound it. This observer manufactures that dataset.
+ *
+ * ⚠️ AND THE POSITIVE HALF IS WORSE THAN IT LOOKS. Scored over every departure
+ * burst on file, the shipping constants fire on 44/44 automatic departures and
+ * 0/108 inspection departures -- an inspection departure is one-signed for
+ * about half a second (dir 93% at 480 ms, 63% at 1 s, 40% at 2 s) and then
+ * rolls back. So do NOT read a REDEP line at contract speed as evidence the
+ * rule would work at inspection speed. The constants have to be derived from
+ * what this records, and today they would be derived from data that does not
+ * contain the case.
+ */
+static volatile bool redep_watch = false;
+
+/*
+ * Restart the accumulator mid-run. ramp_gate is deliberately left alone: it
+ * was earned by this run's reversal count and re-earning it is not possible
+ * from rest. ramp_hit_v is sticky and halts the accumulator, so it must go.
+ */
+void redep_begin()
+{
+    noInterrupts();
+    redep_watch = true;
+    ramp_sum   = 0;
+    ramp_abs   = 0;
+    ramp_n     = 0;
+    ramp_run   = 0;
+    ramp_sign  = 0;
+    ramp_hit_v = false;
+    interrupts();
+}
+
+void redep_end()
+{
+    noInterrupts();
+    redep_watch = false;
+    interrupts();
+}
+
 /* True once the windowed peak has crossed ARRIVAL_PEAK_VALUE this run. */
 bool arrival_peak_hit()
 {
@@ -2189,7 +2246,14 @@ void emit_ramp_log()
     static bool last = false;
     bool now = ramp_hit();
 
-    if (now && !last) {
+    /*
+     * ⚠️ While the re-departure observer is running the accumulator is being
+     * restarted deliberately, so a second rising edge here would print a
+     * second `RAMP latched` for one run and corrupt the ramp census every
+     * dataset analysis rests on. `last` is still tracked so ending the
+     * observation cannot manufacture an edge either.
+     */
+    if (now && !last && !redep_watch) {
         flog_kv(F("RAMP latched mean="), ramp_mean_get());
         flog_kv(FSTR(FS_DIR), ramp_dir_get());
         flog_nl();

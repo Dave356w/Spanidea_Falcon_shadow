@@ -623,6 +623,28 @@ static_assert(XY_CALIB_MIN_BUCKETS <= XY_CALIB_BUCKETS,
  * lateral settles under the beacon, because at that point the cap is only
  * insurance and its cost is the thing that matters.
  */
+/*
+ * ⭐ RE-DEPARTURE OBSERVER arming delay. See the redep_begin() block in
+ * main.cpp for the defect and the measurements.
+ *
+ * The accumulator must not be started while the arrival transient is still
+ * running, or the deceleration that BROUGHT us here re-qualifies immediately:
+ * 119 of 231 arrival bursts contain a qualifying block, because a
+ * drive-controlled stop is a sustained one-signed push just like a departure.
+ * Sign cannot separate them either -- on a REVERSAL the new departure ramp
+ * carries the same sign as the deceleration it rides on.
+ *
+ * `stop_confirm_timer` already means `the last time motion was seen`, so
+ * arming on it costs no new state and is adaptive: it arms once the car has
+ * been inside STOP_BAND_VALUE for this long, i.e. after the stop.
+ *
+ * ⚠️ THE BUDGET IS TIGHT AND THAT IS THE POINT. STOP_CONFIRM_MS is 5000, so
+ * arming at 1500 leaves 3500 ms and RAMP_BLOCKS x RAMP_BLOCK_N needs 1440 ms
+ * of it. Raise this much further and the observer cannot fire before the
+ * release it exists to study.
+ */
+#define REDEP_ARM_MS                   1500
+
 #define STOP_LATERAL_MAX_HOLD_MS       60000UL
 
 /*
@@ -877,6 +899,8 @@ class MovementService {
     bool     rearm_cleared;        /* settled seen -> blank ended early    */
     bool     lat_hold_reported;    /* SL: held printed once this release   */
     bool     lat_hold_expired;     /* STOP_LATERAL_MAX_HOLD_MS spent       */
+    bool     redep_armed;          /* observer started this DECELERATING  */
+    bool     redep_reported;       /* one REDEP line per DECELERATING     */
     float    lat_run_peak;         /* worst lateral m seen while MOVING    */
 
     /*
