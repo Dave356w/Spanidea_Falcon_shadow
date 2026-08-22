@@ -556,7 +556,50 @@ static_assert(XY_CALIB_MIN_BUCKETS <= XY_CALIB_BUCKETS,
  * beacon and mechanism 2 above is real. Set STOP_LATERAL_ARMED 0 and diagnose
  * from the SL lines -- the revert is that one constant.
  */
-#define STOP_LATERAL_ARMED             1     /* 0 = observe only, log and release */
+/*
+ * ⛔ DISARMED 2026-08-21 pm ON DAVE'S CALL, AFTER MEASUREMENT. Observe only:
+ * every SL: line still prints, the confirm window is no longer restarted.
+ *
+ * WHY. Dave reported from the car that the release felt slow, and it is.
+ * Every DECELERATING -> STOPPED interval, measured:
+ *
+ *     pre-veto  (54 runs, 08-20)   median  9.6 s   p90  9.9 s   max 11.4 s
+ *     armed     (22 runs, 08-21)   median 10.9 s   p90 15.3 s   max 17.1 s
+ *
+ * and a replay of the confirm window against the 25 stops on file puts the
+ * veto's own contribution at a median of 2.1 s and a worst case of 12.4 s.
+ *
+ * ⚠️ THE MECHANISM IS NOT A SLOW SETTLE. The lateral reaches quiet almost at
+ * once and is then knocked back to zero by isolated ticks a hair over
+ * XY_STILL -- 0.054, 0.055, 0.067, 0.068, 0.084 against a 0.0555 threshold on
+ * the 08-21 mounting -- and EACH ONE restarts the full STOP_CONFIRM_MS. The
+ * car is stationary throughout (vertical 0.027-0.031 inside a 0.10 band).
+ *
+ * ⛔ RELAXING STOP_LATERAL_QUIET DOES NOT REACH THIS and was measured before
+ * being rejected: a break sets quiet_run() to 0, and 0 is below 4 exactly as
+ * it is below 8. Replayed at 8 vs 4 the release moves by a MEDIAN OF 0 ms.
+ * The tight quantity is the AMPLITUDE the metric is compared against, or the
+ * restart policy -- not the run length. Do not re-propose the run length.
+ *
+ * ⛔ WHAT THIS GIVES UP, PLAINLY: this was the only mitigation deployed
+ * against the 2026-08-20 release on a moving car, and disarming it returns
+ * that behaviour exactly. The standing instruction not to rely on the beacon
+ * on that installation was already in force and is unchanged.
+ *
+ * ⭐ WHAT IT KEEPS: the whole diagnostic. `SL: held` still prints on every
+ * hold that WOULD have happened, now tagged `(obs)`, and `SL: rel mx= q=`
+ * still gives the per-run lateral contrast. So the cost of re-arming stays
+ * measurable from ordinary captures without flying it.
+ *
+ * TO RE-ARM: set this back to 1. Nothing else changes. *
+ * ⚠️ STOP_LATERAL_QUIET IS 4 BECAUSE DAVE SET IT (855e57d, committed on
+ * GitHub) BEFORE the replay above existed. It is deliberately left at his
+ * value rather than reverted. With ARMED 0 it no longer gates any release --
+ * it only decides when the observe-only `SL: held … (obs)` line fires, so a
+ * capture taken now reports the cost of re-arming AT 4, not at 8. If the veto
+ * is ever re-armed, pick that value from the replay, not from this line.
+ */
+#define STOP_LATERAL_ARMED             0     /* 0 = observe only, log and release */
 #define STOP_LATERAL_QUIET             4     /* consecutive quiet lateral metrics */
 
 /*

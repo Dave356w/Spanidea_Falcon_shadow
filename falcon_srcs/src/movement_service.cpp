@@ -1096,7 +1096,7 @@ void MovementService::fsm_run()
 #if STOP_LATERAL_ARMED
                 FLOG.print(FSTR(FS_ARMED));
 #else
-                FLOG.print(F(" (obs)\r\n"));
+                FLOG.print(FSTR(FS_OBS));
 #endif
             }
         }

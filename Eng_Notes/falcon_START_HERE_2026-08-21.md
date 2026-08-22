@@ -22,9 +22,9 @@ that fits again — none of which is a shipped repair.
 | | |
 |---|---|
 | On the device | **`67ca85b`**, `ATmega328PB` env, FALCON_LOG 2, flashed and verified 10:52 |
-| Flash | **32178 / 32256 — 78 free.** `production` 31808 (448), `bench_battery` 31900 (356) |
+| Flash | **32156 / 32256 — 100 free.** `production` 31788 (468), `bench_battery` 31880 (376) |
 | RAM | 1493 |
-| Armed | `STOP_LATERAL_ARMED 1` (§4.2 veto), `JOG_VERDICT_ARMED 1`, `RAMP_ARMED 1`, `VEL_ARMED 0` |
+| Armed | ⛔ **`STOP_LATERAL_ARMED 0` — the §4.2 veto is DISARMED, see §6 item 5a**; `JOG_VERDICT_ARMED 1`, `RAMP_ARMED 1`, `VEL_ARMED 0` |
 | New today | `JOG_RELEASE_POLLED 0` — see §3 |
 | Mounting | counterweight, `XY_STILL` 0.0555, `Zero-Calib` 9.7455, `Threshold-Value` clamped at 0.040 |
 
@@ -214,18 +214,46 @@ show the window was quiet (see §5 trap 1).
 4. 🟠 **Arming rests on the minimum.** `q` hit exactly `ARRIVAL_ARM_SAMPLES` (5)
    on two of fourteen runs. The reversal backup (`ro` ≥ 15) was available on two.
 5. 🟠 **`ARRIVAL_QUIET_MSS` 0.15 against measured cruise 0.27–0.29.**
-5a. 🟠 **§4.2 adds a measured release delay, and the tail is real.** Every
-   `DECELERATING → STOPPED` interval, measured from the captures: pre-veto
-   (54 runs, 08-20) median 9.6 s, max 11.4 s — a hard ceiling. Veto armed
-   (22 runs, 08-21) median 10.9 s, **p90 15.3 s, max 17.1 s**, `SL: held` on
-   all 22. Dave noticed it from the car unprompted. NOT correlated with low
-   contrast — the 17.1 s worst case had the day's HIGHEST `mx/xs` (4.4×), so
-   these are stops where the lateral genuinely kept ringing; the veto was
-   doing what it is specified to do. Bounded by the 60 s cap. Whether ~15 s
-   worst-case to beacon-off is acceptable is a product call; the knobs are
-   `STOP_LATERAL_QUIET` or a tighter cap, and any loosening trades back
-   toward the 08-20 failure direction. Measurement: `decel_time.py` method,
-   nearest-following-sample timestamps, good to ~1 sample.
+5a. ⛔ **§4.2's lateral veto is DISARMED (`STOP_LATERAL_ARMED 0`), 2026-08-21
+   pm, on Dave's call after measurement.** He reported from the car that the
+   release felt slow. It is:
+
+   | | median | p90 | max |
+   |---|---|---|---|
+   | pre-veto (54 runs, 08-20) | 9.6 s | 9.9 s | 11.4 s |
+   | armed (22 runs, 08-21) | 10.9 s | **15.3 s** | **17.1 s** |
+
+   A replay of the confirm window over the 25 stops on file puts the veto's
+   own contribution at a median of **2.1 s** and a worst case of **12.4 s**.
+
+   ⚠️ **The mechanism is not a slow settle.** The lateral reaches quiet almost
+   at once and is knocked back to zero by isolated ticks a hair over
+   `XY_STILL` — 0.054, 0.055, 0.067, 0.068, 0.084 against 0.0555 — and **each
+   one restarts the full `STOP_CONFIRM_MS`**, while the car is stationary
+   (vertical 0.027–0.031 inside a 0.10 band).
+
+   ⛔ **Relaxing `STOP_LATERAL_QUIET` does not reach this** and was measured
+   before being rejected: a break sets `quiet_run()` to 0, and 0 is below 4
+   exactly as it is below 8. Replayed at 8 vs 4, the release moves by a
+   **median of 0 ms**. The tight quantity is the AMPLITUDE, or the restart
+   policy — not the run length. **Do not re-propose the run length.**
+
+   ⭐ **The diagnostic survives disarming.** `SL: held … (obs)` still prints on
+   every hold that would have happened, and `SL: rel mx= q=` still gives the
+   per-run contrast — so the cost of re-arming stays measurable from ordinary
+   captures. Re-arm is one constant, nothing else changes.
+
+   ⛔ **What it gives up:** this was the only deployed mitigation against the
+   2026-08-20 release on a moving car, and disarming returns that behaviour
+   exactly. §0 was already in force and is unchanged.
+
+5b. ⬜ **UNRESOLVED — a 9.7 s stretch in `STATE_MOVING` with the lateral fully
+   quiet**, +14 to +25 s after run 1's departure latch on 08-21. Every
+   indicator says the car was STATIONARY while the FSM stayed latched: `w`≈0,
+   `pk` 0.02–0.03, vertical flat at 9.716–9.720. One of the session's two
+   `ACC-STAT read FAILED` sits inside it. Excluded from the veto-grip analysis
+   as not-travel, which is why it needs its own look — it is the position-lie
+   direction, and it is the only stretch on file of that shape.
 6. **Quiescent current has never been measured.** `idle_current` builds.
 7. **Battery divider — three answers, no meter.**
 8. **No written definition of production ready.** The only exit criteria in the
