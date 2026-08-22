@@ -1,0 +1,91 @@
+Device Booted 
+Reset cause: 0x2
+Configured SPI interface 
+Configured Alarms 
+Address :24
+BMA456 : Initialization done 
+BMA456 : Writing configurations ..  Done 
+BMA456 : Completed configuration 
+Configured BMA456 
+AnyMotion armed thr=32 dur=5
+Device initialized completely 
+ACC-INT n=1 t=5652 st=7 bz=0 pin=0
+ACC-STAT s=0x4EF pin=0 n=1 sk=0
+FSM: Performing Self Calibration 
+ACC-STAT s=0x400 pin=0 n=1 sk=0
+ACC-STAT s=0x4DD pin=0 n=1 sk=0
+ACC-STAT read FAILED
+XY: calib b=6 peak=0.0470 mv=0
+XY: bmax 0.0470 0.0240 0.0410 0.0420 0.0400 0.0400
+FSM: READY 
+-------------------------------------
+Zero-Calib-Value : 9.744343
+Threshold-Value  : 0.040000
+XY-Still-Value   : 0.0600
+-------------------------------------
+FSM: Transitioned to STATE_MONITORING 
+FSM: re-arm blank cleared early, settled at 2507 ms
+  Voltage value : 2278  (settling, ignored)
+  Voltage value : 2293  (settling, ignored)
+  Voltage value : 2300  avg : 2300  pack_mv : 4600
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: Departure latched (polled) ml=82051 q=27 dq=0 td=-1
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+BURST k=dep pre=20 n=80 signed_mmss=-6 -7 0 6 -13 -12 9 22 0 20 1 11 3 6 23 -1 -17 -113 -137 717 67 -5877 136 -55 17 10 28 -3 17 -15 0 12 -13 2 -5 7 3 18 1 3 0 15 6 6 0 2 0 -3 0 -4 -3 16 -12 -6 7 2 10 17 9 2 6 -3 3 -10 -20 8 -10 -2 8 6 11 32 -19 0 -11 12 -19 5 -6 -6 
+JOGV pos=717 neg=5877 ratio=12 opk=717 verdict=RUN (obs)
+FSM: Arrival (polled), peak 0.855
+ARM q=203 a=1 v=1 g=0 ro=13
+FSM: Transitioned to STATE_DECELERATING 
+SL: held t=49 m=2.511 q=0 xs=0.0600 (obs)
+BURST k=arr pre=20 n=80 signed_mmss=0 -9 -10 -12 11 -8 -14 -13 -12 9 -12 3 -13 3 -15 10 -27 854 -161 -507 -63 -82 5 -37 -13 15 3 -3 20 6 7 -16 -21 10 -2 -16 -3 15 -3 -22 -12 -3 3 3 0 0 -8 -2 9 -11 -6 9 -3 -1 -1 -3 -3 -4 -13 -7 12 2 0 4 -13 -10 5 -13 -19 0 -6 -22 -9 -7 -13 -12 5 -12 -13 -9 
+SL: rel mx=0.595 q=98
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+FSM: re-arm blank cleared early, settled at 2556 ms
+FSM: Transitioned to STATE_MOVEMENT_DETECTED 
+FSM: Departure latched (polled) ml=6882 q=0 dq=0 td=-1
+FSM: departure velocity w=0.000
+FSM: Transitioned to STATE_MOVING 
+  Voltage value : 2278  avg : 2297  pack_mv : 4594
+BURST k=dep pre=20 n=80 signed_mmss=0 48 -7 -18 -15 -39 -25 -18 33 14 10 5 23 -31 -19 -52 51 86 -2840 177 801 78 20 22 0 3 -25 -7 -9 -14 -16 -19 -4 -13 12 6 -3 12 -4 -15 7 13 -6 -24 2 4 -2 4 -12 -16 15 -9 -16 -28 -40 -3996 -582 424 562 -43 -10 40 -16 32 29 51 -29 -12 -12 -9 16 21 -15 -8 2 -4 876 81 -73 -121 
+JOGV pos=2840 neg=7418 ratio=38 opk=876 verdict=RUN (obs)
+FSM: Arrival (polled), peak 3.996
+ARM q=31 a=1 v=1 g=0 ro=3
+FSM: Transitioned to STATE_DECELERATING 
+SL: held t=16 m=0.033 q=1 xs=0.0600 (obs)
+BURST k=arr pre=20 n=80 signed_mmss=-16 32 29 51 -29 -12 -12 -9 16 21 -15 -8 2 -4 876 81 -73 -121 7 -4 -10 -4 -12 -2 -9 -4 -6 -22 -15 0 0 -9 -13 -7 3 4 5 -18 -9 3 -18 -13 -3 -6 0 -15 -17 -3 0 12 -15 -11 -25 -12 -2 -15 -13 -15 -10 -3 -2 -13 -30 -2 -25 -22 -6 -16 -6 -7 -19 -9 -19 -19 0 8 -16 -16 -10 1 
+SL: rel mx=4.076 q=105
+FSM: Transitioned to STATE_STOPPED 
+FSM: Transitioned to STATE_MONITORING 
+FSM: re-arm blank cleared early, settled at 2507 ms
+  Voltage value : 2300  avg : 2297  pack_mv : 4594
+  Voltage value : 2303  avg : 2297  pack_mv : 4594
+  Voltage value : 2293  avg : 2296  pack_mv : 4592
+  Voltage value : 2303  avg : 2297  pack_mv : 4594
+  Voltage value : 2300  avg : 2297  pack_mv : 4594
+  Voltage value : 2300  avg : 2297  pack_mv : 4594
+  Voltage value : 2300  avg : 2297  pack_mv : 4594
+  Voltage value : 2293  avg : 2299  pack_mv : 4598
+  Voltage value : 2309  avg : 2300  pack_mv : 4600
+  Voltage value : 2303  avg : 2300  pack_mv : 4600
+  Voltage value : 2293  avg : 2300  pack_mv : 4600
+  Voltage value : 2287  avg : 2298  pack_mv : 4596
+  Voltage value : 2300  avg : 2298  pack_mv : 4596
+  Voltage value : 2300  avg : 2298  pack_mv : 4596
+  Voltage value : 2300  avg : 2298  pack_mv : 4596
+  Voltage value : 2293  avg : 2298  pack_mv : 4596
+  Voltage value : 2309  avg : 2298  pack_mv : 4596
+  Voltage value : 2293  avg : 2296  pack_mv : 4592
+  Voltage value : 2303  avg : 2298  pack_mv : 4596
+  Voltage value : 2296  avg : 2299  pack_mv : 4598
+  Voltage value : 2303  avg : 2299  pack_mv : 4598
+  Voltage value : 2303  avg : 2300  pack_mv : 4600
+  Voltage value : 2303  avg : 2300  pack_mv : 4600
+  Voltage value : 2300  avg : 2301  pack_mv : 4602
+  Voltage value : 2272  avg : 2296  pack_mv : 4592
+  Voltage value : 2300  avg : 2297  pack_mv : 4594
+  Voltage value : 2293  avg : 2296  pack_mv : 4592
+  Voltage value : 2293  avg : 2295  pack_mv : 4590
+  Voltage value : 2293  avg : 2294  pack_mv : 4588
+  Voltage value : 2296  avg : 2293  pack_mv : 4586

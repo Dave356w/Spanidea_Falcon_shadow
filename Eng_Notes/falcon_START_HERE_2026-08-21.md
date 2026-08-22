@@ -21,17 +21,22 @@ that fits again — none of which is a shipped repair.
 
 | | |
 |---|---|
-| On the device | **`67ca85b`**, `ATmega328PB` env, FALCON_LOG 2, flashed and verified 10:52 |
-| Flash | **32156 / 32256 — 100 free.** `production` 31788 (468), `bench_battery` 31880 (376) |
+| On the device | **`f69a934`**, `ATmega328PB` env, FALCON_LOG 2, flashed and verified 19:53 |
+| Flash | **32216 / 32256 — 40 free** ⚠️. `production` 31858 (398), `bench_battery` 31952 (304) |
 | RAM | 1493 |
 | Armed | ⛔ **`STOP_LATERAL_ARMED 0` — the §4.2 veto is DISARMED, see §6 item 5a**; `JOG_VERDICT_ARMED 1`, `RAMP_ARMED 1`, `VEL_ARMED 0` |
-| New today | `JOG_RELEASE_POLLED 0` — see §3 |
-| Mounting | counterweight, `XY_STILL` 0.0555, `Zero-Calib` 9.7455, `Threshold-Value` clamped at 0.040 |
+| New today | `JOG_RELEASE_POLLED 0` (§3), `REDEP_ARM_MS 1500` (§3a), `-mcall-prologues` |
+| Mounting | ⚠️ **BENCH as of 19:53**, reoriented (x 0.550 → 0.756). `XY_STILL` 0.0600, `Zero-Calib` 9.7443. Re-calibrate on the cartop before the first run. |
 
-⚠️ **78 bytes free is below this project's own rule that 80 is not headroom.**
-Nothing else fits on the test build. `-mcall-prologues` is worth **228** and is
-deliberately NOT enabled — it re-generates every function including the ISRs at
-1 MHz. **The next change to this build needs it first, measured on its own.**
+⚠️ **40 bytes free.** `-mcall-prologues` has now been taken (`e4ccb3c`, worth
+228) and the re-departure observer spent it. **Nothing else fits on the test
+build until something is given back.**
+
+⭐ **And the reason the flag was held back for three commits was wrong.**
+Measured symbol by symbol, EVERY interrupt handler is byte-identical across it
+— `__vector_40` (the 600-byte sampling ISR), `_16`, `_11`, `_19`, `_18`, `_1`,
+`_2`. avr-gcc does not apply the transformation to ISRs. The 1 MHz
+interrupt-latency worry was assumed, not measured.
 
 ⭐ **Do not quote a free-space number from a note or from `platformio.ini`.**
 Both were stale within a day on 08-21 and it cost a build.
@@ -52,6 +57,9 @@ Ports: **COM5 = log UART, COM7 = ISP.** Confirm with a signature read.
 - **B3 shipped**: the polled departure path emits a burst. §3.
 - **First car numbers for §4.2's lateral veto**, and the first 350 fpm data on
   any recent build.
+- **Evening, after the car:** the veto **disarmed** on measurement (§6 5a),
+  `-mcall-prologues` taken, B3's `(obs)` closed on the bench, and the
+  **re-departure observer** built for the defect Dave found in §4.4a.
 
 ## 3. B3, and the one thing it still owes
 
@@ -72,10 +80,52 @@ did fire and the polled test merely won the evaluation order, so those runs keep
 the release they have today. That is the discrimination the change turns on and
 it is confirmed, not argued.
 
-⬜ **STILL OWED: a `(obs)` line.** No departure since the flash has been
-polled-*only*. It cannot be commanded — it needs a departure any-motion does not
-see. **That is most likely at inspection speed, which is why the next cartop
-session closes it.** Nothing else is needed from a car for B3.
+✅ **CLOSED 19:56 on the bench.** A tap produced a genuinely polled-only
+departure — any-motion never fired, so `burst_dep_am` stayed false:
+
+```
+FSM: Departure latched (polled) ml=82051 q=27 dq=0 td=-1
+BURST k=dep pre=20 n=80 signed_mmss=… -113 -137 717 67 -5877 136 …
+JOGV pos=717 neg=5877 ratio=12 opk=717 verdict=RUN (obs)
+```
+
+**Before B3 that run emitted no burst and no jog verdict at all.** Both halves
+are now confirmed on hardware: `(armed)` on six car runs where any-motion fired
+(two of them `(polled)`-labelled), `(obs)` here where it genuinely did not.
+`datasets/260821-195320.log`.
+
+⚠️ The second tap of that pair read `opk=876` against the 900 gate — 24 counts
+under, and `(obs)`, so the release was withheld regardless. A bench tap is not
+a car event and this is not a jog-floor datum, but it is a concrete instance of
+the case `JOG_RELEASE_POLLED 0` exists for.
+
+## 3a. The re-departure observer — the thing to read tomorrow
+
+`REDEP hold= mean= dir=`, printed at most once per DECELERATING, changing
+nothing. It arms `REDEP_ARM_MS` (1500 ms) after the last motion the vertical
+band could see, restarts the ISR block accumulator, and reports if the ramp
+pattern qualifies. Full rationale in the `redep_begin()` block in `main.cpp`.
+
+**Reading a line:**
+
+| | |
+|---|---|
+| `hold` small (< ~2000) | the ringdown was still going and a real detector would have been fooled — `REDEP_ARM_MS` is too short |
+| `hold` near 5000 | fired with no margin before the release |
+| **no line at all on a clean stop** | the discriminator is clean there — the result we want |
+
+**Bench result so far: 2 stops, 0 REDEP**, with arrival peaks 0.855 and 3.996
+and lateral `mx` to 4.076. A hard stop's ringdown does not look like a
+departure to this test even when the stop is violent. Two stops is a start,
+not a result.
+
+⛔ **DO NOT read that as evidence the rule works.** Scored over every departure
+burst on file the shipping constants fire on **44/44 automatic and 0/108
+inspection** departures — an inspection departure is one-signed for about half
+a second (dir 93% at 480 ms, 63% at 1 s, 40% at 2 s) and then rolls back. The
+observer will very likely print NOTHING on the cartop runs it most needs to
+catch, and **that is itself the result**: it would mean the constants have to
+come from the recorded `mean`/`dir` values, not from the ramp detector's.
 
 ---
 
@@ -143,6 +193,13 @@ safety character:
   brake latches it — **item 11's shape**. The rest-gated fix's 0-misses-in-24
   was validated on properly spaced runs; Dave confirms his testing always
   spaced them. This is the residual exposure.
+
+⭐ **THIS IS NOW THE HIGHEST-VALUE BATCH IN THE SESSION**, because the device
+carries an observer built specifically for it (§3a). Dave confirmed 2026-08-21
+that **no capture on file contains this case** — all previous testing waited
+for the beacon to clear before the next run — so the corpus has 387
+DECELERATING windows as a negative set and **zero positive examples**. These
+runs are the only source of the positive half.
 
 **The batch:** pairs of short runs with a reversal at varying gaps after
 beacon-off — immediately, ~1 s, ~2 s, ~4 s — plus a few reversing *before*
@@ -214,6 +271,29 @@ show the window was quiet (see §5 trap 1).
 4. 🟠 **Arming rests on the minimum.** `q` hit exactly `ARRIVAL_ARM_SAMPLES` (5)
    on two of fourteen runs. The reversal backup (`ro` ≥ 15) was available on two.
 5. 🟠 **`ARRIVAL_QUIET_MSS` 0.15 against measured cruise 0.27–0.29.**
+4a. 🔴 **NEW 2026-08-21, DAVE'S FIND — a run started before the beacon clears
+   is never seen, and can end in silence while moving.** `STATE_DECELERATING`
+   has exactly two exits and both go to `STOPPED`; both departure detectors
+   live inside `case STATE_MONITORING`. So nothing watches that state.
+   - With the lateral veto armed this was close to benign: the beacon held
+     through both runs and one run went unrecorded.
+   - **Disarmed (which is the current build), the vertical band cannot see a
+     moving car**, so the confirm completes and the beacon goes quiet
+     mid-travel, then the release drops the FSM into MONITORING with the 6 s
+     re-arm blank while the car is still going.
+   - ⚠️ **At inspection speed it is worse.** Peak vertical deviation over whole
+     19 fpm runs measured 0.088 0.054 0.091 0.091 0.084 0.087 0.144 0.173
+     0.040 0.049 0.369 against `STOP_BAND_VALUE` 0.10 — **8 of 11 runs never
+     exceed it at any point**, so a second run does not even postpone the
+     release.
+   - ⛔ **The obvious fix is dead and was measured before being proposed:**
+     re-running the polled test in DECELERATING re-triggers on the ringdown,
+     which stays above 0.040 for a median 3.5–4.7 s and p90 6.3 s against a
+     5 s confirm. A bare any-motion edge is worse — 0.77 spurious edges per
+     window later than 2 s, across 387 windows.
+   - The observer (§3a) is on the device to measure the two candidates that
+     are left: shape, and the lateral channel.
+
 5a. ⛔ **§4.2's lateral veto is DISARMED (`STOP_LATERAL_ARMED 0`), 2026-08-21
    pm, on Dave's call after measurement.** He reported from the car that the
    release felt slow. It is:
@@ -273,6 +353,12 @@ Added today:
 | a mean over all 20 pre-trigger samples for the Δv zero | any-motion fires part-way up the ramp, so it subtracts the departure from itself: 2.1× → 1.03× |
 | a mean rather than a median for that zero | one 3077 spike manufactured the corpus's worst false-automatic |
 | "short hops are weaker" | wrong, and retracted the same day — it is the **terminal**, not the run length |
+| relaxing `STOP_LATERAL_QUIET` to shorten the release | a break sets `quiet_run()` to 0, and 0 is below 4 exactly as below 8 — replayed at 8 vs 4 the release moves a **median of 0 ms** |
+| velocity conservation, on the 67%/128% figure | the real reason is **variance, not bias**: 130 paired bursts give a median ratio 1.03 but p10–p90 of **0.45–1.57**, and it does not tighten per installation (up to 47.9× spread within one session) |
+| Δv as an absolute release confirmation | same measurement — unbiased in the median, useless per run |
+| re-running the polled test inside DECELERATING | ringdown stays above 0.040 for a median 3.5–4.7 s against a 5 s confirm |
+| a bare any-motion edge inside DECELERATING | 0.77 spurious edges per window past 2 s, over 387 windows |
+| removing the any-motion interrupt for polled/ramp | **92% of inspection departures** and 55% of automatic ones are carried by any-motion alone; ramp logic needs 1440 ms and cannot supply phase from rest |
 
 # 8. Where everything is
 
@@ -283,5 +369,5 @@ Added today:
 | the FSM, spelled out | `falcon_fsm_logic_and_shortcomings_2026-08-21.md` |
 | Δv tool | `falcon_srcs/graph/dv_replay.py` (`--veto ../logs` for the veto replay) |
 | corpus | `falcon_srcs/datasets/` — **270 departure bursts**, 133 labelled |
-| today's captures | `datasets/260821-101915.log` (14 runs), `260821-105230.log` (6 B3 runs) |
+| today's captures | `260821-101915.log` (14 car runs), `260821-105230.log` (6 B3 runs), `260821-195320.log` (bench, the `(obs)` closure + first REDEP negatives) |
 | ⚠️ raw logs | `falcon_srcs/logs/` is gitignored — bench machine only |

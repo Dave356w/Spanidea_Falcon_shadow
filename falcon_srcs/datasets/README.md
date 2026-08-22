@@ -63,6 +63,22 @@ polled-only departure has occurred since the flash; the next one prints it.
 Write-up: `falcon_START_HERE_2026-08-21.md` §3. All 6 runs labelled `run` in
 `session_g_labels.csv`.
 
+## Added 2026-08-21 evening — `260821-195320.log`, and a COVERAGE GAP
+
+Two bench taps on build `f69a934`. Small, but it carries the first
+`JOGV … (obs)` on file — a genuinely polled-only departure, which before B3
+would have produced no burst and no verdict at all — and the first `REDEP`
+negatives (2 stops, 0 lines).
+
+⛔ **COVERAGE GAP, stated by Dave 2026-08-21 and worth more than the file:**
+**no capture in this corpus contains a run that began while the FSM was in
+`STATE_DECELERATING`.** All testing to date waited for the beacon to clear
+before the next run. So for any rule about that state the corpus offers **387
+DECELERATING windows as a negative set and zero positive examples**, and a
+replay can only ever REJECT a candidate there, never confirm one. Every
+threshold on file — the Δv gate, the jog verdict, the rest-gated re-arm
+patch's 0-misses-in-24 — was derived on properly spaced runs.
+
 ## Verified equivalent
 
 `graph/jog_window_replay.py` produces byte-identical output against either
